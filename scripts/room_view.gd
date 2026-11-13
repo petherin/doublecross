@@ -26,6 +26,8 @@ var highlight_color := Color.WHITE
 var my_id := 1
 ## Traps the local player has set: furniture/doorway key -> trap kind.
 var my_traps := {}
+## Darts in flight (shared with the game): { owner, room, pos, vel, live }
+var darts: Array = []
 ## Trap explosions etc: { kind, room, pos, t }
 var _effects: Array = []
 
@@ -41,7 +43,10 @@ func _process(delta: float) -> void:
 
 
 static func _life(kind: String) -> float:
-	return 3.2 if kind == "BOMB" else 1.6
+	match kind:
+		"BOMB": return 3.2
+		"HIT": return 0.5
+		_: return 1.6
 
 
 func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
@@ -89,6 +94,9 @@ func _draw() -> void:
 			if my_traps.has(tk):
 				_draw_trap_marker(t["f"], my_traps[tk])
 
+	for d in darts:
+		if d["room"] == room:
+			_draw_dart(d)
 	_draw_front_ledges(R, tint)
 	_draw_my_tripwires()
 	for e in _effects:
@@ -298,6 +306,17 @@ func _draw_my_tripwires() -> void:
 		draw_circle(b, 3.0, highlight_color)
 
 
+func _draw_dart(d: Dictionary) -> void:
+	var p: Vector2 = d["pos"]
+	var v: Vector2 = (d["vel"] as Vector2).normalized()
+	var head := World.iso(p, 50.0)
+	var tail := World.iso(p - v * 26.0, 50.0)
+	draw_line(World.iso(p - v * 60.0, 50.0), tail, Color(1, 1, 1, 0.18), 3.0, true)
+	draw_line(tail, head, Color("c7ccd6"), 3.0, true)
+	draw_circle(tail, 3.5, Color("ff5a5f"))
+	draw_circle(World.iso(p, 0.0), 4.0, Color(0, 0, 0, 0.3))
+
+
 func _draw_effect(e: Dictionary) -> void:
 	var t: float = e["t"]
 	var p := World.iso(e["pos"], 40.0)
@@ -305,6 +324,22 @@ func _draw_effect(e: Dictionary) -> void:
 	var word := "TWANG!"
 	var col := Color("eef1f5")
 	match e["kind"]:
+		"HIT":
+			# Quick impact burst.
+			var k := t / 0.5
+			for i in 8:
+				var a := i * TAU / 8.0
+				draw_line(p + Vector2.from_angle(a) * (12.0 + 30.0 * k), p + Vector2.from_angle(a) * (20.0 + 44.0 * k), Color(1, 0.9, 0.4, 1.0 - k), 3.0, true)
+			return
+		"DOWN":
+			word = "WHAM!"
+			col = Color("ff5a5f")
+			var k := minf(1.0, t * 5.0)
+			var pts := PackedVector2Array()
+			for i in 16:
+				var r := (60.0 if i % 2 == 0 else 30.0) * k
+				pts.append(p + Vector2.from_angle(i * TAU / 16.0) * r)
+			draw_colored_polygon(pts, Color(1, 0.85, 0.2, clampf(1.6 - t, 0.0, 1.0) * 0.8))
 		"BOMB":
 			word = "KABOOM!"
 			col = Color("ffb13b")

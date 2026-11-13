@@ -30,6 +30,19 @@ const DOOR_REACH := 120.0
 const KO_TIME := 4.0
 const MAX_TRAPS := 3
 
+# Combat and clocks
+const TIME_LIMIT := 360.0       # each agent's clock, in seconds
+const TRAP_PENALTY := 20.0      # seconds lost when caught by a trap
+const DOWN_PENALTY := 30.0      # seconds lost when taken out in a fight
+const DOWN_TIME := 3.0
+const MAX_HP := 3
+const MAX_DARTS := 3
+const MELEE_RANGE := 85.0
+const MELEE_COOLDOWN := 0.55
+const DART_COOLDOWN := 0.7
+const DART_SPEED := 950.0
+const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians)
+
 const STYLES := [
 	{"name": "AGENT CRIMSON", "coat": Color("b3262e"), "hat": Color("2a0d10"), "accent": Color("ff5a5f")},
 	{"name": "AGENT COBALT", "coat": Color("1f5fae"), "hat": Color("0b1a33"), "accent": Color("5ab0ff")},
@@ -48,6 +61,8 @@ var inventories := {}
 ## furniture_key or door_key -> { "kind": "BOMB"|"SPRING"|"WIRE", "owner": peer id }
 var traps := {}
 var over := false
+## peer id -> seconds left on that agent's clock (host counts down, syncs).
+var clocks := {}
 
 var bot: Bot
 var _agent_by_id := {}
@@ -55,6 +70,12 @@ var _view: RoomView
 var _hud: Hud
 var _exit_cooldown := 0.0
 var _rng := RandomNumberGenerator.new()
+var _start_room := {}
+var _melee_cd := 0.0
+var _dart_cd := 0.0
+var _clock_sync := 0.0
+## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
+var darts: Array = []
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
@@ -88,12 +109,18 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "") -> void:
 		add_child(a)
 		agents.append(a)
 		_agent_by_id[id] = a
-		inventories[id] = {"items": [], "case": false, "gadgets": []}
+		inventories[id] = {"items": [], "case": false, "gadgets": [], "hp": MAX_HP, "darts": MAX_DARTS}
+		clocks[id] = TIME_LIMIT
+		_start_room[id] = start
+		a.max_hp = MAX_HP
+		a.hp = MAX_HP
+		a.recovered.connect(func(kind): _on_recovered(id, kind))
 		if id == my_id:
 			local_agent = a
 	_view.agents = agents
 	_view.highlight_color = local_agent.accent
 	_view.my_id = my_id
+	_view.darts = darts
 
 	if vs_bot:
 		var ba: Agent = _agent_by_id[BOT_ID]
@@ -112,13 +139,16 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "") -> void:
 	_hud.rematch_requested.connect(func(): rematch_requested.emit())
 	_hud.search_pressed.connect(_try_search)
 	_hud.trap_chosen.connect(_try_trap)
+	_hud.attack_pressed.connect(_try_melee)
+	_hud.fire_pressed.connect(_try_fire)
 	local_agent.room_changed.connect(_on_room_changed)
 	local_agent.search_finished.connect(func(r, i): if not over: request_search.rpc_id(1, r, i))
 	local_agent.trap_finished.connect(func(info): if not over: request_trap.rpc_id(1, info))
 	local_agent.door_passed.connect(func(r, d): if not over: request_door.rpc_id(1, r, d))
 	local_agent.exit_touched.connect(_on_exit_touched)
 	_on_room_changed(local_agent.room, false)
-	_hud.toast("Find all four pieces of intel, then reach the EXIT.\nWatch out for traps!", Color.WHITE, 4.0)
+	_hud.toast("Find all four pieces of intel, then reach the EXIT before your clock runs out.\nWatch out for traps, and for your rival!", Color.WHITE, 4.5)
+	_update_hud_status()
 
 
 func _process(delta: float) -> void:
@@ -135,7 +165,15 @@ func _process(delta: float) -> void:
 	# Controls are screen-relative: up on the stick = up the screen.
 	local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
 
+	_melee_cd -= delta
+	_dart_cd -= delta
+	if multiplayer.is_server() and not over:
+		_tick_clocks(delta)
+	_update_hud_status()
+
 	var busy := over or local_agent.searching or local_agent.ko_time > 0.0
+	_hud.attack_button.enabled = not busy and _melee_cd <= 0.0
+	_hud.fire_button.enabled = not busy and _dart_cd <= 0.0 and inventories[my_id]["darts"] > 0
 	var near := -1 if busy else nearest_furniture(local_agent)
 	var door := -1 if busy else near_door(local_agent)
 	_view.highlight = near
@@ -150,6 +188,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: _try_trap("BOMB")
 			KEY_2: _try_trap("SPRING")
 			KEY_3: _try_trap("WIRE")
+			KEY_F: _try_melee()
+			KEY_G: _try_fire()
 
 
 func _on_room_changed(room: Vector2i, animate := true) -> void:
@@ -257,7 +297,154 @@ func _on_exit_touched() -> void:
 		_hud.toast("The exit won't open yet. Still missing: %s" % ", ".join(PackedStringArray(missing)), Color("ffd23f"), 3.0)
 
 
+# ------------------------------------------------------------------ combat (local side)
+
+func _update_hud_status() -> void:
+	var rival := -1
+	for id in clocks:
+		if id != my_id:
+			rival = id
+	_hud.set_status(clocks.get(my_id, 0.0), clocks.get(rival, -1.0),
+		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"])
+
+
+## The nearest other agent in `a`'s room that can be hit, and within `reach`.
+func rival_near(a: Agent, reach: float) -> Agent:
+	var best: Agent = null
+	var best_d := reach
+	for o in agents:
+		if o == a or o.room != a.room or o.ko_time > 0.0:
+			continue
+		var d := a.position.distance_to(o.position)
+		if d < best_d:
+			best_d = d
+			best = o
+	return best
+
+
+func _id_of(a: Agent) -> int:
+	for id in _agent_by_id:
+		if _agent_by_id[id] == a:
+			return id
+	return -1
+
+
+func _try_melee() -> void:
+	if over or local_agent.searching or local_agent.ko_time > 0.0 or _melee_cd > 0.0:
+		return
+	_melee_cd = MELEE_COOLDOWN
+	do_melee(my_id)
+
+
+func _try_fire() -> void:
+	if over or local_agent.searching or local_agent.ko_time > 0.0 or _dart_cd > 0.0:
+		return
+	if inventories[my_id]["darts"] <= 0:
+		_hud.toast("Out of darts! They refill when you're taken out… or use your cosh.", Color("ffd23f"), 2.0)
+		return
+	_dart_cd = DART_COOLDOWN
+	do_fire(my_id, 0.0)
+
+
+## Swing the cosh. Used for the local player and the bot.
+func do_melee(id: int) -> void:
+	var a: Agent = _agent_by_id[id]
+	var target := rival_near(a, MELEE_RANGE)
+	if target:
+		a.facing = (target.position - a.position).angle()
+	a.swing()
+	show_attack.rpc("melee", id, a.position, Vector2.from_angle(a.facing))
+	if target:
+		_send_hit(id, _id_of(target), "melee")
+
+
+## Fire a dart. Auto-aims at a rival roughly in front; `aim_error` (radians)
+## makes the bot miss sometimes.
+func do_fire(id: int, aim_error: float) -> void:
+	var a: Agent = _agent_by_id[id]
+	var dir := Vector2.from_angle(a.facing)
+	var target := rival_near(a, 2000.0)
+	if target:
+		var to := (target.position - a.position).normalized()
+		if absf(dir.angle_to(to)) < AIM_CONE or id != my_id:
+			dir = to
+	dir = dir.rotated(_rng.randf_range(-aim_error, aim_error))
+	a.facing = dir.angle()
+	a.swing()
+	var start := a.position + dir * 34.0
+	darts.append({"owner": id, "room": a.room, "pos": start, "vel": dir * DART_SPEED, "live": true})
+	show_attack.rpc("dart", id, start, dir)
+	if id == BOT_ID or multiplayer.is_server():
+		_handle_fire(id)
+	else:
+		request_fire.rpc_id(1)
+
+
+## Cosmetic copy of the other side's attack (the attacker's device decides hits).
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func show_attack(kind: String, id: int, pos: Vector2, dir: Vector2) -> void:
+	if not _agent_by_id.has(id):
+		return
+	var a: Agent = _agent_by_id[id]
+	a.facing = dir.angle()
+	a.swing()
+	if kind == "dart":
+		darts.append({"owner": id, "room": a.room, "pos": pos, "vel": dir * DART_SPEED, "live": false})
+
+
+func _physics_process(delta: float) -> void:
+	# Move darts; the device that fired a dart decides whether it hits.
+	var keep := []
+	for d in darts:
+		var old: Vector2 = d["pos"]
+		d["pos"] = old + d["vel"] * delta
+		var p: Vector2 = d["pos"]
+		var stop := not World.ROOM.has_point(p)
+		for f in world.furniture(d["room"]):
+			if (f["rect"] as Rect2).has_point(p):
+				stop = true
+				break
+		if d["live"] and not stop:
+			for o in agents:
+				var oid := _id_of(o)
+				if oid == d["owner"] or o.room != d["room"] or o.ko_time > 0.0:
+					continue
+				if Geometry2D.get_closest_point_to_segment(o.position, old, p).distance_to(o.position) < 30.0:
+					_send_hit(d["owner"], oid, "dart")
+					stop = true
+					break
+		if not stop:
+			keep.append(d)
+	darts.clear()
+	darts.append_array(keep)
+
+
+func _send_hit(by: int, target: int, kind: String) -> void:
+	if by == BOT_ID or multiplayer.is_server():
+		_handle_hit(by, target, kind)
+	else:
+		request_hit.rpc_id(1, target, kind)
+
+
+func _on_recovered(id: int, kind: String) -> void:
+	# After being taken out you wake up back where you started.
+	if kind == "DOWN" and (id == my_id or (bot and id == BOT_ID)):
+		_agent_by_id[id].respawn(_start_room[id])
+
+
 # ------------------------------------------------------------------ host: requests
+
+@rpc("any_peer", "call_local", "reliable")
+func request_hit(target: int, kind: String) -> void:
+	if multiplayer.is_server():
+		_handle_hit(_sender(), target, kind)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func request_fire() -> void:
+	if multiplayer.is_server():
+		_handle_fire(_sender())
+
 
 @rpc("any_peer", "call_local", "reliable")
 func request_search(room: Vector2i, idx: int) -> void:
@@ -357,7 +544,72 @@ func _handle_escape(pid: int) -> void:
 	if over:
 		return
 	if inventories.has(pid) and _missing(pid).is_empty():
-		game_over.rpc(pid)
+		game_over.rpc(pid, "escape")
+
+
+func _handle_fire(pid: int) -> void:
+	if over or not inventories.has(pid):
+		return
+	inventories[pid]["darts"] = maxi(0, inventories[pid]["darts"] - 1)
+	_broadcast({"type": "fire", "pid": pid})
+
+
+func _handle_hit(by: int, target: int, kind: String) -> void:
+	if over or by == target or not inventories.has(target) or not inventories.has(by):
+		return
+	var ta: Agent = _agent_by_id[target]
+	var ba: Agent = _agent_by_id[by]
+	if ta.ko_time > 0.0:
+		return
+	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > MELEE_RANGE * 2.0):
+		return
+	var inv: Dictionary = inventories[target]
+	inv["hp"] -= 1
+	if inv["hp"] > 0:
+		_broadcast({"type": "hit", "pid": target, "by": by, "kind": kind, "from": ba.position})
+		return
+	# Taken out: drop the intel, lose time, wake up back at the start.
+	var lost: Array = inv["items"].duplicate()
+	inv["items"].clear()
+	for item in lost:
+		_hide_somewhere(item, ta.room)
+	inv["hp"] = MAX_HP
+	inv["darts"] = MAX_DARTS
+	_penalise(target, DOWN_PENALTY)
+	_broadcast({"type": "down", "pid": target, "by": by, "kind": kind, "room": ta.room, "lost": lost, "from": ba.position})
+
+
+func _penalise(pid: int, seconds: float) -> void:
+	clocks[pid] = maxf(1.0, clocks[pid] - seconds)
+	sync_clocks.rpc(clocks)
+
+
+func _tick_clocks(delta: float) -> void:
+	for id in clocks:
+		clocks[id] -= delta
+	_clock_sync -= delta
+	if _clock_sync <= 0.0:
+		_clock_sync = 0.5
+		sync_clocks.rpc(clocks)
+	var out := []
+	for id in clocks:
+		if clocks[id] <= 0.0:
+			out.append(id)
+	if out.is_empty():
+		return
+	# Someone's clock ran out: the other agent (if they still have time) wins.
+	var winner := 0
+	for id in clocks:
+		if clocks[id] > 0.0:
+			winner = id
+	if clocks.size() == 1:
+		winner = 0
+	game_over.rpc(winner, "time")
+
+
+@rpc("authority", "call_local", "unreliable_ordered")
+func sync_clocks(c: Dictionary) -> void:
+	clocks = c
 
 
 ## The victim is knocked out and the intel they carry flies into the
@@ -369,6 +621,7 @@ func _spring_trap(pid: int, key: String, room: Vector2i) -> void:
 	inventories[pid]["items"].clear()
 	for item in lost:
 		_hide_somewhere(item, room)
+	_penalise(pid, TRAP_PENALTY)
 	_broadcast({"type": "ko", "pid": pid, "kind": trap["kind"], "owner": trap["owner"], "room": room, "lost": lost})
 
 
@@ -410,6 +663,7 @@ func sync_state(p_contents: Dictionary, p_inventories: Dictionary, p_traps: Dict
 	for id in inventories:
 		if _agent_by_id.has(id):
 			_agent_by_id[id].has_case = inventories[id]["case"]
+			_agent_by_id[id].hp = inventories[id]["hp"]
 	var mine := {}
 	for k in traps:
 		if traps[k]["owner"] == my_id:
@@ -459,6 +713,25 @@ func _on_event(e: Dictionary) -> void:
 		"disarm":
 			if me:
 				_hud.toast("Snipped a TRIPWIRE with your WIRE CUTTERS!", col, 2.5)
+		"hit":
+			var victim: Agent = _agent_by_id[pid]
+			victim.hurt(victim.position - e["from"])
+			_view.add_effect("HIT", victim.room, victim.position)
+			if me:
+				_hud.flash(Color("ff2a2a"))
+			elif e["by"] == my_id:
+				pass
+		"down":
+			var victim: Agent = _agent_by_id[pid]
+			victim.hurt(victim.position - e["from"])
+			victim.knock_out("DOWN", DOWN_TIME)
+			_view.add_effect("DOWN", e["room"], victim.position)
+			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
+			if me:
+				_hud.flash(Color("ff2a2a"))
+				_hud.toast("You've been taken out! -%ds.%s" % [int(DOWN_PENALTY), dropped], warn, 3.5)
+			elif e["by"] == my_id:
+				_hud.toast("You took out %s! They lose %ds." % [victim.display_name, int(DOWN_PENALTY)], col, 3.0)
 		"ko":
 			var victim: Agent = _agent_by_id[pid]
 			victim.knock_out(e["kind"], KO_TIME)
@@ -467,10 +740,10 @@ func _on_event(e: Dictionary) -> void:
 			var dropped := " Your intel went flying!" if not lost.is_empty() else ""
 			var trap_name: String = World.TRAP_NAMES[e["kind"]]
 			if me and e["owner"] == my_id:
-				_hud.toast("Caught in your own %s! Nice one.%s" % [trap_name, dropped], warn, 3.5)
+				_hud.toast("Caught in your own %s! Nice one. -%ds.%s" % [trap_name, int(TRAP_PENALTY), dropped], warn, 3.5)
 				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif me:
-				_hud.toast("%s!%s" % [_exclamation(e["kind"]), " You walked into a %s.%s" % [trap_name, dropped]], warn, 3.5)
+				_hud.toast("%s! You walked into a %s. -%ds.%s" % [_exclamation(e["kind"]), trap_name, int(TRAP_PENALTY), dropped], warn, 3.5)
 				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif e["owner"] == my_id:
 				_hud.toast("Your %s got %s!" % [trap_name, victim.display_name], col, 3.0)
@@ -491,8 +764,13 @@ static func _exclamation(kind: String) -> String:
 
 
 @rpc("authority", "call_local", "reliable")
-func game_over(winner: int) -> void:
+func game_over(winner: int, reason := "escape") -> void:
+	if over:
+		return
 	over = true
 	for a in agents:
 		a.frozen = true
-	_hud.show_end(winner == my_id, _agent_by_id[winner].display_name, multiplayer.is_server())
+	var name := ""
+	if _agent_by_id.has(winner):
+		name = _agent_by_id[winner].display_name
+	_hud.show_end(winner, my_id, name, reason, multiplayer.is_server())

@@ -7,6 +7,8 @@ signal exit_touched
 signal search_finished(room: Vector2i, idx: int)
 signal trap_finished(info: Dictionary)
 signal door_passed(from_room: Vector2i, dir: int)
+## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE" or "DOWN").
+signal recovered(kind: String)
 
 const World = preload("res://scripts/world.gd")
 const Ui = preload("res://scripts/ui.gd")
@@ -39,6 +41,12 @@ var ko_kind := ""
 var _ko_total := 1.0
 ## 1.0 right after a bomb, fading to 0: blackened with soot and smouldering.
 var soot := 0.0
+## Combat. hp/darts mirror the host's match state (for drawing).
+var hp := 3
+var max_hp := 3
+var attack_anim := 0.0       # counts down while swinging the cosh
+var hurt_time := 0.0         # red flash after being hit
+var _knock := Vector2.ZERO   # knock-back velocity
 
 var _busy_kind := ""       # "search" or "trap"
 var _trap_info := {}
@@ -74,9 +82,13 @@ func _physics_process(delta: float) -> void:
 		position = position.lerp(_target, minf(1.0, delta * 15.0))
 	if moving or searching:
 		_walk += delta * 12.0
+	attack_anim = maxf(0.0, attack_anim - delta)
+	hurt_time = maxf(0.0, hurt_time - delta)
 	if ko_time > 0.0:
 		ko_time = maxf(0.0, ko_time - delta)
 		_walk += delta * 6.0
+		if ko_time == 0.0:
+			recovered.emit(ko_kind)
 	elif soot > 0.0:
 		# The soot wears off a while after you come round.
 		soot = maxf(0.0, soot - delta / 10.0)
@@ -89,6 +101,28 @@ func knock_out(kind: String, seconds: float) -> void:
 	_ko_total = seconds
 	if kind == "BOMB":
 		soot = 1.0
+
+
+func swing() -> void:
+	attack_anim = 0.3
+
+
+## Flinch from a hit coming from direction `from_dir` (floor space).
+func hurt(from_dir: Vector2) -> void:
+	hurt_time = 0.3
+	cancel_busy()
+	if is_local:
+		_knock = from_dir.normalized() * 700.0
+
+
+## Back on your feet in `start_room` after being taken out.
+func respawn(start_room: Vector2i) -> void:
+	room = start_room
+	position = World.ROOM.get_center()
+	_target = position
+	_knock = Vector2.ZERO
+	_send_state()
+	room_changed.emit(room)
 
 
 func cancel_busy() -> void:
@@ -138,7 +172,8 @@ func _local_move(delta: float) -> void:
 	moving = v.length() > 25.0
 	if moving:
 		facing = v.angle()
-	var p := position + v * delta
+	var p := position + (v + _knock) * delta
+	_knock = _knock.move_toward(Vector2.ZERO, 3500.0 * delta)
 	p = _resolve_furniture(p)
 	p = _resolve_walls(p)
 	if p != Vector2.INF:
@@ -246,6 +281,9 @@ func paint(ci: CanvasItem) -> void:
 		coat = coat.lerp(Color("2b2622"), 0.8 * sooty)
 		hat = hat.lerp(Color("141210"), 0.8 * sooty)
 		skin = skin.lerp(Color("3d3632"), 0.85 * sooty)
+	if hurt_time > 0.0:
+		coat = coat.lerp(Color(1, 0.25, 0.25), hurt_time / 0.3 * 0.7)
+		skin = skin.lerp(Color(1, 0.3, 0.3), hurt_time / 0.3 * 0.5)
 	var dark := coat.darkened(0.4)
 	var trousers := Color("1b1e25")
 
@@ -255,6 +293,8 @@ func paint(ci: CanvasItem) -> void:
 	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
 
 	var tilt := sin(_walk * 1.3) * 0.25 if ko else 0.0
+	if ko and ko_kind == "DOWN":
+		tilt = -PI / 2.0 * 0.92 * flip
 	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
 	# Legs and shoes
 	ci.draw_line(Vector2(-5, -30), Vector2(-5 + stride, -3), trousers, 7.0, true)
@@ -313,7 +353,20 @@ func paint(ci: CanvasItem) -> void:
 	var hand := Vector2(12 + stride * 0.8, -35)
 	if searching:
 		hand = Vector2(18, -40 + sin(_walk * 3.0) * 4.0)
+	var swinging := attack_anim > 0.0
+	if swinging:
+		# Overarm swing with a cosh: from raised behind the head to down in front.
+		var k := 1.0 - attack_anim / 0.3
+		var ang := lerpf(-2.4, 0.5, k)
+		hand = Vector2(6, -58) + Vector2.from_angle(ang) * 22.0
 	ci.draw_line(Vector2(8, -60), hand, dark, 7.0, true)
+	if swinging:
+		var k2 := 1.0 - attack_anim / 0.3
+		var cosh_dir := Vector2.from_angle(lerpf(-2.4, 0.5, k2) - 0.3)
+		ci.draw_line(hand, hand + cosh_dir * 20.0, Color("3b2a1c"), 5.0, true)
+		ci.draw_circle(hand + cosh_dir * 20.0, 4.0, Color("2a1d14"))
+		# Motion streak
+		ci.draw_arc(Vector2(6, -58), 40.0, -2.2, lerpf(-2.2, 0.6, k2), 12, Color(1, 1, 1, 0.35 * (1.0 - k2)), 3.0, true)
 	if has_case and not searching:
 		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 14)), Color("7a5238"))
 		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 3)), Color("946645"))
@@ -326,6 +379,10 @@ func paint(ci: CanvasItem) -> void:
 	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	for i in max_hp:
+		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -98)
+		ci.draw_circle(pip, 4.0, Color(0, 0, 0, 0.6))
+		ci.draw_circle(pip, 3.0, accent if i < hp else Color(1, 1, 1, 0.15))
 
 	# Smouldering: smoke wisps curl up and the odd ember glows.
 	if soot > 0.05:

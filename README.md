@@ -44,8 +44,8 @@ rebuilt with an original setting, original characters and a lot more polish.
 | 1 | Two players on separate tablets moving through a shared, synced base over the local network | ✅ Done |
 | 2 | Searching furniture, mission items, briefcase, escape door and the win condition | ✅ Done |
 | 3 | Traps and counter-gadgets (bomb ⇄ extinguisher, spring trap ⇄ toolkit, tripwire ⇄ wire cutters) | ✅ Done |
-| 4 | Combat (melee and dart pistol), per-player countdown and respawn penalty | ⏳ Next |
-| 5 | Sound, music, menus, settings | 🔜 |
+| 4 | Combat (cosh and dart pistol), per-player countdown and respawn penalty | ✅ Done |
+| 5 | Sound, music, menus, settings | ⏳ Next |
 | 6 | Richer, more detailed graphics | 🔜 |
 | 7 | Bot difficulty levels: easy (walks into its own traps), medium, hard | ✅ Done |
 | ★ | One-player mode against a bot | ✅ Done |
@@ -66,6 +66,8 @@ What works today:
 - **Traps:** hide a BOMB or SPRING TRAP in furniture, or string a TRIPWIRE across a doorway. Only you can see your own traps (up to three at a time), and yes, you can walk into them yourself.
 - **Getting caught** knocks you out for a few seconds and sends any intel you're carrying flying into the furniture around the room.
 - **Gadgets:** the EXTINGUISHER beats the bomb, the TOOLKIT beats the spring trap and the WIRE CUTTERS beat the tripwire. Each is used up when it saves you and turns up again somewhere else in the base.
+- **Clocks:** each agent has 6 minutes. If your clock runs out, you lose. Traps cost 20 seconds; being taken out costs 30.
+- **Fighting:** swing your cosh up close or fire your dart pistol (3 darts per life, auto-aims at a rival roughly in front of you). Three hits take an agent out: they drop their intel and wake up back in their starting room.
 - **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, a bit forgetful, and now and then sets off its own traps), MEDIUM or HARD.
 
 ## Playing it
@@ -122,10 +124,12 @@ against itself.
 | Move | Drag anywhere on the left half of the screen | WASD / arrow keys |
 | Search nearby furniture (it glows) | **SEARCH** button (bottom right) | <kbd>E</kbd> or <kbd>Space</kbd> |
 | Set a trap | **TRAP** button, then pick BOMB, SPRING or WIRE | <kbd>1</kbd> bomb, <kbd>2</kbd> spring, <kbd>3</kbd> tripwire |
+| Cosh (melee) | **ATTACK** button | <kbd>F</kbd> |
+| Fire a dart | **FIRE** button | <kbd>G</kbd> |
 | Escape | Walk into the EXIT with all four items | |
 | Leave match | **LEAVE** button / Android back | Close window |
 
-The attack button arrives with milestone 4.
+
 
 ## How it's built
 

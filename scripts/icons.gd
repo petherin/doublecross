@@ -75,6 +75,16 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			ci.draw_line(c + Vector2(-0.34, 0.12) * s, c + Vector2(0.34, 0.16) * s, k.call(Color("eef1f5")), 0.04 * s)
 			ci.draw_circle(c + Vector2(0.0, 0.14) * s, 0.06 * s, k.call(Color("ff5a5f")))
 
+		"COSH":
+			ci.draw_line(c + Vector2(-0.3, 0.32) * s, c + Vector2(0.22, -0.2) * s, k.call(Color("7a5238")), 0.13 * s, true)
+			ci.draw_circle(c + Vector2(0.26, -0.24) * s, 0.14 * s, k.call(Color("3b2a1c")))
+			ci.draw_line(c + Vector2(-0.36, 0.38) * s, c + Vector2(-0.22, 0.24) * s, k.call(Color("15151a")), 0.15 * s)
+		"DART":
+			ci.draw_line(c + Vector2(-0.36, 0.2) * s, c + Vector2(0.3, -0.16) * s, k.call(Color("c7ccd6")), 0.06 * s, true)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0.42, -0.23) * s, c + Vector2(0.26, -0.2) * s, c + Vector2(0.31, -0.1) * s]), k.call(Color("eef1f5")))
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.44, 0.06) * s, c + Vector2(-0.22, 0.12) * s]), k.call(Color("ff5a5f")))
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.3, 0.34) * s, c + Vector2(-0.2, 0.16) * s]), k.call(Color("ff5a5f")))
+
 
 ## A magnifying glass, for the search button.
 static func magnifier(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:

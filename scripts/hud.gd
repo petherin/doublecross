@@ -6,6 +6,8 @@ signal leave_requested
 signal search_pressed
 signal rematch_requested
 signal trap_chosen(kind: String)
+signal attack_pressed
+signal fire_pressed
 
 const World = preload("res://scripts/world.gd")
 const Joystick = preload("res://scripts/joystick.gd")
@@ -17,6 +19,14 @@ var world: World
 var joystick: Joystick
 var search_button: ActionButton
 var trap_button: ActionButton
+var attack_button: ActionButton
+var fire_button: ActionButton
+var _status: Control
+var _clock_mine := 0.0
+var _clock_rival := -1.0
+var _hp := 3
+var _max_hp := 3
+var _darts := 3
 var _trap_options := {}       # kind -> ActionButton
 var _trap_menu_open := false
 var _trap_menu_timer := 0.0
@@ -53,6 +63,27 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	search_button.radius = 70.0
 	search_button.pressed.connect(func(): search_pressed.emit())
 	add_child(search_button)
+
+	attack_button = ActionButton.new()
+	attack_button.label = "ATTACK"
+	attack_button.icon = "COSH"
+	attack_button.accent = Color("ff7a1a")
+	attack_button.radius = 58.0
+	attack_button.pressed.connect(func(): attack_pressed.emit())
+	add_child(attack_button)
+
+	fire_button = ActionButton.new()
+	fire_button.label = "FIRE"
+	fire_button.icon = "DART"
+	fire_button.accent = Color("ff7a1a")
+	fire_button.radius = 48.0
+	fire_button.pressed.connect(func(): fire_pressed.emit())
+	add_child(fire_button)
+
+	_status = Control.new()
+	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status.draw.connect(_draw_status)
+	add_child(_status)
 
 	trap_button = ActionButton.new()
 	trap_button.label = "TRAP"
@@ -130,6 +161,58 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_layout()
 
 
+func _place(b: Control, centre: Vector2) -> void:
+	b.position = centre - b.size / 2.0
+
+
+## Clock, health and darts (top-left) and the rival's clock (top-right).
+func set_status(mine: float, rival: float, hp: int, max_hp: int, darts: int) -> void:
+	if absf(mine - _clock_mine) < 0.05 and absf(rival - _clock_rival) < 0.05 and hp == _hp and darts == _darts:
+		return
+	_clock_mine = mine
+	_clock_rival = rival
+	_hp = hp
+	_max_hp = max_hp
+	_darts = darts
+	fire_button.label = "FIRE ×%d" % darts
+	fire_button.queue_redraw()
+	_status.queue_redraw()
+
+
+static func _fmt(t: float) -> String:
+	var s := int(ceil(maxf(t, 0.0)))
+	return "%d:%02d" % [s / 60, s % 60]
+
+
+func _draw_status() -> void:
+	var font := ThemeDB.fallback_font
+	var low := _clock_mine < 30.0
+	var blink := low and int(Time.get_ticks_msec() / 300) % 2 == 0
+	var col := Color("ff5a5f") if low else Color.WHITE
+	var bg := Rect2(8, 4, 250, 38)
+	_status.draw_rect(bg, Color(0, 0, 0, 0.45))
+	# Stopwatch icon
+	var c := Vector2(28, 23)
+	_status.draw_arc(c, 11, 0, TAU, 24, col, 2.5, true)
+	_status.draw_line(c, c + Vector2(0, -7), col, 2.0)
+	_status.draw_line(c, c + Vector2(5, 2), col, 2.0)
+	_status.draw_rect(Rect2(c.x - 3, c.y - 16, 6, 3), col)
+	_status.draw_string(font, Vector2(46, 32), _fmt(_clock_mine), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(col, 0.35) if blink else col)
+	# Health pips
+	for i in _max_hp:
+		var p := Vector2(132 + i * 22, 23)
+		_status.draw_circle(p, 8, Color(0, 0, 0, 0.5))
+		_status.draw_circle(p, 6.5, _accent if i < _hp else Color(1, 1, 1, 0.15))
+	# Darts left
+	Icons.draw(_status, "DART", Vector2(210, 23), 22.0, _darts > 0)
+	_status.draw_string(font, Vector2(224, 31), "%d" % _darts, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+	if _clock_rival >= 0.0:
+		var txt := "RIVAL  %s" % _fmt(_clock_rival)
+		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		_status.draw_rect(Rect2(_status.size.x - w - 28, 4, w + 20, 38), Color(0, 0, 0, 0.45))
+		_status.draw_string(font, Vector2(_status.size.x - w - 18, 31), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.75))
+
+
 ## Size of this layer in its own (scaled) units.
 func _area() -> Vector2:
 	return Ui.view_size(self) / scale.x
@@ -142,14 +225,18 @@ func _layout() -> void:
 	joystick.position = Vector2(0, 60)
 	joystick.size = Vector2(L.x * 0.5, L.y - 60)
 	joystick.queue_redraw()
-	search_button.position = Vector2(L.x - 175, L.y - 175)
-	trap_button.position = Vector2(L.x - 300, L.y - 120)
-	# Trap options fan out above the TRAP button.
-	var spots := [Vector2(-60, -120), Vector2(40, -170), Vector2(140, -195)]
+	# Right-hand action cluster (positions are button centres).
+	_place(search_button, Vector2(L.x - 105, L.y - 105))
+	_place(attack_button, Vector2(L.x - 95, L.y - 268))
+	_place(fire_button, Vector2(L.x - 228, L.y - 222))
+	_place(trap_button, Vector2(L.x - 250, L.y - 78))
+	# Trap options fan out to the left of the TRAP button.
+	var spots := [Vector2(L.x - 380, L.y - 72), Vector2(L.x - 392, L.y - 178), Vector2(L.x - 345, L.y - 280)]
 	var kinds := ["BOMB", "SPRING", "WIRE"]
 	for i in kinds.size():
-		var b: ActionButton = _trap_options[kinds[i]]
-		b.position = trap_button.position + Vector2(50, 50) + spots[i] - Vector2(44, 44)
+		_place(_trap_options[kinds[i]], spots[i])
+	_status.position = Vector2(0, 60)
+	_status.size = Vector2(L.x, 44)
 	_flash.size = L
 	_leave.position = Vector2(L.x - 110, 10)
 	_minimap.position = Vector2(L.x - 190, 12)
@@ -225,9 +312,12 @@ func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.5)
 
 
-func show_end(won: bool, winner_name: String, can_rematch: bool) -> void:
+func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool) -> void:
+	var won := winner == my_id
 	search_button.visible = false
 	trap_button.visible = false
+	attack_button.visible = false
+	fire_button.visible = false
 	_close_trap_menu()
 	joystick.visible = false
 	if _toast_tween:
@@ -243,14 +333,24 @@ func show_end(won: bool, winner_name: String, can_rematch: bool) -> void:
 	_end.add_child(dim)
 	create_tween().tween_property(dim, "color:a", 0.7, 0.4)
 
-	var title := _label("MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED!", 72, Color("5dff8a") if won else Color("ff5a5f"))
+	var title_text := "MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED!"
+	var sub_text := "You escaped with the intel. Drinks are on you." if won else "%s got out with the intel. Awkward." % winner_name
+	if reason == "time":
+		if winner == 0:
+			title_text = "TIME'S UP"
+			sub_text = "Nobody got out. The base goes into lockdown."
+		elif won:
+			title_text = "LAST AGENT STANDING"
+			sub_text = "Your rival's clock ran out. A win's a win."
+		else:
+			title_text = "OUT OF TIME"
+			sub_text = "Your clock ran out. %s wins by default." % winner_name
+	var title := _label(title_text, 72, Color("5dff8a") if won else Color("ff5a5f"))
 	title.position = Vector2(0, L.y / 2 - 150)
 	title.size = Vector2(L.x, 100)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end.add_child(title)
-	var sub := _label(
-		"You escaped with the intel. Drinks are on you." if won
-		else "%s got out with the intel. Awkward." % winner_name, 28, Color(1, 1, 1, 0.85))
+	var sub := _label(sub_text, 28, Color(1, 1, 1, 0.85))
 	sub.position = Vector2(0, L.y / 2 - 50)
 	sub.size = Vector2(L.x, 40)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

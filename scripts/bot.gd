@@ -17,6 +17,17 @@ const CELL := 40.0
 ##  avoid_own: chance it remembers (and steers clear of) its own traps
 ##  trap:    chance of setting a trap after a search
 ##  sneaky:  re-searches a room when it hears a trap go off there (dropped intel)
+## Fighting, per difficulty:
+##  aggro:  chance it picks a fight when it meets you
+##  react:  delay before each attack (seconds)
+##  aim:    dart aim error (radians)
+##  chase:  how far it will chase you across a room
+const FIGHT := {
+	"easy": {"aggro": 0.3, "react": [0.7, 1.2], "aim": 0.45, "chase": 250.0},
+	"medium": {"aggro": 0.6, "react": [0.35, 0.7], "aim": 0.22, "chase": 450.0},
+	"hard": {"aggro": 0.85, "react": [0.15, 0.4], "aim": 0.08, "chase": 700.0},
+}
+
 const LEVELS := {
 	"easy": {"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7, "trap": 0.12, "sneaky": false},
 	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0, "trap": 0.2, "sneaky": false},
@@ -28,6 +39,10 @@ var agent: Agent
 var id := 2
 var level := "hard"
 var _p: Dictionary = LEVELS["hard"]
+var _f: Dictionary = FIGHT["hard"]
+var _engaged := false
+var _met_in := Vector2i(-1, -1)
+var _attack_cd := 0.0
 
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
@@ -47,6 +62,7 @@ func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard") -> void:
 	id = p_id
 	level = p_level if LEVELS.has(p_level) else "hard"
 	_p = LEVELS[level]
+	_f = FIGHT[level]
 	_rng.randomize()
 	agent.room_changed.connect(func(_r):
 		_path = PackedVector2Array()
@@ -78,7 +94,7 @@ func on_event(e: Dictionary) -> void:
 			# Only rig furniture it has just emptied. Nothing can be hidden in
 			# trapped furniture, so a careful bot never needs to come back to it.
 			_maybe_trap(key, _p["trap"])
-		"ko":
+		"ko", "down":
 			var room: Vector2i = e["room"]
 			if pid == id or _p["sneaky"]:
 				# Intel just went flying in that room: worth searching it again.
@@ -87,7 +103,7 @@ func on_event(e: Dictionary) -> void:
 			if pid == id:
 				_path = PackedVector2Array()
 				_action = {}
-				_wait = game.KO_TIME + 0.3
+				_wait = 0.4
 		"trap_set", "trap_fail":
 			if pid == id:
 				_think_pause()
@@ -113,7 +129,10 @@ func _maybe_trap(key: String, chance: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	agent.move_input = Vector2.ZERO
+	_attack_cd -= delta
 	if game.over or agent.frozen or agent.searching or agent.ko_time > 0.0:
+		return
+	if _fight(delta):
 		return
 	if _wait > 0.0:
 		_wait -= delta
@@ -125,6 +144,44 @@ func _physics_process(delta: float) -> void:
 		_do_action()
 		return
 	_think()
+
+
+# ------------------------------------------------------------------ fighting
+
+## Returns true while the bot is busy fighting (and not exploring).
+func _fight(_delta: float) -> bool:
+	var rival: Agent = game.local_agent
+	if rival == null or rival == agent or rival.room != agent.room or rival.ko_time > 0.0:
+		_met_in = Vector2i(-1, -1)
+		_engaged = false
+		return false
+	# Decide once per meeting whether to pick a fight.
+	if _met_in != agent.room:
+		_met_in = agent.room
+		_engaged = _rng.randf() < _f["aggro"]
+		_attack_cd = _rng.randf_range(_f["react"][0], _f["react"][1])
+	# Carrying everything? Ignore the rival and run for it.
+	if not _engaged or game._missing(id).is_empty():
+		return false
+	var to := rival.position - agent.position
+	var dist := to.length()
+	if dist > _f["chase"]:
+		return false
+	_path = PackedVector2Array()
+	_action = {}
+	agent.facing = to.angle()
+	if dist < game.MELEE_RANGE - 10.0:
+		if _attack_cd <= 0.0:
+			game.do_melee(id)
+			_attack_cd = game.MELEE_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
+		return true
+	if _attack_cd <= 0.0 and game.inventories[id]["darts"] > 0 and dist > 200.0 and _rng.randf() < 0.5:
+		game.do_fire(id, _f["aim"])
+		_attack_cd = game.DART_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
+		return true
+	# Close in.
+	agent.move_input = to.normalized() * _p["speed"]
+	return true
 
 
 # ------------------------------------------------------------------ decisions
