@@ -45,8 +45,8 @@ rebuilt with an original setting, original characters and a lot more polish.
 | 2 | Searching furniture, mission items, briefcase, escape door and the win condition | ✅ Done |
 | 3 | Traps and counter-gadgets (bomb ⇄ extinguisher, spring trap ⇄ toolkit, tripwire ⇄ wire cutters) | ✅ Done |
 | 4 | Combat (cosh and dart pistol), per-player countdown and respawn penalty | ✅ Done |
-| 5 | Sound, music, menus, settings | ⏳ Next |
-| 6 | Richer, more detailed graphics | 🔜 |
+| 5 | Sound, music, menus, settings | ✅ Done |
+| 6 | Richer, more detailed graphics | ⏳ Next |
 | 7 | Bot difficulty levels: easy (walks into its own traps), medium, hard | ✅ Done |
 | ★ | One-player mode against a bot | ✅ Done |
 | ★ | Phones as well as tablets, and a Mac app | ✅ Done |
@@ -68,6 +68,8 @@ What works today:
 - **Gadgets:** the EXTINGUISHER beats the bomb, the TOOLKIT beats the spring trap and the WIRE CUTTERS beat the tripwire. Each is used up when it saves you and turns up again somewhere else in the base.
 - **Clocks:** each agent has 6 minutes. If your clock runs out, you lose. Traps cost 20 seconds; being taken out costs 30.
 - **Fighting:** swing your cosh up close or fire your dart pistol (3 darts per life, auto-aims at a rival roughly in front of you). Three hits take an agent out: they drop their intel and wake up back in their starting room.
+- **Sound:** an original spy-jazz soundtrack and sound effects, all synthesised by `tools/make_audio.py` (no samples). Explosions in other rooms sound muffled through the walls; the music speeds up when your clock drops under a minute.
+- **Settings and How to Play** on the title screen: music and effects volume, vibration, and the clock length (4–10 minutes).
 - **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, a bit forgetful, and now and then sets off its own traps), MEDIUM or HARD.
 
 ## Playing it
@@ -151,6 +153,9 @@ scripts/
   menu.gd       title screen
   bot.gd        computer opponent (room-to-room routing + AStarGrid2D within rooms)
   ui.gd         phone/tablet screen-size helpers
+  sound.gd      sound effects, music and audio buses (autoload "Sound")
+  settings.gd   saved player settings (autoload "Settings")
+tools/make_audio.py   synthesises every sound and the music into assets/audio/
   action_button.gd  multi-touch round button (SEARCH, and later TRAP/ATTACK)
   icons.gd      drawn item icons
 .github/workflows/android.yml   builds the Android APK and the Mac app on every push

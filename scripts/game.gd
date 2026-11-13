@@ -76,11 +76,16 @@ var _dart_cd := 0.0
 var _clock_sync := 0.0
 ## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
 var darts: Array = []
+var time_limit := TIME_LIMIT
+var _step_t := {}
+var _was_searching := {}
+var _last_tick := -1
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
-func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "") -> void:
+func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6) -> void:
 	my_id = p_my_id
+	time_limit = minutes * 60.0
 	_rng.randomize()
 	world = World.new(seed_value)
 	contents = world.hidden.duplicate()
@@ -110,7 +115,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "") -> void:
 		agents.append(a)
 		_agent_by_id[id] = a
 		inventories[id] = {"items": [], "case": false, "gadgets": [], "hp": MAX_HP, "darts": MAX_DARTS}
-		clocks[id] = TIME_LIMIT
+		clocks[id] = time_limit
 		_start_room[id] = start
 		a.max_hp = MAX_HP
 		a.hp = MAX_HP
@@ -170,6 +175,7 @@ func _process(delta: float) -> void:
 	if multiplayer.is_server() and not over:
 		_tick_clocks(delta)
 	_update_hud_status()
+	_sounds(delta)
 
 	var busy := over or local_agent.searching or local_agent.ko_time > 0.0
 	_hud.attack_button.enabled = not busy and _melee_cd <= 0.0
@@ -195,6 +201,31 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	_view.room = room
 	_hud.show_room(room, animate)
+	if animate:
+		Sound.play("door", -6.0)
+
+
+## Footsteps, rummaging, the low-time tick and music tempo.
+func _sounds(delta: float) -> void:
+	for a in agents:
+		if a.room != local_agent.room:
+			continue
+		var vol := -12.0 if a == local_agent else -16.0
+		if a.moving and a.ko_time <= 0.0:
+			_step_t[a] = _step_t.get(a, 0.0) - delta
+			if _step_t[a] <= 0.0:
+				_step_t[a] = 0.3
+				Sound.play("step1" if randf() < 0.5 else "step2", vol)
+		if a.searching and not _was_searching.get(a, false):
+			Sound.play("rummage", vol + 8.0)
+		_was_searching[a] = a.searching
+	if over:
+		return
+	var left: float = clocks.get(my_id, 999.0)
+	Sound.music_tempo(1.08 if left < 60.0 else 1.0)
+	if left < 30.0 and int(left) != _last_tick:
+		_last_tick = int(left)
+		Sound.play("tick", -4.0, false, 0.0)
 
 
 # ------------------------------------------------------------------ helpers
@@ -284,6 +315,7 @@ func _try_trap(kind: String) -> void:
 		_hud.toast("You've already got %d traps set. Use them before setting more!" % MAX_TRAPS, Color("ffd23f"), 2.5)
 		return
 	local_agent.start_trap({"kind": kind, "key": key}, TRAP_TIME)
+	Sound.play("trap_set", -3.0)
 
 
 func _on_exit_touched() -> void:
@@ -294,6 +326,7 @@ func _on_exit_touched() -> void:
 	if missing.is_empty():
 		request_escape.rpc_id(1)
 	else:
+		Sound.play("locked", -4.0)
 		_hud.toast("The exit won't open yet. Still missing: %s" % ", ".join(PackedStringArray(missing)), Color("ffd23f"), 3.0)
 
 
@@ -353,6 +386,7 @@ func do_melee(id: int) -> void:
 	if target:
 		a.facing = (target.position - a.position).angle()
 	a.swing()
+	_attack_sound("swing", a.room)
 	show_attack.rpc("melee", id, a.position, Vector2.from_angle(a.facing))
 	if target:
 		_send_hit(id, _id_of(target), "melee")
@@ -373,6 +407,7 @@ func do_fire(id: int, aim_error: float) -> void:
 	a.swing()
 	var start := a.position + dir * 34.0
 	darts.append({"owner": id, "room": a.room, "pos": start, "vel": dir * DART_SPEED, "live": true})
+	_attack_sound("dart", a.room)
 	show_attack.rpc("dart", id, start, dir)
 	if id == BOT_ID or multiplayer.is_server():
 		_handle_fire(id)
@@ -388,8 +423,14 @@ func show_attack(kind: String, id: int, pos: Vector2, dir: Vector2) -> void:
 	var a: Agent = _agent_by_id[id]
 	a.facing = dir.angle()
 	a.swing()
+	_attack_sound("dart" if kind == "dart" else "swing", a.room)
 	if kind == "dart":
 		darts.append({"owner": id, "room": a.room, "pos": pos, "vel": dir * DART_SPEED, "live": false})
+
+
+func _attack_sound(sound_name: String, room: Vector2i) -> void:
+	if room == local_agent.room:
+		Sound.play(sound_name, -3.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -680,6 +721,7 @@ func sync_state(p_contents: Dictionary, p_inventories: Dictionary, p_traps: Dict
 func _on_event(e: Dictionary) -> void:
 	var pid: int = e.get("pid", 0)
 	var me := pid == my_id
+	_event_sound(e, me)
 	var col := local_agent.accent.lightened(0.3)
 	var warn := Color("ffd23f")
 	match e.get("type", ""):
@@ -749,6 +791,44 @@ func _on_event(e: Dictionary) -> void:
 				_hud.toast("Your %s got %s!" % [trap_name, victim.display_name], col, 3.0)
 
 
+func _event_sound(e: Dictionary, me: bool) -> void:
+	var here: bool = not e.has("room") or e["room"] == local_agent.room
+	match e.get("type", ""):
+		"search":
+			if not me:
+				return
+			if e["disarmed"] != "":
+				Sound.play("gadget")
+			var found: String = e["found"]
+			if found == "":
+				Sound.play("nothing", -2.0)
+			elif found in World.GADGETS:
+				Sound.play("gadget")
+			else:
+				Sound.play("found")
+		"disarm":
+			if me:
+				Sound.play("gadget")
+		"ko":
+			var sound_name: String = {"BOMB": "boom", "SPRING": "boing", "WIRE": "twang"}[e["kind"]]
+			# A bomb is loud enough to hear through the walls.
+			if here or me or e["kind"] == "BOMB":
+				Sound.play(sound_name, 0.0, not (here or me), 0.03)
+			if me:
+				Settings.buzz(350 if e["kind"] == "BOMB" else 200)
+		"hit":
+			var v: Agent = _agent_by_id[e["pid"]]
+			if v.room == local_agent.room:
+				Sound.play("hit", -1.0)
+			if me:
+				Settings.buzz(80)
+		"down":
+			if here or me:
+				Sound.play("down")
+			if me:
+				Settings.buzz(300)
+
+
 static func _trap_for(gadget: String) -> String:
 	for t in World.TRAPS:
 		if World.TRAPS[t] == gadget:
@@ -773,4 +853,7 @@ func game_over(winner: int, reason := "escape") -> void:
 	var name := ""
 	if _agent_by_id.has(winner):
 		name = _agent_by_id[winner].display_name
+	Sound.music(false)
+	Sound.music_tempo(1.0)
+	Sound.play("win" if winner == my_id else "lose")
 	_hud.show_end(winner, my_id, name, reason, multiplayer.is_server())

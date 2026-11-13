@@ -10,6 +10,7 @@ var _game: Game
 ## One-player modes are run entirely on this device.
 var _offline_mode := ""   # "", "practice" or "bot"
 var _bot_level := "medium"
+var _minutes := 6
 
 
 func _ready() -> void:
@@ -19,6 +20,7 @@ func _ready() -> void:
 	Net.opponent_joined.connect(_on_opponent_joined)
 	Net.session_ended.connect(_show_menu)
 	_show_menu("")
+	Sound.music(true)
 
 
 func _notification(what: int) -> void:
@@ -54,11 +56,12 @@ func _on_opponent_joined(_id: int) -> void:
 	# Small pause so the joiner has finished its side of the handshake.
 	await get_tree().create_timer(0.3).timeout
 	if Net.in_session:
-		start_game.rpc(randi())
+		start_game.rpc(randi(), Settings.clock_minutes)
 
 
 @rpc("authority", "call_local", "reliable")
-func start_game(seed_value: int) -> void:
+func start_game(seed_value: int, minutes := 6) -> void:
+	_minutes = minutes
 	_offline_mode = ""
 	var ids: Array = [multiplayer.get_unique_id()]
 	ids.append_array(multiplayer.get_peers())
@@ -67,6 +70,7 @@ func start_game(seed_value: int) -> void:
 
 func _start_offline(mode: String) -> void:
 	_offline_mode = mode
+	_minutes = Settings.clock_minutes
 	_begin(randi(), [multiplayer.get_unique_id()])
 
 
@@ -74,7 +78,7 @@ func _rematch() -> void:
 	if _offline_mode != "":
 		_begin(randi(), [multiplayer.get_unique_id()])
 	elif multiplayer.is_server():
-		start_game.rpc(randi())
+		start_game.rpc(randi(), Settings.clock_minutes)
 
 
 func _begin(seed_value: int, ids: Array) -> void:
@@ -90,6 +94,8 @@ func _begin(seed_value: int, ids: Array) -> void:
 	_game = Game.new()
 	_game.name = "Game"
 	add_child(_game)
-	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _bot_level if _offline_mode == "bot" else "")
+	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _bot_level if _offline_mode == "bot" else "", _minutes)
+	Sound.music(true)
+	Sound.music_tempo(1.0)
 	_game.leave_requested.connect(_leave)
 	_game.rematch_requested.connect(_rematch)

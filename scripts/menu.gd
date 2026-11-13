@@ -13,6 +13,7 @@ var _cancel: Button
 var _t := 0.0
 var _content: Control
 var _bot_level := "medium"
+var _overlay: Control
 var _lift := 0.0
 
 const Ui = preload("res://scripts/ui.gd")
@@ -21,6 +22,7 @@ const Ui = preload("res://scripts/ui.gd")
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = _make_theme()
+	_bot_level = Settings.bot_level
 	# All menu widgets live in a 1280x800 panel that is centred (and lifted
 	# above the on-screen keyboard) in _process.
 	_content = Control.new()
@@ -69,7 +71,10 @@ func _ready() -> void:
 		b.button_pressed = lv == _bot_level
 		b.custom_minimum_size = Vector2(141, 50)
 		b.add_theme_font_size_override("font_size", 20)
-		b.pressed.connect(func(): _bot_level = lv)
+		b.pressed.connect(func():
+			_bot_level = lv
+			Settings.bot_level = lv
+			Settings.save())
 		levels.add_child(b)
 	left.add_child(levels)
 	left.add_child(_big_button("PRACTICE SOLO", func(): practice_requested.emit()))
@@ -104,6 +109,7 @@ func _ready() -> void:
 	right.add_child(row)
 	_ip_edit = LineEdit.new()
 	_ip_edit.placeholder_text = "192.168.1.20"
+	_ip_edit.text = Settings.last_ip
 	_ip_edit.custom_minimum_size = Vector2(300, 60)
 	_ip_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
 	_ip_edit.text_submitted.connect(func(_t): _join(_ip_edit.text.strip_edges()))
@@ -133,6 +139,25 @@ func _ready() -> void:
 		set_status(""))
 	_content.add_child(_cancel)
 
+	# Small buttons along the bottom.
+	var help := Button.new()
+	help.text = "HOW TO PLAY"
+	help.position = Vector2(140, 730)
+	help.size = Vector2(210, 50)
+	help.add_theme_font_size_override("font_size", 20)
+	help.pressed.connect(_show_help)
+	_content.add_child(help)
+	var settings := Button.new()
+	settings.text = "SETTINGS"
+	settings.position = Vector2(370, 730)
+	settings.size = Vector2(170, 50)
+	settings.add_theme_font_size_override("font_size", 20)
+	settings.pressed.connect(_show_settings)
+	_content.add_child(settings)
+
+	# Every button in the menu clicks.
+	_hook_clicks(self)
+
 	Net.hosts_changed.connect(_refresh_hosts)
 	Net.joined_host.connect(func(): set_status("Connected! Briefing incoming…"))
 	Net.join_failed.connect(func():
@@ -140,6 +165,148 @@ func _ready() -> void:
 		set_status("Couldn't reach that game. Check you're on the same Wi-Fi."))
 	Net.start_listening()
 	_refresh_hosts()
+
+
+func _hook_clicks(n: Node) -> void:
+	for c in n.get_children():
+		if c is BaseButton and not c.has_meta("click"):
+			c.set_meta("click", true)
+			(c as BaseButton).pressed.connect(func(): Sound.play("click", -4.0, false, 0.0))
+		_hook_clicks(c)
+
+
+## A dimmed full-screen panel with a centred card; returns the card's VBox.
+func _open_overlay(title_text: String, width := 760.0) -> VBoxContainer:
+	_close_overlay()
+	_overlay = Control.new()
+	add_child(_overlay)
+	_overlay.position = Vector2.ZERO
+	_overlay.size = Ui.view_size(self)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.78)
+	_overlay.add_child(dim)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	_overlay.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var card := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("0f1621")
+	sb.border_color = Color("5ab0ff")
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
+	sb.set_content_margin_all(28)
+	card.add_theme_stylebox_override("panel", sb)
+	card.custom_minimum_size = Vector2(width, 0)
+	center.add_child(card)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 16)
+	card.add_child(box)
+	var t := Label.new()
+	t.text = title_text
+	t.add_theme_font_size_override("font_size", 40)
+	t.add_theme_color_override("font_color", Color("ff5a5f"))
+	box.add_child(t)
+	return box
+
+
+func _close_overlay() -> void:
+	if _overlay:
+		_overlay.queue_free()
+		_overlay = null
+
+
+func _done_button(box: VBoxContainer) -> void:
+	var done := Button.new()
+	done.text = "DONE"
+	done.custom_minimum_size = Vector2(0, 64)
+	done.pressed.connect(func():
+		Settings.save()
+		_close_overlay())
+	box.add_child(done)
+	_hook_clicks(box)
+
+
+func _show_settings() -> void:
+	var box := _open_overlay("SETTINGS", 640.0)
+	box.add_child(_slider_row("Music", Settings.music_volume, func(v):
+		Settings.music_volume = v
+		Settings.changed.emit()))
+	box.add_child(_slider_row("Sound effects", Settings.sfx_volume, func(v):
+		Settings.sfx_volume = v
+		Settings.changed.emit()
+		Sound.play("click", -4.0, false, 0.0)))
+	var vib := CheckButton.new()
+	vib.text = "Vibrate when hit"
+	vib.button_pressed = Settings.vibration
+	vib.toggled.connect(func(on): Settings.vibration = on)
+	box.add_child(vib)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var l := Label.new()
+	l.text = "Clock per agent"
+	l.custom_minimum_size = Vector2(230, 0)
+	row.add_child(l)
+	var group := ButtonGroup.new()
+	for m in [4, 6, 8, 10]:
+		var b := Button.new()
+		b.text = "%d min" % m
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = m == Settings.clock_minutes
+		b.custom_minimum_size = Vector2(90, 50)
+		b.pressed.connect(func(): Settings.clock_minutes = m)
+		row.add_child(b)
+	box.add_child(row)
+	var note := Label.new()
+	note.text = "In a two-player game the host's clock setting is used."
+	note.add_theme_font_size_override("font_size", 18)
+	note.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	box.add_child(note)
+	_done_button(box)
+
+
+func _slider_row(label_text: String, value: float, on_change: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var l := Label.new()
+	l.text = label_text
+	l.custom_minimum_size = Vector2(230, 0)
+	row.add_child(l)
+	var sl := HSlider.new()
+	sl.min_value = 0.0
+	sl.max_value = 1.0
+	sl.step = 0.05
+	sl.value = value
+	sl.custom_minimum_size = Vector2(320, 40)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.drag_ended.connect(func(_c): on_change.call(sl.value))
+	sl.value_changed.connect(func(v): if not sl.has_focus(): on_change.call(v))
+	row.add_child(sl)
+	return row
+
+
+func _show_help() -> void:
+	var box := _open_overlay("HOW TO PLAY", 900.0)
+	var text := RichTextLabel.new()
+	text.bbcode_enabled = true
+	text.fit_content = true
+	text.custom_minimum_size = Vector2(840, 0)
+	text.add_theme_font_size_override("normal_font_size", 21)
+	text.add_theme_font_size_override("bold_font_size", 21)
+	text.text = """[b][color=#5ab0ff]The mission[/color][/b]  Find the [b]PASSPORT, CASH, MICROFILM[/b] and [b]KEYCARD[/b] hidden in the furniture, then walk out of the glowing [color=#5dff8a][b]EXIT[/b][/color] before your clock runs out. First one out wins.
+
+[b][color=#5ab0ff]Searching[/color][/b]  Stand next to furniture and tap [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can only carry one item, so you'll swap and leave the other behind.
+
+[b][color=#5ab0ff]Traps[/color][/b]  Tap [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a [b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs 20 seconds. Only you can see your own traps, but they still work on you!
+
+[b][color=#5ab0ff]Gadgets[/color][/b]  The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the [b]WIRE CUTTERS[/b] beat tripwires. Each one is used up when it saves you.
+
+[b][color=#5ab0ff]Fighting[/color][/b]  [b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: they drop their intel, lose 30 seconds and wake up back at the start.
+
+[b][color=#5ab0ff]Keyboard[/color][/b]  WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart"""
+	box.add_child(text)
+	_done_button(box)
 
 
 func set_status(msg: String) -> void:
@@ -163,6 +330,8 @@ func _process(delta: float) -> void:
 		target = maxf(0.0, field_bottom - kb_top)
 	_lift = lerpf(_lift, target, minf(1.0, delta * 12.0))
 	_content.position = ((vp - Ui.BASE * k) / 2.0).floor() - Vector2(0, _lift)
+	if _overlay:
+		_overlay.size = vp
 	queue_redraw()
 
 
@@ -191,6 +360,8 @@ func _join(ip: String) -> void:
 	if ip == "":
 		set_status("Type the host's IP address first.")
 		return
+	Settings.last_ip = ip
+	Settings.save()
 	if Net.join(ip) != OK:
 		set_status("That doesn't look like a valid address.")
 		return
