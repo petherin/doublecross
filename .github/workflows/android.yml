@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK and Mac app
 
 on:
   push:
@@ -25,15 +25,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Cache Godot and Android export templates
+      - name: Cache Godot and export templates
         uses: actions/cache@v4
         with:
           path: |
             ~/godot
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}-android
+          key: godot-${{ env.GODOT_VERSION }}-android-macos
 
-      - name: Install Godot and Android export templates
+      - name: Install Godot and the Android + macOS export templates
         run: |
           if [ ! -x ~/godot/godot ]; then
             mkdir -p ~/godot
@@ -42,10 +42,10 @@ jobs:
             mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
           fi
           T=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          if [ ! -f "$T/android_debug.apk" ]; then
+          if [ ! -f "$T/android_debug.apk" ] || [ ! -f "$T/macos.zip" ]; then
             mkdir -p "$T"
             wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
-            unzip -q -j -o /tmp/templates.tpz 'templates/android_*' 'templates/version.txt' -d "$T"
+            unzip -q -j -o /tmp/templates.tpz 'templates/android_*' 'templates/macos.zip' 'templates/version.txt' -d "$T"
             rm /tmp/templates.tpz
           fi
           ls "$T"
@@ -77,3 +77,16 @@ jobs:
         with:
           name: double-cross-apk
           path: build/double-cross.apk
+
+      - name: Export Mac app
+        run: |
+          ~/godot/godot --headless --export-release "macOS" build/DoubleCross-macOS.zip
+          test -f build/DoubleCross-macOS.zip
+          ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: double-cross-mac
+          # Godot's zip keeps the app's executable permissions; GitHub's own
+          # artifact zipping would not, so upload the zip as-is.
+          path: build/DoubleCross-macOS.zip

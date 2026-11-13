@@ -10,7 +10,7 @@
 <p align="center">
   <a href="../../actions/workflows/android.yml"><img src="../../actions/workflows/android.yml/badge.svg" alt="Android build"></a>
   <img src="https://img.shields.io/badge/engine-Godot%204.3-478cbf" alt="Godot 4.3">
-  <img src="https://img.shields.io/badge/platform-Android-3ddc84" alt="Android">
+  <img src="https://img.shields.io/badge/platform-Android%20%7C%20macOS-3ddc84" alt="Android and macOS">
   <img src="https://img.shields.io/badge/licence-all%20rights%20reserved-red" alt="All rights reserved">
 </p>
 
@@ -76,7 +76,25 @@ What works today:
 > devices from seeing each other. If the game doesn't show up, use the IP
 > address instead, or try a phone hotspot.
 
-### On a Mac (or Windows/Linux) for testing
+### As a Mac app
+
+1. Open the [**Actions** tab](../../actions/workflows/android.yml), click the latest green run and
+   download **double-cross-mac**. Unzip it, then unzip `DoubleCross-macOS.zip` inside to get **Double Cross.app**.
+   It runs natively on Apple Silicon and Intel Macs.
+2. Drag it into **Applications**.
+3. The app isn't signed with an Apple developer certificate, so the first time you open it macOS will
+   refuse. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the
+   Double Cross message. Or run this once in Terminal:
+
+   ```bash
+   xattr -dr com.apple.quarantine "/Applications/Double Cross.app"
+   ```
+4. When macOS asks whether Double Cross may find devices on your local network, click **Allow**.
+   It needs that to find and join games.
+
+A Mac can play against tablets and phones on the same Wi-Fi.
+
+### From source in Godot (Mac, Windows or Linux)
 
 You don't need a tablet to try it. The game runs on a computer and can play
 against itself.
@@ -120,12 +138,12 @@ scripts/
   menu.gd       title screen
   action_button.gd  multi-touch round button (SEARCH, and later TRAP/ATTACK)
   icons.gd      drawn item icons
-.github/workflows/android.yml   builds the APK on every push
+.github/workflows/android.yml   builds the Android APK and the Mac app on every push
 ```
 
 ### Building the APK yourself
 
-Every push to `main` builds a debug APK automatically with GitHub Actions. To
+Every push to `main` builds a debug APK and a Mac app automatically with GitHub Actions. To
 build locally instead, install the Android SDK and OpenJDK 17, set their paths in
 **Editor → Editor Settings → Export → Android**, then use **Project → Export… → Android**.
 
