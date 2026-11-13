@@ -13,6 +13,10 @@ const Agent = preload("res://scripts/agent.gd")
 const RoomView = preload("res://scripts/room_view.gd")
 const Hud = preload("res://scripts/hud.gd")
 const Ui = preload("res://scripts/ui.gd")
+const Bot = preload("res://scripts/bot.gd")
+
+## Peer id used for the computer-controlled rival in one-player games.
+const BOT_ID := 2
 
 const SEARCH_TIME := 0.8
 const SEARCH_REACH := 46.0
@@ -37,10 +41,11 @@ var _agent_by_id := {}
 var _view: RoomView
 var _hud: Hud
 var _exit_cooldown := 0.0
+var bot: Bot
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
-func setup(seed_value: int, p_my_id: int, ids: Array) -> void:
+func setup(seed_value: int, p_my_id: int, ids: Array, vs_bot := false) -> void:
 	my_id = p_my_id
 	world = World.new(seed_value)
 	contents = world.hidden.duplicate()
@@ -50,6 +55,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array) -> void:
 	_view.position = Ui.center_offset(self)
 	get_viewport().size_changed.connect(func(): _view.position = Ui.center_offset(self))
 
+	if vs_bot:
+		ids.append(BOT_ID)
 	ids.sort()
 	for i in ids.size():
 		var id: int = ids[i]
@@ -57,7 +64,12 @@ func setup(seed_value: int, p_my_id: int, ids: Array) -> void:
 		a.name = "Agent_%d" % id
 		a.set_multiplayer_authority(id)
 		var start := Vector2i(0, 0) if i == 0 else Vector2i(World.COLS - 1, World.ROWS - 1)
-		a.configure(world, start, id == my_id, STYLES[i % STYLES.size()])
+		var style: Dictionary = STYLES[i % STYLES.size()].duplicate()
+		var is_bot := vs_bot and id == BOT_ID
+		if is_bot:
+			style["name"] += " (BOT)"
+		# The bot's agent is simulated on this device, like the player's own.
+		a.configure(world, start, id == my_id or is_bot, style)
 		add_child(a)
 		agents.append(a)
 		_agent_by_id[id] = a
@@ -66,6 +78,14 @@ func setup(seed_value: int, p_my_id: int, ids: Array) -> void:
 			local_agent = a
 	_view.agents = agents
 	_view.highlight_color = local_agent.accent
+
+	if vs_bot:
+		var ba: Agent = _agent_by_id[BOT_ID]
+		bot = Bot.new()
+		add_child(bot)
+		bot.setup(self, ba, BOT_ID)
+		ba.search_finished.connect(func(r, i): _handle_search(BOT_ID, r, i))
+		ba.exit_touched.connect(func(): _handle_escape(BOT_ID))
 
 	_hud = Hud.new()
 	add_child(_hud)
@@ -144,10 +164,12 @@ func _on_search_finished(room: Vector2i, idx: int) -> void:
 ## Runs on the host: decides what the searcher finds.
 @rpc("any_peer", "call_local", "reliable")
 func request_search(room: Vector2i, idx: int) -> void:
-	if not multiplayer.is_server() or over:
-		return
-	var pid := _sender()
-	if not inventories.has(pid):
+	if multiplayer.is_server():
+		_handle_search(_sender(), room, idx)
+
+
+func _handle_search(pid: int, room: Vector2i, idx: int) -> void:
+	if over or not inventories.has(pid):
 		return
 	var found: String = contents.get(World.furniture_key(room, idx), "")
 	var left := ""
@@ -172,6 +194,8 @@ func apply_search(pid: int, room: Vector2i, idx: int, found: String, left: Strin
 	elif found != "":
 		inv["items"].append(found)
 	_agent_by_id[pid].has_case = inv["case"]
+	if bot and pid == BOT_ID:
+		bot.on_search_result(key, found, left)
 	if pid != my_id:
 		return
 	_hud.set_inventory(inv["items"], inv["case"])
@@ -216,9 +240,13 @@ func _on_exit_touched() -> void:
 
 @rpc("any_peer", "call_local", "reliable")
 func request_escape() -> void:
-	if not multiplayer.is_server() or over:
+	if multiplayer.is_server():
+		_handle_escape(_sender())
+
+
+func _handle_escape(pid: int) -> void:
+	if over:
 		return
-	var pid := _sender()
 	if inventories.has(pid) and _missing(pid).is_empty():
 		game_over.rpc(pid)
 

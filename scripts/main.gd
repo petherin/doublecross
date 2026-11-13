@@ -7,6 +7,8 @@ const Game = preload("res://scripts/game.gd")
 
 var _menu: Menu
 var _game: Game
+## One-player modes are run entirely on this device.
+var _offline_mode := ""   # "", "practice" or "bot"
 
 
 func _ready() -> void:
@@ -34,7 +36,8 @@ func _show_menu(msg: String) -> void:
 		_game = null
 	if _menu == null:
 		_menu = Menu.new()
-		_menu.practice_requested.connect(func(): _begin(randi(), [multiplayer.get_unique_id()]))
+		_menu.practice_requested.connect(func(): _start_offline("practice"))
+		_menu.bot_requested.connect(func(): _start_offline("bot"))
 		add_child(_menu)
 	_menu.set_status(msg)
 
@@ -53,13 +56,21 @@ func _on_opponent_joined(_id: int) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func start_game(seed_value: int) -> void:
+	_offline_mode = ""
 	var ids: Array = [multiplayer.get_unique_id()]
 	ids.append_array(multiplayer.get_peers())
 	_begin(seed_value, ids)
 
 
+func _start_offline(mode: String) -> void:
+	_offline_mode = mode
+	_begin(randi(), [multiplayer.get_unique_id()])
+
+
 func _rematch() -> void:
-	if multiplayer.is_server():
+	if _offline_mode != "":
+		_begin(randi(), [multiplayer.get_unique_id()])
+	elif multiplayer.is_server():
 		start_game.rpc(randi())
 
 
@@ -76,6 +87,6 @@ func _begin(seed_value: int, ids: Array) -> void:
 	_game = Game.new()
 	_game.name = "Game"
 	add_child(_game)
-	_game.setup(seed_value, multiplayer.get_unique_id(), ids)
+	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _offline_mode == "bot")
 	_game.leave_requested.connect(_leave)
 	_game.rematch_requested.connect(_rematch)

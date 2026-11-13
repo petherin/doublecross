@@ -45,7 +45,10 @@ rebuilt with an original setting, original characters and a lot more polish.
 | 2 | Searching furniture, mission items, briefcase, escape door and the win condition | ✅ Done |
 | 3 | Traps and counter-gadgets (tripwire ⇄ wire cutters, paint bomb ⇄ extinguisher…) | ⏳ Next |
 | 4 | Combat (melee and dart pistol), per-player countdown and respawn penalty | 🔜 |
-| 5 | Art pass, sound, music, menus, settings | 🔜 |
+| 5 | Sound, music, menus, settings | 🔜 |
+| 6 | Richer, more detailed graphics | 🔜 |
+| ★ | One-player mode against a bot | ✅ Done |
+| ★ | Phones as well as tablets, and a Mac app | ✅ Done |
 
 What works today:
 
@@ -59,6 +62,7 @@ What works today:
 - Without the briefcase you can carry just one item. Search with full hands and you swap: your item stays behind in that furniture for your rival to find.
 - The EXIT (green on the mini-map) only opens for an agent carrying all four pieces of intel. First one out wins, then the host can call a rematch on a freshly shuffled base.
 - The host's tablet referees every search and escape, so both tablets always agree on who has what.
+- **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and remembers what it has searched.
 
 ## Playing it
 
@@ -102,7 +106,7 @@ against itself.
 1. Install **Godot 4.3** from [godotengine.org](https://godotengine.org/download/archive/4.3-stable/)
    (the standard version, not .NET). It runs natively on Apple Silicon.
 2. In Godot, choose **Import** and pick this folder's `project.godot`.
-3. **Solo:** press ▶ (or <kbd>⌘</kbd>+<kbd>B</kbd>) and choose **PRACTICE SOLO**. Move with WASD/arrows or drag with the mouse.
+3. **Solo:** press ▶ (or <kbd>⌘</kbd>+<kbd>B</kbd>) and choose **PLAY VS BOT** (or **PRACTICE SOLO** to explore alone). Move with WASD/arrows or drag with the mouse.
 4. **Two players on one Mac:** go to **Debug → Customize Run Instances…**, tick
    **Enable Multiple Instances**, set it to **2** and press ▶. In one window click
    **HOST GAME**. In the other, type `127.0.0.1` and click **JOIN**.
@@ -136,6 +140,8 @@ scripts/
   hud.gd        top bar, mini-map, joystick, room-change fade
   joystick.gd   floating touch joystick
   menu.gd       title screen
+  bot.gd        computer opponent (room-to-room routing + AStarGrid2D within rooms)
+  ui.gd         phone/tablet screen-size helpers
   action_button.gd  multi-touch round button (SEARCH, and later TRAP/ATTACK)
   icons.gd      drawn item icons
 .github/workflows/android.yml   builds the Android APK and the Mac app on every push

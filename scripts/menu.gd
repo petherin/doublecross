@@ -2,6 +2,7 @@ extends Control
 ## Title screen: host a game, join one found on the network (or by IP), or practise solo.
 
 signal practice_requested
+signal bot_requested
 
 var _status: Label
 var _hosts_box: VBoxContainer
@@ -51,10 +52,11 @@ func _ready() -> void:
 	var left := VBoxContainer.new()
 	left.position = Vector2(140, 280)
 	left.size = Vector2(440, 300)
-	left.add_theme_constant_override("separation", 22)
+	left.add_theme_constant_override("separation", 18)
 	_content.add_child(left)
 	_main_buttons = left
 	left.add_child(_big_button("HOST GAME", _on_host))
+	left.add_child(_big_button("PLAY VS BOT", func(): bot_requested.emit()))
 	left.add_child(_big_button("PRACTICE SOLO", func(): practice_requested.emit()))
 
 	# Right column: join
@@ -203,7 +205,7 @@ func _refresh_hosts() -> void:
 func _big_button(text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(440, 96)
+	b.custom_minimum_size = Vector2(440, 88)
 	b.add_theme_font_size_override("font_size", 34)
 	b.pressed.connect(cb)
 	return b
