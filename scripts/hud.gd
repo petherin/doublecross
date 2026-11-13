@@ -5,6 +5,7 @@ extends CanvasLayer
 signal leave_requested
 signal search_pressed
 signal rematch_requested
+signal trap_chosen(kind: String)
 
 const World = preload("res://scripts/world.gd")
 const Joystick = preload("res://scripts/joystick.gd")
@@ -15,6 +16,12 @@ const Ui = preload("res://scripts/ui.gd")
 var world: World
 var joystick: Joystick
 var search_button: ActionButton
+var trap_button: ActionButton
+var _trap_options := {}       # kind -> ActionButton
+var _trap_menu_open := false
+var _trap_menu_timer := 0.0
+var _flash: ColorRect
+var _gadgets: Array = []
 var _room_label: Label
 var _minimap: Control
 var _inventory: Control
@@ -47,6 +54,26 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	search_button.pressed.connect(func(): search_pressed.emit())
 	add_child(search_button)
 
+	trap_button = ActionButton.new()
+	trap_button.label = "TRAP"
+	trap_button.icon = "BOMB"
+	trap_button.accent = accent
+	trap_button.radius = 50.0
+	trap_button.pressed.connect(_toggle_trap_menu)
+	add_child(trap_button)
+	for kind in ["BOMB", "SPRING", "WIRE"]:
+		var b := ActionButton.new()
+		b.label = kind
+		b.icon = kind
+		b.accent = Color("ffd23f")
+		b.radius = 44.0
+		b.visible = false
+		b.pressed.connect(func():
+			_close_trap_menu()
+			trap_chosen.emit(kind))
+		add_child(b)
+		_trap_options[kind] = b
+
 	_bar = ColorRect.new()
 	_bar.color = Color(0, 0, 0, 0.55)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,7 +85,7 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 
 	_inventory = Control.new()
 	_inventory.position = Vector2(196, 6)
-	_inventory.size = Vector2(260, 48)
+	_inventory.size = Vector2(420, 48)
 	_inventory.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_inventory.draw.connect(_draw_inventory)
 	add_child(_inventory)
@@ -89,6 +116,11 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_toast.modulate.a = 0.0
 	add_child(_toast)
 
+	_flash = ColorRect.new()
+	_flash.color = Color(1, 0, 0, 0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_flash)
+
 	_fade = ColorRect.new()
 	_fade.color = Color(0, 0, 0, 0)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -111,10 +143,18 @@ func _layout() -> void:
 	joystick.size = Vector2(L.x * 0.5, L.y - 60)
 	joystick.queue_redraw()
 	search_button.position = Vector2(L.x - 175, L.y - 175)
+	trap_button.position = Vector2(L.x - 300, L.y - 120)
+	# Trap options fan out above the TRAP button.
+	var spots := [Vector2(-60, -120), Vector2(40, -170), Vector2(140, -195)]
+	var kinds := ["BOMB", "SPRING", "WIRE"]
+	for i in kinds.size():
+		var b: ActionButton = _trap_options[kinds[i]]
+		b.position = trap_button.position + Vector2(50, 50) + spots[i] - Vector2(44, 44)
+	_flash.size = L
 	_leave.position = Vector2(L.x - 110, 10)
 	_minimap.position = Vector2(L.x - 190, 12)
-	_room_label.position = Vector2(450, 10)
-	_room_label.size = Vector2(maxf(0.0, L.x - 450 - 200), 40)
+	_room_label.position = Vector2(620, 10)
+	_room_label.size = Vector2(maxf(0.0, L.x - 620 - 200), 40)
 	_room_label.visible = _room_label.size.x > 160
 	_toast.size = Vector2(minf(800.0, L.x - 40), 70)
 	_toast.position = Vector2((L.x - _toast.size.x) / 2, L.y - 160)
@@ -133,10 +173,45 @@ func show_room(room: Vector2i, animate: bool) -> void:
 		create_tween().tween_property(_fade, "color:a", 0.0, 0.25)
 
 
-func set_inventory(items: Array, has_case: bool) -> void:
+func set_inventory(items: Array, has_case: bool, gadgets: Array = []) -> void:
 	_held = items.duplicate()
 	_has_case = has_case
+	_gadgets = gadgets.duplicate()
 	_inventory.queue_redraw()
+
+
+## Which traps can be set right here (furniture traps / a doorway tripwire).
+func set_trap_options(furniture: bool, door: bool) -> void:
+	trap_button.enabled = furniture or door
+	_trap_options["BOMB"].enabled = furniture
+	_trap_options["SPRING"].enabled = furniture
+	_trap_options["WIRE"].enabled = door
+	if _trap_menu_open:
+		_trap_menu_timer -= get_process_delta_time()
+		if _trap_menu_timer <= 0.0 or not trap_button.enabled:
+			_close_trap_menu()
+
+
+func _toggle_trap_menu() -> void:
+	if _trap_menu_open:
+		_close_trap_menu()
+		return
+	_trap_menu_open = true
+	_trap_menu_timer = 4.0
+	for k in _trap_options:
+		_trap_options[k].visible = true
+
+
+func _close_trap_menu() -> void:
+	_trap_menu_open = false
+	for k in _trap_options:
+		_trap_options[k].visible = false
+
+
+## A quick coloured flash over the whole screen (when you get caught).
+func flash(col: Color) -> void:
+	_flash.color = Color(col, 0.55)
+	create_tween().tween_property(_flash, "color:a", 0.0, 0.8)
 
 
 func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:
@@ -152,6 +227,8 @@ func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:
 
 func show_end(won: bool, winner_name: String, can_rematch: bool) -> void:
 	search_button.visible = false
+	trap_button.visible = false
+	_close_trap_menu()
 	joystick.visible = false
 	if _toast_tween:
 		_toast_tween.kill()
@@ -207,6 +284,17 @@ func _draw_inventory() -> void:
 		Icons.draw(_inventory, item, c, 30.0, have)
 		if i == World.INTEL.size() - 1:
 			_inventory.draw_line(Vector2(c.x + 25, 6), Vector2(c.x + 25, 42), Color(1, 1, 1, 0.2), 1.0)
+	# Tool belt: smaller gadget icons.
+	var x0 := 24 + slots.size() * 50 + 4
+	_inventory.draw_line(Vector2(x0 - 25, 6), Vector2(x0 - 25, 42), Color(1, 1, 1, 0.2), 1.0)
+	for i in World.GADGETS.size():
+		var g: String = World.GADGETS[i]
+		var c := Vector2(x0 + i * 38, 24)
+		var have := _gadgets.has(g)
+		_inventory.draw_circle(c, 16, Color(1, 1, 1, 0.12 if have else 0.04))
+		if have:
+			_inventory.draw_arc(c, 16, 0, TAU, 28, Color("ffd23f", 0.9), 2.0, true)
+		Icons.draw(_inventory, g, c, 24.0, have)
 
 
 func _draw_minimap() -> void:

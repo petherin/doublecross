@@ -23,13 +23,25 @@ var agents: Array = []
 ## Index of the furniture the local agent can search right now (-1 = none).
 var highlight := -1
 var highlight_color := Color.WHITE
+var my_id := 1
+## Traps the local player has set: furniture/doorway key -> trap kind.
+var my_traps := {}
+## Trap explosions etc: { kind, room, pos, t }
+var _effects: Array = []
 
 var _t := 0.0
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	for e in _effects:
+		e["t"] += delta
+	_effects = _effects.filter(func(e): return e["t"] < 1.6)
 	queue_redraw()
+
+
+func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
+	_effects.append({"kind": kind, "room": effect_room, "pos": pos, "t": 0.0})
 
 
 static func P(x: float, y: float, z := 0.0) -> Vector2:
@@ -44,16 +56,21 @@ func _draw() -> void:
 	_draw_floor(R, tint)
 	_draw_back_walls(R, tint)
 
-	# Depth-sort furniture and agents. Footprints never overlap, so A is in
-	# front of B when A starts beyond B's far edge on either floor axis.
+	# Depth sorting. Furniture is sorted among itself, then each agent is
+	# slotted in just after the last piece of furniture it stands in front of.
 	var things := []
 	var items: Array = world.furniture(room)
 	for i in items.size():
 		things.append({"rect": items[i]["rect"], "f": items[i], "i": i})
-	for a in agents:
-		if a.room == room:
-			things.append({"rect": Rect2(a.position, Vector2.ZERO), "agent": a})
-	things.sort_custom(_behind)
+	things.sort_custom(_box_behind)
+	var here := agents.filter(func(a): return a.room == room)
+	here.sort_custom(func(a, b): return a.position.x + a.position.y < b.position.x + b.position.y)
+	for a in here:
+		var slot := 0
+		for j in things.size():
+			if things[j].has("f") and _agent_in_front(a.position, things[j]["rect"]):
+				slot = j + 1
+		things.insert(slot, {"agent": a})
 	for t in things:
 		if t.has("agent"):
 			t["agent"].paint(self)
@@ -61,18 +78,31 @@ func _draw() -> void:
 			_draw_furniture(t["f"], tint)
 			if t["i"] == highlight:
 				_draw_highlight(t["f"])
+			var tk := World.furniture_key(room, t["i"])
+			if my_traps.has(tk):
+				_draw_trap_marker(t["f"], my_traps[tk])
 
 	_draw_front_ledges(R, tint)
+	_draw_my_tripwires()
+	for e in _effects:
+		if e["room"] == room:
+			_draw_effect(e)
 
 
-## Sort comparator: true when `a` should be drawn before (behind) `b`.
-static func _behind(a: Dictionary, b: Dictionary) -> bool:
+## An agent standing at floor point `p` is in front of a box if it's past the
+## box's front-left face (larger y) or its front-right face (larger x).
+static func _agent_in_front(p: Vector2, r: Rect2) -> bool:
+	return p.x >= r.end.x or p.y >= r.end.y
+
+
+## Sort comparator for furniture: true when box `a` should be drawn before `b`.
+static func _box_behind(a: Dictionary, b: Dictionary) -> bool:
 	var ra: Rect2 = a["rect"]
 	var rb: Rect2 = b["rect"]
-	if rb.position.x >= ra.end.x or rb.position.y >= ra.end.y:
-		return true
-	if ra.position.x >= rb.end.x or ra.position.y >= rb.end.y:
-		return false
+	var b_front := rb.position.x >= ra.end.x or rb.position.y >= ra.end.y
+	var a_front := ra.position.x >= rb.end.x or ra.position.y >= rb.end.y
+	if b_front != a_front:
+		return b_front
 	return ra.get_center().x + ra.get_center().y < rb.get_center().x + rb.get_center().y
 
 
@@ -232,6 +262,68 @@ func _doorway(a: Vector2, b: Vector2, is_exit: bool) -> void:
 	var font := ThemeDB.fallback_font
 	var w := font.get_string_size("EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 	draw_string(font, mid + Vector2(-w / 2, 7), "EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("eaffea"))
+
+
+## A small reminder of where you've hidden a trap (only you see it).
+func _draw_trap_marker(f: Dictionary, kind: String) -> void:
+	var r: Rect2 = f["rect"]
+	var h: float = HEIGHTS.get(f["type"], 50.0)
+	var p := World.iso(r.get_center(), h + 8)
+	draw_circle(p, 11.0, Color(0, 0, 0, 0.5))
+	draw_arc(p, 11.0, 0, TAU, 20, Color(highlight_color, 0.8), 2.0, true)
+	Icons.draw(self, kind, p, 16.0, true)
+
+
+func _draw_my_tripwires() -> void:
+	var R := World.ROOM
+	var c := R.get_center()
+	var dh := World.DOOR_HALF
+	for dir in World.DIR_VEC:
+		if world.opening(room, dir) != 1 or not my_traps.has(World.door_key(room, dir)):
+			continue
+		var v := Vector2(World.DIR_VEC[dir])
+		var mid := c + v * R.size / 2.0
+		var side := Vector2(-v.y, v.x) * dh
+		var a := World.iso(mid - side, 10.0)
+		var b := World.iso(mid + side, 10.0)
+		draw_line(a, b, Color(highlight_color, 0.6 + 0.3 * sin(_t * 5.0)), 2.0, true)
+		draw_circle(a, 3.0, highlight_color)
+		draw_circle(b, 3.0, highlight_color)
+
+
+func _draw_effect(e: Dictionary) -> void:
+	var t: float = e["t"]
+	var p := World.iso(e["pos"], 40.0)
+	var font := ThemeDB.fallback_font
+	var word := "TWANG!"
+	var col := Color("eef1f5")
+	match e["kind"]:
+		"BOMB":
+			word = "SPLAT!"
+			col = Color("ff3fbf")
+			var splat := [Color("ff3fbf"), Color("3fd0ff"), Color("7dff6b"), Color("ffd23f")]
+			var grow := minf(1.0, t * 6.0)
+			for i in 14:
+				var a := i * 2.4
+				var d := (30.0 + (i * 37 % 50)) * grow
+				var fade := clampf(1.6 - t, 0.0, 1.0)
+				draw_circle(p + Vector2(cos(a) * d, sin(a) * d * 0.6), 10.0 + i % 4 * 4.0, Color(splat[i % 4], fade))
+		"SPRING":
+			word = "BOING!"
+			col = Color("ffd23f")
+			var base := World.iso(e["pos"])
+			var coil := PackedVector2Array()
+			var hgt := minf(1.0, t * 5.0) * 70.0
+			for i in 11:
+				coil.append(base + Vector2(10 if i % 2 == 0 else -10, -i * hgt / 10.0))
+			draw_polyline(coil, Color("c7ccd6"), 3.0, true)
+	# Comic-book word that pops and floats up
+	var size := int(40 + 20 * minf(1.0, t * 8.0))
+	var a := clampf(1.6 - t, 0.0, 1.0)
+	var w := font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var at := p + Vector2(-w / 2, -60 - t * 40)
+	draw_string_outline(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 10, Color(0, 0, 0, a))
+	draw_string(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col, a))
 
 
 ## Pulsing outline round the furniture you can search, plus a magnifier.

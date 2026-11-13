@@ -38,6 +38,43 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			ci.draw_rect(Rect2(c + Vector2(-0.3, -0.24) * s, Vector2(0.1, 0.12) * s), k.call(Color("e8c25a")))
 			ci.draw_rect(Rect2(c + Vector2(0.2, -0.24) * s, Vector2(0.1, 0.12) * s), k.call(Color("e8c25a")))
 
+		"WIRE CUTTERS":
+			ci.draw_line(c + Vector2(-0.35, -0.35) * s, c + Vector2(0.15, 0.15) * s, k.call(Color("c7ccd6")), 0.1 * s)
+			ci.draw_line(c + Vector2(0.35, -0.35) * s, c + Vector2(-0.15, 0.15) * s, k.call(Color("c7ccd6")), 0.1 * s)
+			ci.draw_line(c + Vector2(0.15, 0.15) * s, c + Vector2(0.38, 0.42) * s, k.call(Color("ff5a5f")), 0.14 * s)
+			ci.draw_line(c + Vector2(-0.15, 0.15) * s, c + Vector2(-0.38, 0.42) * s, k.call(Color("ff5a5f")), 0.14 * s)
+			ci.draw_circle(c, 0.07 * s, k.call(Color("50575f")))
+		"EXTINGUISHER":
+			ci.draw_rect(Rect2(c + Vector2(-0.16, -0.25) * s, Vector2(0.32, 0.68) * s), k.call(Color("d32f2f")))
+			ci.draw_circle(c + Vector2(0, -0.25) * s, 0.16 * s, k.call(Color("d32f2f")))
+			ci.draw_rect(Rect2(c + Vector2(-0.06, -0.48) * s, Vector2(0.12, 0.1) * s), k.call(Color("2b2f36")))
+			ci.draw_line(c + Vector2(0.05, -0.44) * s, c + Vector2(0.35, -0.3) * s, k.call(Color("2b2f36")), 0.07 * s)
+			ci.draw_rect(Rect2(c + Vector2(-0.16, 0.0) * s, Vector2(0.32, 0.1) * s), k.call(Color("eef1f5")))
+		"TOOLKIT":
+			ci.draw_line(c + Vector2(-0.3, 0.32) * s, c + Vector2(0.2, -0.18) * s, k.call(Color("9aa3b0")), 0.11 * s)
+			ci.draw_arc(c + Vector2(0.24, -0.24) * s, 0.14 * s, -0.6, 4.2, 12, k.call(Color("9aa3b0")), 0.08 * s)
+			ci.draw_line(c + Vector2(0.3, 0.3) * s, c + Vector2(-0.18, -0.18) * s, k.call(Color("e8c25a")), 0.09 * s)
+			ci.draw_rect(Rect2(c + Vector2(0.2, 0.2) * s, Vector2(0.16, 0.16) * s), k.call(Color("3b2a1c")))
+		"BOMB":
+			ci.draw_circle(c + Vector2(-0.05, 0.08) * s, 0.32 * s, k.call(Color("15151a")))
+			ci.draw_circle(c + Vector2(-0.16, -0.02) * s, 0.08 * s, k.call(Color(1, 1, 1, 0.35)))
+			ci.draw_rect(Rect2(c + Vector2(0.06, -0.3) * s, Vector2(0.14, 0.12) * s), k.call(Color("2b2b33")))
+			ci.draw_line(c + Vector2(0.13, -0.3) * s, c + Vector2(0.3, -0.42) * s, k.call(Color("c9a46a")), 0.05 * s)
+			ci.draw_circle(c + Vector2(0.32, -0.44) * s, 0.08 * s, k.call(Color("ffd23f")))
+		"SPRING":
+			var pts := PackedVector2Array()
+			for i in 13:
+				var t := i / 12.0
+				pts.append(c + Vector2((0.28 if i % 2 == 0 else -0.28), 0.36 - t * 0.66) * s)
+			ci.draw_polyline(pts, k.call(Color("c7ccd6")), 0.07 * s, true)
+			ci.draw_rect(Rect2(c + Vector2(-0.38, 0.36) * s, Vector2(0.76, 0.1) * s), k.call(Color("50575f")))
+			ci.draw_rect(Rect2(c + Vector2(-0.3, -0.4) * s, Vector2(0.6, 0.1) * s), k.call(Color("ff5a5f")))
+		"WIRE":
+			ci.draw_rect(Rect2(c + Vector2(-0.44, -0.3) * s, Vector2(0.1, 0.6) * s), k.call(Color("e0b10b")))
+			ci.draw_rect(Rect2(c + Vector2(0.34, -0.3) * s, Vector2(0.1, 0.6) * s), k.call(Color("e0b10b")))
+			ci.draw_line(c + Vector2(-0.34, 0.12) * s, c + Vector2(0.34, 0.16) * s, k.call(Color("eef1f5")), 0.04 * s)
+			ci.draw_circle(c + Vector2(0.0, 0.14) * s, 0.06 * s, k.call(Color("ff5a5f")))
+
 
 ## A magnifying glass, for the search button.
 static func magnifier(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:

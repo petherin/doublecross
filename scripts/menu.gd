@@ -2,7 +2,7 @@ extends Control
 ## Title screen: host a game, join one found on the network (or by IP), or practise solo.
 
 signal practice_requested
-signal bot_requested
+signal bot_requested(level: String)
 
 var _status: Label
 var _hosts_box: VBoxContainer
@@ -12,6 +12,7 @@ var _main_buttons: Control
 var _cancel: Button
 var _t := 0.0
 var _content: Control
+var _bot_level := "medium"
 var _lift := 0.0
 
 const Ui = preload("res://scripts/ui.gd")
@@ -50,13 +51,27 @@ func _ready() -> void:
 
 	# Left column: host / practice
 	var left := VBoxContainer.new()
-	left.position = Vector2(140, 280)
+	left.position = Vector2(140, 250)
 	left.size = Vector2(440, 300)
 	left.add_theme_constant_override("separation", 18)
 	_content.add_child(left)
 	_main_buttons = left
 	left.add_child(_big_button("HOST GAME", _on_host))
-	left.add_child(_big_button("PLAY VS BOT", func(): bot_requested.emit()))
+	left.add_child(_big_button("PLAY VS BOT", func(): bot_requested.emit(_bot_level)))
+	var levels := HBoxContainer.new()
+	levels.add_theme_constant_override("separation", 8)
+	var group := ButtonGroup.new()
+	for lv in ["easy", "medium", "hard"]:
+		var b := Button.new()
+		b.text = lv.to_upper()
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = lv == _bot_level
+		b.custom_minimum_size = Vector2(141, 50)
+		b.add_theme_font_size_override("font_size", 20)
+		b.pressed.connect(func(): _bot_level = lv)
+		levels.add_child(b)
+	left.add_child(levels)
 	left.add_child(_big_button("PRACTICE SOLO", func(): practice_requested.emit()))
 
 	# Right column: join
@@ -100,7 +115,7 @@ func _ready() -> void:
 	row.add_child(jb)
 
 	_status = Label.new()
-	_status.position = Vector2(0, 640)
+	_status.position = Vector2(0, 645)
 	_status.size = Vector2(1280, 80)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -186,7 +201,8 @@ func _join(ip: String) -> void:
 func _set_waiting(on: bool) -> void:
 	_main_buttons.modulate.a = 0.35 if on else 1.0
 	for b in _main_buttons.get_children():
-		(b as Button).disabled = on
+		if b is Button:
+			(b as Button).disabled = on
 	_cancel.visible = on
 
 

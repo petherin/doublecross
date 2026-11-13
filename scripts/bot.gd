@@ -10,14 +10,24 @@ const World = preload("res://scripts/world.gd")
 const Agent = preload("res://scripts/agent.gd")
 
 const CELL := 40.0
-const REACH := 60.0          # how close to furniture it needs to stand to search
-const THINK_MIN := 0.25      # pause between decisions, so it feels human
-const THINK_MAX := 0.7
-const SPEED_FACTOR := 0.9    # a touch slower than a person at full tilt
+## How each difficulty plays.
+##  speed:   fraction of full running speed
+##  think:   pause between decisions (seconds), so it feels human
+##  memory:  chance it remembers having searched something
+##  avoid_own: steers clear of its own traps
+##  trap:    chance of setting a trap after a search
+##  sneaky:  re-searches a room when it hears a trap go off there (dropped intel)
+const LEVELS := {
+	"easy": {"speed": 0.7, "think": [0.8, 1.8], "memory": 0.5, "avoid_own": false, "trap": 0.2, "sneaky": false},
+	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": true, "trap": 0.2, "sneaky": false},
+	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": true, "trap": 0.3, "sneaky": true},
+}
 
 var game: Node
 var agent: Agent
 var id := 2
+var level := "hard"
+var _p: Dictionary = LEVELS["hard"]
 
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
@@ -30,30 +40,79 @@ var _stuck_time := 0.0
 var _last_pos := Vector2.ZERO
 
 
-func setup(p_game: Node, p_agent: Agent, p_id: int) -> void:
+func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard") -> void:
 	game = p_game
 	agent = p_agent
 	id = p_id
+	level = p_level if LEVELS.has(p_level) else "hard"
+	_p = LEVELS[level]
 	_rng.randomize()
 	agent.room_changed.connect(func(_r):
 		_path = PackedVector2Array()
 		_action = {}
-		_wait = _rng.randf_range(THINK_MIN, THINK_MAX))
+		_think_pause())
 
 
-## Called by the game after the host settles one of the bot's searches.
-func on_search_result(key: String, found: String, left: String) -> void:
-	_known.erase(key)
-	_searched[key] = true
-	if left != "":
-		_known[key] = left
-		_searched.erase(key)
-	_wait = _rng.randf_range(THINK_MIN, THINK_MAX)
+func _think_pause() -> void:
+	_wait = _rng.randf_range(_p["think"][0], _p["think"][1])
+
+
+## Called by the game for everything that happens in the match.
+func on_event(e: Dictionary) -> void:
+	var pid: int = e.get("pid", 0)
+	match e.get("type", ""):
+		"search":
+			if pid != id:
+				return
+			var key: String = e["key"]
+			_known.erase(key)
+			if _rng.randf() < _p["memory"]:
+				_searched[key] = true
+			if e["left"] != "":
+				_known[key] = e["left"]
+				_searched.erase(key)
+				_think_pause()
+				return
+			_think_pause()
+			# Only rig furniture it has just emptied. Nothing can be hidden in
+			# trapped furniture, so a careful bot never needs to come back to it.
+			_maybe_trap(key, _p["trap"])
+		"ko":
+			var room: Vector2i = e["room"]
+			if pid == id or _p["sneaky"]:
+				# Intel just went flying in that room: worth searching it again.
+				for i in world().furniture(room).size():
+					_searched.erase(World.furniture_key(room, i))
+			if pid == id:
+				_path = PackedVector2Array()
+				_action = {}
+				_wait = game.KO_TIME + 0.3
+		"trap_set", "trap_fail":
+			if pid == id:
+				_think_pause()
+
+
+## Maybe hide a trap: in the furniture at `key`, or across another doorway.
+func _maybe_trap(key: String, chance: float) -> void:
+	if _rng.randf() >= chance or game.traps_owned_by(id) >= game.MAX_TRAPS:
+		return
+	var info := {}
+	var door: int = game.near_door(agent)
+	# Careless bots also string tripwires across doors they'll use themselves.
+	if door != -1 and not _p["avoid_own"] and _rng.randf() < 0.35:
+		info = {"kind": "WIRE", "key": World.door_key(agent.room, door)}
+	elif not game.traps.has(key) and not game.contents.has(key):
+		info = {"kind": "BOMB" if _rng.randf() < 0.5 else "SPRING", "key": key}
+	if info.is_empty() or game.traps.has(info["key"]):
+		return
+	_path = PackedVector2Array()
+	_action = {}
+	agent.start_trap(info, game.TRAP_TIME)
 
 
 func _physics_process(delta: float) -> void:
 	agent.move_input = Vector2.ZERO
-	if game.over or agent.frozen or agent.searching:
+	if game.over or agent.frozen or agent.searching or agent.ko_time > 0.0:
 		return
 	if _wait > 0.0:
 		_wait -= delta
@@ -108,8 +167,6 @@ func _think() -> void:
 	#    moving things about. Forget what we've searched and start again.
 	_searched.clear()
 	_wait = 0.5
-	if inv["items"].is_empty() and not inv["case"]:
-		return
 
 
 ## Furniture in `room` worth visiting: unsearched, or known to hold an item
@@ -119,6 +176,8 @@ func _targets_in(room: Vector2i) -> Array:
 	var items: Array = world().furniture(room)
 	for i in items.size():
 		var key := World.furniture_key(room, i)
+		if _p["avoid_own"] and game.traps.has(key) and game.traps[key]["owner"] == id:
+			continue
 		if _known.has(key):
 			if _can_take_more():
 				out.append(i)
@@ -170,11 +229,11 @@ func _do_action() -> void:
 		"push":
 			# Walk straight out through the doorway (or into the exit).
 			var v := Vector2(World.DIR_VEC[a["dir"]])
-			agent.move_input = v * SPEED_FACTOR
+			agent.move_input = v * _p["speed"]
 			a["t"] = a.get("t", 0.0) + get_physics_process_delta_time()
 			if a["t"] > 1.5:
 				_action = {}
-				_wait = _rng.randf_range(0.3, 1.0)
+				_think_pause()
 		_:
 			_action = {}
 
@@ -202,7 +261,7 @@ func _follow(delta: float) -> void:
 		_path.remove_at(0)
 	if _path.is_empty():
 		return
-	agent.move_input = (_path[0] - p).normalized() * SPEED_FACTOR
+	agent.move_input = (_path[0] - p).normalized() * _p["speed"]
 	# If we're not making progress, nudge sideways and re-plan.
 	if p.distance_to(_last_pos) < 1.0:
 		_stuck_time += delta
@@ -241,12 +300,14 @@ func _search_spot(room: Vector2i, idx: int) -> Vector2:
 			var p := grid.get_point_position(cell)
 			var q := Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
 			var d := p.distance_to(q)
-			if d > REACH:
+			if d > 120.0 or d < 0.01:
 				continue
-			var score := agent.position.distance_to(p)
+			# Prefer squares close to the furniture, then close to the bot.
+			var score := d * 2.0 + agent.position.distance_to(p) * 0.3
 			if score < best_d:
 				best_d = score
-				best = p
+				# Stand right up against the furniture, whatever the grid says.
+				best = q + (p - q) / d * (Agent.RADIUS + 8.0)
 	return best
 
 
@@ -306,6 +367,23 @@ func _room_distance(a: Vector2i, b: Vector2i) -> int:
 
 
 func _next_room(a: Vector2i, b: Vector2i) -> Vector2i:
+	var options := []
 	if a.x != b.x:
-		return a + Vector2i(signi(b.x - a.x), 0)
-	return a + Vector2i(0, signi(b.y - a.y))
+		options.append(Vector2i(signi(b.x - a.x), 0))
+	if a.y != b.y:
+		options.append(Vector2i(0, signi(b.y - a.y)))
+	if _p["avoid_own"]:
+		# Prefer a doorway it hasn't rigged with its own tripwire.
+		for step in options:
+			var dir := _dir_of(step)
+			var k := World.door_key(a, dir)
+			if not (game.traps.has(k) and game.traps[k]["owner"] == id):
+				return a + step
+	return a + options[0]
+
+
+func _dir_of(step: Vector2i) -> int:
+	for d in World.DIR_VEC:
+		if World.DIR_VEC[d] == step:
+			return d
+	return World.Dir.UP

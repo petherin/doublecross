@@ -5,6 +5,8 @@ extends Node2D
 signal room_changed(room: Vector2i)
 signal exit_touched
 signal search_finished(room: Vector2i, idx: int)
+signal trap_finished(info: Dictionary)
+signal door_passed(from_room: Vector2i, dir: int)
 
 const World = preload("res://scripts/world.gd")
 const Ui = preload("res://scripts/ui.gd")
@@ -31,6 +33,13 @@ var has_case := false
 var searching := false
 var search_progress := 0.0
 
+## Knocked out by a trap: can't move while this counts down.
+var ko_time := 0.0
+var ko_kind := ""
+var _ko_total := 1.0
+
+var _busy_kind := ""       # "search" or "trap"
+var _trap_info := {}
 var _search_time := 0.0
 var _search_left := 0.0
 var _search_room := Vector2i.ZERO
@@ -63,9 +72,36 @@ func _physics_process(delta: float) -> void:
 		position = position.lerp(_target, minf(1.0, delta * 15.0))
 	if moving or searching:
 		_walk += delta * 12.0
+	if ko_time > 0.0:
+		ko_time = maxf(0.0, ko_time - delta)
+		_walk += delta * 6.0
+
+
+func knock_out(kind: String, seconds: float) -> void:
+	cancel_busy()
+	ko_kind = kind
+	ko_time = seconds
+	_ko_total = seconds
+
+
+func cancel_busy() -> void:
+	if searching:
+		searching = false
+		search_progress = 0.0
+		_busy_kind = ""
+		if is_local:
+			_send_state()
+
+
+## Spends `duration` setting a trap; emits trap_finished(info) afterwards.
+func start_trap(info: Dictionary, duration: float) -> void:
+	start_search(-1, duration)
+	_busy_kind = "trap"
+	_trap_info = info
 
 
 func start_search(idx: int, duration: float) -> void:
+	_busy_kind = "search"
 	searching = true
 	_search_time = duration
 	_search_left = duration
@@ -82,9 +118,15 @@ func _local_move(delta: float) -> void:
 			searching = false
 			search_progress = 0.0
 			_send_state()
-			search_finished.emit(_search_room, _search_idx)
+			# Clear the busy state *before* emitting: listeners may start a new action.
+			var kind := _busy_kind
+			_busy_kind = ""
+			if kind == "trap":
+				trap_finished.emit(_trap_info)
+			else:
+				search_finished.emit(_search_room, _search_idx)
 	var v := move_input.limit_length(1.0) * SPEED
-	if frozen or searching:
+	if frozen or searching or ko_time > 0.0:
 		v = Vector2.ZERO
 	moving = v.length() > 25.0
 	if moving:
@@ -149,6 +191,7 @@ func _resolve_furniture(p: Vector2) -> Vector2:
 
 
 func _enter(dir: int) -> Vector2:
+	door_passed.emit(room, dir)
 	room += World.DIR_VEC[dir]
 	position = World.entry_point(dir, RADIUS)
 	_target = position
@@ -177,12 +220,24 @@ func net_state(r: Vector2i, pos: Vector2, f: float, m: bool, s: bool) -> void:
 ## with the furniture). Upright, stylised spy in a trench coat and fedora.
 func paint(ci: CanvasItem) -> void:
 	var foot := World.iso(position)
+	var ko := ko_time > 0.0
+	var ko_age := _ko_total - ko_time
+	if ko and ko_kind == "SPRING" and ko_age < 0.9:
+		# Launched into the air and back down.
+		foot.y -= sin(ko_age / 0.9 * PI) * 160.0
 	var sdir := World.floor_to_screen_dir(Vector2.from_angle(facing))
 	var flip := -1.0 if sdir.x < 0.0 else 1.0
 	var back_view := sdir.y < -0.15
 	var stride := sin(_walk) * 7.0 if moving else 0.0
 	var bob := absf(sin(_walk)) * 2.0 if moving else 0.0
 	var skin := Color("e0b48f")
+	var coat := self.coat
+	var hat := self.hat
+	if ko and ko_kind == "BOMB":
+		# Covered in paint.
+		coat = coat.lerp(Color("ff3fbf"), 0.55)
+		hat = hat.lerp(Color("3fd0ff"), 0.6)
+		skin = skin.lerp(Color("7dff6b"), 0.5)
 	var dark := coat.darkened(0.4)
 	var trousers := Color("1b1e25")
 
@@ -191,7 +246,8 @@ func paint(ci: CanvasItem) -> void:
 	ci.draw_circle(Vector2.ZERO, 26.0, Color(0, 0, 0, 0.4))
 	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
 
-	ci.draw_set_transform(foot - Vector2(0, bob), 0.0, Vector2(flip, 1.0))
+	var tilt := sin(_walk * 1.3) * 0.25 if ko else 0.0
+	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
 	# Legs and shoes
 	ci.draw_line(Vector2(-5, -30), Vector2(-5 + stride, -3), trousers, 7.0, true)
 	ci.draw_line(Vector2(5, -30), Vector2(5 - stride, -3), trousers, 7.0, true)
@@ -216,9 +272,9 @@ func paint(ci: CanvasItem) -> void:
 	else:
 		ci.draw_rect(Rect2(2, -76, 9, 4), Color("0c0c10"))
 	# Fedora: brim, crown, band
-	ci.draw_set_transform(foot - Vector2(0, bob) + Vector2(0, -80), 0.0, Vector2(flip, 0.28))
+	ci.draw_set_transform(foot - Vector2(0, bob) + Vector2(0, -80).rotated(tilt), tilt, Vector2(flip, 0.28))
 	ci.draw_circle(Vector2.ZERO, 17.0, hat.lightened(0.1))
-	ci.draw_set_transform(foot - Vector2(0, bob), 0.0, Vector2(flip, 1.0))
+	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
 	ci.draw_colored_polygon(PackedVector2Array([
 		Vector2(-10, -81), Vector2(10, -81), Vector2(8, -95), Vector2(-8, -95)]), hat)
 	ci.draw_rect(Rect2(-10, -85, 20, 4), accent)
@@ -240,6 +296,13 @@ func paint(ci: CanvasItem) -> void:
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
 
+	# Dizzy stars while knocked out
+	if ko:
+		for i in 4:
+			var a := _walk * 1.5 + i * TAU / 4.0
+			var sp := foot + Vector2(cos(a) * 26.0, -102.0 + sin(a) * 8.0)
+			_star(ci, sp, 7.0, Color("ffd23f"))
+
 	# Thought bubble while searching (with a progress ring for your own agent)
 	if searching:
 		var b := foot + Vector2(30, -128)
@@ -250,3 +313,11 @@ func paint(ci: CanvasItem) -> void:
 		var q := "?"
 		var qw := font.get_string_size(q, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 		ci.draw_string(font, b + Vector2(-qw / 2, 8), q, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("15171c"))
+
+
+static func _star(ci: CanvasItem, c: Vector2, r: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 10:
+		var rr := r if i % 2 == 0 else r * 0.45
+		pts.append(c + Vector2.from_angle(-PI / 2 + i * TAU / 10.0) * rr)
+	ci.draw_colored_polygon(pts, col)

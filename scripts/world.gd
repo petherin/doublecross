@@ -56,6 +56,11 @@ const FREE_TYPES := ["crate", "desk", "plant", "crate"]
 
 const INTEL := ["PASSPORT", "CASH", "MICROFILM", "KEYCARD"]
 const BRIEFCASE := "BRIEFCASE"
+## Gadgets go on your tool belt (they don't count towards the carry limit).
+const GADGETS := ["WIRE CUTTERS", "EXTINGUISHER", "TOOLKIT"]
+## Trap -> the gadget that defuses it.
+const TRAPS := {"BOMB": "EXTINGUISHER", "SPRING": "TOOLKIT", "WIRE": "WIRE CUTTERS"}
+const TRAP_NAMES := {"BOMB": "PAINT BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"}
 
 var seed_value := 0
 ## The one room with a way out, and which (outer, back) wall it's on.
@@ -114,6 +119,23 @@ func opening(room: Vector2i, dir: int) -> int:
 
 static func furniture_key(room: Vector2i, idx: int) -> String:
 	return "%d,%d,%d" % [room.x, room.y, idx]
+
+
+static func key_room(key: String) -> Vector2i:
+	var p := key.split(",")
+	return Vector2i(int(p[0]), int(p[1]))
+
+
+static func key_index(key: String) -> int:
+	return int(key.split(",")[2])
+
+
+## One key per doorway, the same from both sides of it.
+static func door_key(room: Vector2i, dir: int) -> String:
+	if dir == Dir.UP or dir == Dir.LEFT:
+		room += DIR_VEC[dir]
+		dir = OPPOSITE[dir]
+	return "D%d,%d,%d" % [room.x, room.y, dir]
 
 
 func furniture(room: Vector2i) -> Array:
@@ -200,7 +222,7 @@ func _hide_items(rng: RandomNumberGenerator) -> void:
 			spots.append([r, i])
 	spots = _shuffled(spots, rng)
 	var used_rooms := {}
-	for item in INTEL + [BRIEFCASE]:
+	for item in INTEL + [BRIEFCASE] + GADGETS:
 		for spot in spots:
 			var key := furniture_key(spot[0], spot[1])
 			if hidden.has(key) or used_rooms.has(spot[0]):

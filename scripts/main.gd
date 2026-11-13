@@ -9,6 +9,7 @@ var _menu: Menu
 var _game: Game
 ## One-player modes are run entirely on this device.
 var _offline_mode := ""   # "", "practice" or "bot"
+var _bot_level := "medium"
 
 
 func _ready() -> void:
@@ -37,7 +38,9 @@ func _show_menu(msg: String) -> void:
 	if _menu == null:
 		_menu = Menu.new()
 		_menu.practice_requested.connect(func(): _start_offline("practice"))
-		_menu.bot_requested.connect(func(): _start_offline("bot"))
+		_menu.bot_requested.connect(func(level):
+			_bot_level = level
+			_start_offline("bot"))
 		add_child(_menu)
 	_menu.set_status(msg)
 
@@ -87,6 +90,6 @@ func _begin(seed_value: int, ids: Array) -> void:
 	_game = Game.new()
 	_game.name = "Game"
 	add_child(_game)
-	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _offline_mode == "bot")
+	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _bot_level if _offline_mode == "bot" else "")
 	_game.leave_requested.connect(_leave)
 	_game.rematch_requested.connect(_rematch)

@@ -7,6 +7,8 @@ signal pressed
 const Icons = preload("res://scripts/icons.gd")
 
 var label := "ACTION"
+## "search" draws a magnifier; anything else is an item/trap icon name.
+var icon := "search"
 var accent := Color("5ab0ff")
 var radius := 64.0
 var enabled := true:
@@ -44,8 +46,11 @@ func _draw() -> void:
 	var a := 1.0 if enabled else 0.3
 	draw_circle(c, radius, Color(accent, (0.45 if down else 0.18) * a))
 	draw_arc(c, radius, 0, TAU, 48, Color(accent, 0.9 * a), 3.0, true)
-	Icons.magnifier(self, c - Vector2(0, 10), radius * 0.8, Color(1, 1, 1, a))
+	if icon == "search":
+		Icons.magnifier(self, c - Vector2(0, 10), radius * 0.8, Color(1, 1, 1, a))
+	else:
+		Icons.draw(self, icon, c - Vector2(0, radius * 0.14), radius * 0.85, enabled)
 	var font := ThemeDB.fallback_font
-	var fs := 16
+	var fs := 16 if radius >= 56 else 13
 	var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	draw_string(font, c + Vector2(-w / 2, radius * 0.62), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, a))
