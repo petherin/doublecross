@@ -56,7 +56,7 @@ func rebuild(world: World, room: Vector2i) -> void:
 	# Ceiling lamps, high up so tops catch more light than sides.
 	for i in 2:
 		var lp := Vector2(R.position.x + R.size.x * (0.3 if i == 0 else 0.72), R.get_center().y)
-		var l := _light(lp, 420.0, warm, 1.05, 260.0)
+		var l := _light(lp, 420.0, warm, 0.85, 220.0)
 		if (h + i) % 4 == 0:
 			_flicker.append([l, l.energy, float(i) * 3.0])
 	# Coloured spill from the light strips along the two back walls.

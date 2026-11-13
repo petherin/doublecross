@@ -193,6 +193,22 @@ python3.11 -m venv .blendenv
 
 <p align="center"><img src="docs/agent-turnaround.png" alt="The crimson agent from eight directions, plus walk, search, swing, hurt and knocked-down poses" width="90%"></p>
 
+The furniture goes through the same pipeline: `tools/blender/build_furniture.py`
+models every piece (desk with monitor and mug, control console with glowing
+buttons, filing cabinet, lockers, TOP SECRET crate, bookcase, safe, potted
+plant, gadget rack, sofa) in game units and renders it for each wall it can
+stand against, with normal maps, at exactly the game's isometric scale so the
+sprites line up with the collision boxes.
+
+```bash
+.blendenv/bin/python tools/blender/build_furniture.py            # everything
+.blendenv/bin/python tools/blender/build_furniture.py --only safe # just one type
+```
+
+In the game, real 2D lights (ceiling lamps, coloured wall strips, screens,
+daylight from the exit and explosion flashes) shade the agents and furniture
+through those normal maps.
+
 `--preview` renders small, fast sheets for trying out changes. If the sheets
 are missing, the game falls back to the original drawn-in-code agents.
 

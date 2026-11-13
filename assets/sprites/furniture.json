@@ -1,0 +1,269 @@
+{
+  "scale": 0.5,
+  "sprites": {
+    "desk_bottom": {
+      "color": "res://assets/sprites/furniture/desk_bottom.png",
+      "normal": "res://assets/sprites/furniture/desk_bottom_n.png",
+      "anchor": [
+        153.0,
+        162.0
+      ]
+    },
+    "desk_free": {
+      "color": "res://assets/sprites/furniture/desk_free.png",
+      "normal": "res://assets/sprites/furniture/desk_free_n.png",
+      "anchor": [
+        153.0,
+        165.0
+      ]
+    },
+    "desk_left": {
+      "color": "res://assets/sprites/furniture/desk_left.png",
+      "normal": "res://assets/sprites/furniture/desk_left_n.png",
+      "anchor": [
+        153.0,
+        179.0
+      ]
+    },
+    "desk_right": {
+      "color": "res://assets/sprites/furniture/desk_right.png",
+      "normal": "res://assets/sprites/furniture/desk_right_n.png",
+      "anchor": [
+        153.0,
+        154.0
+      ]
+    },
+    "desk_top": {
+      "color": "res://assets/sprites/furniture/desk_top.png",
+      "normal": "res://assets/sprites/furniture/desk_top_n.png",
+      "anchor": [
+        153.0,
+        165.0
+      ]
+    },
+    "console_bottom": {
+      "color": "res://assets/sprites/furniture/console_bottom.png",
+      "normal": "res://assets/sprites/furniture/console_bottom_n.png",
+      "anchor": [
+        167.0,
+        183.0
+      ]
+    },
+    "console_left": {
+      "color": "res://assets/sprites/furniture/console_left.png",
+      "normal": "res://assets/sprites/furniture/console_left_n.png",
+      "anchor": [
+        166.0,
+        218.0
+      ]
+    },
+    "console_right": {
+      "color": "res://assets/sprites/furniture/console_right.png",
+      "normal": "res://assets/sprites/furniture/console_right_n.png",
+      "anchor": [
+        166.0,
+        177.0
+      ]
+    },
+    "console_top": {
+      "color": "res://assets/sprites/furniture/console_top.png",
+      "normal": "res://assets/sprites/furniture/console_top_n.png",
+      "anchor": [
+        167.0,
+        181.0
+      ]
+    },
+    "cabinet_left": {
+      "color": "res://assets/sprites/furniture/cabinet_left.png",
+      "normal": "res://assets/sprites/furniture/cabinet_left_n.png",
+      "anchor": [
+        92.0,
+        185.0
+      ]
+    },
+    "cabinet_top": {
+      "color": "res://assets/sprites/furniture/cabinet_top.png",
+      "normal": "res://assets/sprites/furniture/cabinet_top_n.png",
+      "anchor": [
+        92.0,
+        185.0
+      ]
+    },
+    "locker_left": {
+      "color": "res://assets/sprites/furniture/locker_left.png",
+      "normal": "res://assets/sprites/furniture/locker_left_n.png",
+      "anchor": [
+        115.0,
+        293.0
+      ]
+    },
+    "locker_top": {
+      "color": "res://assets/sprites/furniture/locker_top.png",
+      "normal": "res://assets/sprites/furniture/locker_top_n.png",
+      "anchor": [
+        115.0,
+        294.0
+      ]
+    },
+    "crate_bottom": {
+      "color": "res://assets/sprites/furniture/crate_bottom.png",
+      "normal": "res://assets/sprites/furniture/crate_bottom_n.png",
+      "anchor": [
+        114.0,
+        170.0
+      ]
+    },
+    "crate_free": {
+      "color": "res://assets/sprites/furniture/crate_free.png",
+      "normal": "res://assets/sprites/furniture/crate_free_n.png",
+      "anchor": [
+        114.0,
+        170.0
+      ]
+    },
+    "crate_right": {
+      "color": "res://assets/sprites/furniture/crate_right.png",
+      "normal": "res://assets/sprites/furniture/crate_right_n.png",
+      "anchor": [
+        114.0,
+        170.0
+      ]
+    },
+    "shelf_left": {
+      "color": "res://assets/sprites/furniture/shelf_left.png",
+      "normal": "res://assets/sprites/furniture/shelf_left_n.png",
+      "anchor": [
+        143.0,
+        288.0
+      ]
+    },
+    "shelf_top": {
+      "color": "res://assets/sprites/furniture/shelf_top.png",
+      "normal": "res://assets/sprites/furniture/shelf_top_n.png",
+      "anchor": [
+        143.0,
+        288.0
+      ]
+    },
+    "safe_bottom": {
+      "color": "res://assets/sprites/furniture/safe_bottom.png",
+      "normal": "res://assets/sprites/furniture/safe_bottom_n.png",
+      "anchor": [
+        104.0,
+        170.0
+      ]
+    },
+    "safe_left": {
+      "color": "res://assets/sprites/furniture/safe_left.png",
+      "normal": "res://assets/sprites/furniture/safe_left_n.png",
+      "anchor": [
+        104.0,
+        170.0
+      ]
+    },
+    "safe_right": {
+      "color": "res://assets/sprites/furniture/safe_right.png",
+      "normal": "res://assets/sprites/furniture/safe_right_n.png",
+      "anchor": [
+        105.0,
+        170.0
+      ]
+    },
+    "safe_top": {
+      "color": "res://assets/sprites/furniture/safe_top.png",
+      "normal": "res://assets/sprites/furniture/safe_top_n.png",
+      "anchor": [
+        104.0,
+        170.0
+      ]
+    },
+    "plant_bottom": {
+      "color": "res://assets/sprites/furniture/plant_bottom.png",
+      "normal": "res://assets/sprites/furniture/plant_bottom_n.png",
+      "anchor": [
+        50.0,
+        148.0
+      ]
+    },
+    "plant_free": {
+      "color": "res://assets/sprites/furniture/plant_free.png",
+      "normal": "res://assets/sprites/furniture/plant_free_n.png",
+      "anchor": [
+        50.0,
+        149.0
+      ]
+    },
+    "plant_left": {
+      "color": "res://assets/sprites/furniture/plant_left.png",
+      "normal": "res://assets/sprites/furniture/plant_left_n.png",
+      "anchor": [
+        57.0,
+        152.0
+      ]
+    },
+    "plant_right": {
+      "color": "res://assets/sprites/furniture/plant_right.png",
+      "normal": "res://assets/sprites/furniture/plant_right_n.png",
+      "anchor": [
+        50.0,
+        143.0
+      ]
+    },
+    "plant_top": {
+      "color": "res://assets/sprites/furniture/plant_top.png",
+      "normal": "res://assets/sprites/furniture/plant_top_n.png",
+      "anchor": [
+        50.0,
+        149.0
+      ]
+    },
+    "rack_left": {
+      "color": "res://assets/sprites/furniture/rack_left.png",
+      "normal": "res://assets/sprites/furniture/rack_left_n.png",
+      "anchor": [
+        126.0,
+        256.0
+      ]
+    },
+    "rack_top": {
+      "color": "res://assets/sprites/furniture/rack_top.png",
+      "normal": "res://assets/sprites/furniture/rack_top_n.png",
+      "anchor": [
+        126.0,
+        256.0
+      ]
+    },
+    "sofa_bottom": {
+      "color": "res://assets/sprites/furniture/sofa_bottom.png",
+      "normal": "res://assets/sprites/furniture/sofa_bottom_n.png",
+      "anchor": [
+        165.0,
+        146.0
+      ]
+    },
+    "sofa_left": {
+      "color": "res://assets/sprites/furniture/sofa_left.png",
+      "normal": "res://assets/sprites/furniture/sofa_left_n.png",
+      "anchor": [
+        165.0,
+        180.0
+      ]
+    },
+    "sofa_right": {
+      "color": "res://assets/sprites/furniture/sofa_right.png",
+      "normal": "res://assets/sprites/furniture/sofa_right_n.png",
+      "anchor": [
+        165.0,
+        146.0
+      ]
+    },
+    "sofa_top": {
+      "color": "res://assets/sprites/furniture/sofa_top.png",
+      "normal": "res://assets/sprites/furniture/sofa_top_n.png",
+      "anchor": [
+        165.0,
+        180.0
+      ]
+    }
+  }
+}
