@@ -11,7 +11,7 @@
   <a href="../../actions/workflows/android.yml"><img src="../../actions/workflows/android.yml/badge.svg" alt="Android build"></a>
   <img src="https://img.shields.io/badge/engine-Godot%204.3-478cbf" alt="Godot 4.3">
   <img src="https://img.shields.io/badge/platform-Android-3ddc84" alt="Android">
-  <img src="https://img.shields.io/badge/licence-MIT-blue" alt="MIT licence">
+  <img src="https://img.shields.io/badge/licence-all%20rights%20reserved-red" alt="All rights reserved">
 </p>
 
 ---
@@ -126,4 +126,6 @@ installs over the previous one. Never use it for a store release.
 
 ## Licence
 
-[MIT](LICENSE). Do what you like, just keep the notice.
+Copyright © 2026 petherin. **All rights reserved.** The code is public so you can
+look at it, but you may not copy, reuse, modify or distribute any of it without
+written permission. See [LICENSE](LICENSE).
