@@ -60,7 +60,7 @@ const BRIEFCASE := "BRIEFCASE"
 const GADGETS := ["WIRE CUTTERS", "EXTINGUISHER", "TOOLKIT"]
 ## Trap -> the gadget that defuses it.
 const TRAPS := {"BOMB": "EXTINGUISHER", "SPRING": "TOOLKIT", "WIRE": "WIRE CUTTERS"}
-const TRAP_NAMES := {"BOMB": "PAINT BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"}
+const TRAP_NAMES := {"BOMB": "BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"}
 
 var seed_value := 0
 ## The one room with a way out, and which (outer, back) wall it's on.

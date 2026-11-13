@@ -14,13 +14,13 @@ const CELL := 40.0
 ##  speed:   fraction of full running speed
 ##  think:   pause between decisions (seconds), so it feels human
 ##  memory:  chance it remembers having searched something
-##  avoid_own: steers clear of its own traps
+##  avoid_own: chance it remembers (and steers clear of) its own traps
 ##  trap:    chance of setting a trap after a search
 ##  sneaky:  re-searches a room when it hears a trap go off there (dropped intel)
 const LEVELS := {
-	"easy": {"speed": 0.7, "think": [0.8, 1.8], "memory": 0.5, "avoid_own": false, "trap": 0.2, "sneaky": false},
-	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": true, "trap": 0.2, "sneaky": false},
-	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": true, "trap": 0.3, "sneaky": true},
+	"easy": {"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7, "trap": 0.12, "sneaky": false},
+	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0, "trap": 0.2, "sneaky": false},
+	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": 1.0, "trap": 0.3, "sneaky": true},
 }
 
 var game: Node
@@ -31,7 +31,8 @@ var _p: Dictionary = LEVELS["hard"]
 
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
-var _known := {}             # furniture key -> item the bot knows is there
+var _known := {}
+var _own_memory := {}        # own trap key -> does it remember this one?             # furniture key -> item the bot knows is there
 var _path: PackedVector2Array = PackedVector2Array()
 var _action := {}            # what to do once the path is done
 var _wait := 0.6
@@ -99,7 +100,7 @@ func _maybe_trap(key: String, chance: float) -> void:
 	var info := {}
 	var door: int = game.near_door(agent)
 	# Careless bots also string tripwires across doors they'll use themselves.
-	if door != -1 and not _p["avoid_own"] and _rng.randf() < 0.35:
+	if door != -1 and _p["avoid_own"] < 1.0 and _rng.randf() < 0.35:
 		info = {"kind": "WIRE", "key": World.door_key(agent.room, door)}
 	elif not game.traps.has(key) and not game.contents.has(key):
 		info = {"kind": "BOMB" if _rng.randf() < 0.5 else "SPRING", "key": key}
@@ -176,7 +177,7 @@ func _targets_in(room: Vector2i) -> Array:
 	var items: Array = world().furniture(room)
 	for i in items.size():
 		var key := World.furniture_key(room, i)
-		if _p["avoid_own"] and game.traps.has(key) and game.traps[key]["owner"] == id:
+		if game.traps.has(key) and game.traps[key]["owner"] == id and _remembers_own(key):
 			continue
 		if _known.has(key):
 			if _can_take_more():
@@ -372,14 +373,21 @@ func _next_room(a: Vector2i, b: Vector2i) -> Vector2i:
 		options.append(Vector2i(signi(b.x - a.x), 0))
 	if a.y != b.y:
 		options.append(Vector2i(0, signi(b.y - a.y)))
-	if _p["avoid_own"]:
-		# Prefer a doorway it hasn't rigged with its own tripwire.
-		for step in options:
-			var dir := _dir_of(step)
-			var k := World.door_key(a, dir)
-			if not (game.traps.has(k) and game.traps[k]["owner"] == id):
-				return a + step
+	# Prefer a doorway it hasn't rigged with its own tripwire (if it remembers).
+	for step in options:
+		var dir := _dir_of(step)
+		var k := World.door_key(a, dir)
+		if not (game.traps.has(k) and game.traps[k]["owner"] == id and _remembers_own(k)):
+			return a + step
 	return a + options[0]
+
+
+## Whether the bot remembers its own trap at `key`. Decided once per trap,
+## so a forgetful bot doesn't flip-flop about the same piece of furniture.
+func _remembers_own(key: String) -> bool:
+	if not _own_memory.has(key):
+		_own_memory[key] = _rng.randf() < _p["avoid_own"]
+	return _own_memory[key]
 
 
 func _dir_of(step: Vector2i) -> int:

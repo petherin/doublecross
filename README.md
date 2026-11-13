@@ -43,7 +43,7 @@ rebuilt with an original setting, original characters and a lot more polish.
 |---|---|---|
 | 1 | Two players on separate tablets moving through a shared, synced base over the local network | ✅ Done |
 | 2 | Searching furniture, mission items, briefcase, escape door and the win condition | ✅ Done |
-| 3 | Traps and counter-gadgets (paint bomb ⇄ extinguisher, spring trap ⇄ toolkit, tripwire ⇄ wire cutters) | ✅ Done |
+| 3 | Traps and counter-gadgets (bomb ⇄ extinguisher, spring trap ⇄ toolkit, tripwire ⇄ wire cutters) | ✅ Done |
 | 4 | Combat (melee and dart pistol), per-player countdown and respawn penalty | ⏳ Next |
 | 5 | Sound, music, menus, settings | 🔜 |
 | 6 | Richer, more detailed graphics | 🔜 |
@@ -63,10 +63,10 @@ What works today:
 - Without the briefcase you can carry just one item. Search with full hands and you swap: your item stays behind in that furniture for your rival to find.
 - The EXIT (green on the mini-map) only opens for an agent carrying all four pieces of intel. First one out wins, then the host can call a rematch on a freshly shuffled base.
 - The host's tablet referees every search and escape, so both tablets always agree on who has what.
-- **Traps:** hide a PAINT BOMB or SPRING TRAP in furniture, or string a TRIPWIRE across a doorway. Only you can see your own traps (up to three at a time), and yes, you can walk into them yourself.
+- **Traps:** hide a BOMB or SPRING TRAP in furniture, or string a TRIPWIRE across a doorway. Only you can see your own traps (up to three at a time), and yes, you can walk into them yourself.
 - **Getting caught** knocks you out for a few seconds and sends any intel you're carrying flying into the furniture around the room.
-- **Gadgets:** the EXTINGUISHER beats the paint bomb, the TOOLKIT beats the spring trap and the WIRE CUTTERS beat the tripwire. Each is used up when it saves you and turns up again somewhere else in the base.
-- **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, forgetful and prone to setting off its own traps), MEDIUM or HARD.
+- **Gadgets:** the EXTINGUISHER beats the bomb, the TOOLKIT beats the spring trap and the WIRE CUTTERS beat the tripwire. Each is used up when it saves you and turns up again somewhere else in the base.
+- **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, a bit forgetful, and now and then sets off its own traps), MEDIUM or HARD.
 
 ## Playing it
 

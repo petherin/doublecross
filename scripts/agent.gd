@@ -37,6 +37,8 @@ var search_progress := 0.0
 var ko_time := 0.0
 var ko_kind := ""
 var _ko_total := 1.0
+## 1.0 right after a bomb, fading to 0: blackened with soot and smouldering.
+var soot := 0.0
 
 var _busy_kind := ""       # "search" or "trap"
 var _trap_info := {}
@@ -75,6 +77,9 @@ func _physics_process(delta: float) -> void:
 	if ko_time > 0.0:
 		ko_time = maxf(0.0, ko_time - delta)
 		_walk += delta * 6.0
+	elif soot > 0.0:
+		# The soot wears off a while after you come round.
+		soot = maxf(0.0, soot - delta / 10.0)
 
 
 func knock_out(kind: String, seconds: float) -> void:
@@ -82,6 +87,8 @@ func knock_out(kind: String, seconds: float) -> void:
 	ko_kind = kind
 	ko_time = seconds
 	_ko_total = seconds
+	if kind == "BOMB":
+		soot = 1.0
 
 
 func cancel_busy() -> void:
@@ -233,11 +240,12 @@ func paint(ci: CanvasItem) -> void:
 	var skin := Color("e0b48f")
 	var coat := self.coat
 	var hat := self.hat
-	if ko and ko_kind == "BOMB":
-		# Covered in paint.
-		coat = coat.lerp(Color("ff3fbf"), 0.55)
-		hat = hat.lerp(Color("3fd0ff"), 0.6)
-		skin = skin.lerp(Color("7dff6b"), 0.5)
+	var sooty := minf(1.0, soot * 1.4)
+	if sooty > 0.0:
+		# Blackened by the blast.
+		coat = coat.lerp(Color("2b2622"), 0.8 * sooty)
+		hat = hat.lerp(Color("141210"), 0.8 * sooty)
+		skin = skin.lerp(Color("3d3632"), 0.85 * sooty)
 	var dark := coat.darkened(0.4)
 	var trousers := Color("1b1e25")
 
@@ -271,13 +279,36 @@ func paint(ci: CanvasItem) -> void:
 		ci.draw_circle(Vector2(0, -73), 9.0, Color("2a1d16"))
 	else:
 		ci.draw_rect(Rect2(2, -76, 9, 4), Color("0c0c10"))
-	# Fedora: brim, crown, band
-	ci.draw_set_transform(foot - Vector2(0, bob) + Vector2(0, -80).rotated(tilt), tilt, Vector2(flip, 0.28))
+	if sooty > 0.0 and not back_view:
+		# Wide white eyes peering out of the soot.
+		ci.draw_circle(Vector2(4, -73), 2.2, Color(1, 1, 1, sooty))
+		ci.draw_circle(Vector2(9, -73), 2.2, Color(1, 1, 1, sooty))
+		ci.draw_circle(Vector2(4.6, -73), 1.0, Color(0, 0, 0, sooty))
+		ci.draw_circle(Vector2(9.6, -73), 1.0, Color(0, 0, 0, sooty))
+		# Hair blown up into spikes.
+		for i in 5:
+			var hx := -7.0 + i * 3.5
+			ci.draw_line(Vector2(hx, -79), Vector2(hx + (i - 2) * 2.0, -86), Color(0.1, 0.09, 0.08, sooty), 2.0)
+	# Fedora: brim, crown, band (blown askew by a bomb)
+	var hat_off := Vector2.ZERO
+	var hat_tilt := tilt
+	if sooty > 0.0:
+		hat_off = Vector2(-3, -6) * sooty
+		hat_tilt += -0.4 * sooty
+	# Everything for the hat is drawn around the top of the head, so it
+	# tilts about the head rather than the feet.
+	var hat_at := foot - Vector2(0, bob) + (Vector2(0, -80) + hat_off).rotated(tilt)
+	ci.draw_set_transform(hat_at, hat_tilt, Vector2(flip, 0.28))
 	ci.draw_circle(Vector2.ZERO, 17.0, hat.lightened(0.1))
-	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
+	ci.draw_set_transform(hat_at, hat_tilt, Vector2(flip, 1.0))
 	ci.draw_colored_polygon(PackedVector2Array([
-		Vector2(-10, -81), Vector2(10, -81), Vector2(8, -95), Vector2(-8, -95)]), hat)
-	ci.draw_rect(Rect2(-10, -85, 20, 4), accent)
+		Vector2(-10, -1), Vector2(10, -1), Vector2(8, -15), Vector2(-8, -15)]), hat)
+	ci.draw_rect(Rect2(-10, -5, 20, 4), accent.lerp(Color("2b2622"), 0.7 * sooty))
+	if sooty > 0.0:
+		# Singed holes in the crown.
+		ci.draw_circle(Vector2(-3, -10), 2.0, Color(1.0, 0.45, 0.1, 0.8 * sooty))
+		ci.draw_circle(Vector2(4, -8), 1.5, Color(1.0, 0.6, 0.2, 0.7 * sooty))
+	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
 	# Front arm with hand (rummaging while searching), maybe holding the briefcase
 	var hand := Vector2(12 + stride * 0.8, -35)
 	if searching:
@@ -295,6 +326,17 @@ func paint(ci: CanvasItem) -> void:
 	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+
+	# Smouldering: smoke wisps curl up and the odd ember glows.
+	if soot > 0.05:
+		var now := Time.get_ticks_msec() / 1000.0
+		for i in 5:
+			var life := fmod(now * 0.8 + i * 0.2, 1.0)
+			var wp := foot + Vector2(sin(now * 2.0 + i * 1.7) * 10.0 + (i - 2) * 6.0, -60.0 - life * 70.0)
+			ci.draw_circle(wp, 5.0 + life * 9.0, Color(0.35, 0.33, 0.32, (1.0 - life) * 0.45 * soot))
+		for i in 3:
+			var flick := 0.5 + 0.5 * sin(now * 9.0 + i * 2.3)
+			ci.draw_circle(foot + Vector2(-8 + i * 8, -40 - i * 9), 1.8, Color(1.0, 0.55, 0.1, flick * soot))
 
 	# Dizzy stars while knocked out
 	if ko:

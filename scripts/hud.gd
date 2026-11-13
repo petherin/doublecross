@@ -210,8 +210,8 @@ func _close_trap_menu() -> void:
 
 ## A quick coloured flash over the whole screen (when you get caught).
 func flash(col: Color) -> void:
-	_flash.color = Color(col, 0.55)
-	create_tween().tween_property(_flash, "color:a", 0.0, 0.8)
+	_flash.color = Color(col, 0.45)
+	create_tween().tween_property(_flash, "color:a", 0.0, 0.5)
 
 
 func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:

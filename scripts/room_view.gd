@@ -36,8 +36,12 @@ func _process(delta: float) -> void:
 	_t += delta
 	for e in _effects:
 		e["t"] += delta
-	_effects = _effects.filter(func(e): return e["t"] < 1.6)
+	_effects = _effects.filter(func(e): return e["t"] < _life(e["kind"]))
 	queue_redraw()
+
+
+static func _life(kind: String) -> float:
+	return 3.2 if kind == "BOMB" else 1.6
 
 
 func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
@@ -54,6 +58,9 @@ func _draw() -> void:
 	var R := World.ROOM
 	var tint: Color = world.rooms[room]["tint"]
 	_draw_floor(R, tint)
+	for e in _effects:
+		if e["room"] == room and e["kind"] == "BOMB":
+			_draw_scorch(e)
 	_draw_back_walls(R, tint)
 
 	# Depth sorting. Furniture is sorted among itself, then each agent is
@@ -299,15 +306,9 @@ func _draw_effect(e: Dictionary) -> void:
 	var col := Color("eef1f5")
 	match e["kind"]:
 		"BOMB":
-			word = "SPLAT!"
-			col = Color("ff3fbf")
-			var splat := [Color("ff3fbf"), Color("3fd0ff"), Color("7dff6b"), Color("ffd23f")]
-			var grow := minf(1.0, t * 6.0)
-			for i in 14:
-				var a := i * 2.4
-				var d := (30.0 + (i * 37 % 50)) * grow
-				var fade := clampf(1.6 - t, 0.0, 1.0)
-				draw_circle(p + Vector2(cos(a) * d, sin(a) * d * 0.6), 10.0 + i % 4 * 4.0, Color(splat[i % 4], fade))
+			word = "KABOOM!"
+			col = Color("ffb13b")
+			_draw_explosion(e)
 		"SPRING":
 			word = "BOING!"
 			col = Color("ffd23f")
@@ -319,11 +320,81 @@ func _draw_effect(e: Dictionary) -> void:
 			draw_polyline(coil, Color("c7ccd6"), 3.0, true)
 	# Comic-book word that pops and floats up
 	var size := int(40 + 20 * minf(1.0, t * 8.0))
-	var a := clampf(1.6 - t, 0.0, 1.0)
+	var a := clampf(_life(e["kind"]) - 0.4 - t, 0.0, 1.0)
+	if e["kind"] == "BOMB":
+		size = int(52 + 26 * minf(1.0, t * 8.0))
+		p.y -= 50.0
 	var w := font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var at := p + Vector2(-w / 2, -60 - t * 40)
 	draw_string_outline(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 10, Color(0, 0, 0, a))
 	draw_string(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col, a))
+
+
+## A fiery, smoky blast: flash, fireball, flying sparks, then rolling smoke.
+func _draw_explosion(e: Dictionary) -> void:
+	var t: float = e["t"]
+	var ground := World.iso(e["pos"])
+	var c := World.iso(e["pos"], 45.0)
+	var seed_v := int(e["pos"].x * 7.0 + e["pos"].y * 13.0)
+	# 1) White-hot flash
+	if t < 0.18:
+		var f := t / 0.18
+		draw_circle(c, 40.0 + f * 120.0, Color(1.0, 0.97, 0.8, 0.85 * (1.0 - f)))
+	# 2) Sparks and debris flying out
+	if t < 0.9:
+		for i in 16:
+			var ang := i * TAU / 16.0 + float((seed_v + i * 31) % 10) * 0.05
+			var spd := 160.0 + float((seed_v + i * 17) % 90)
+			var d := spd * t
+			var start := c + Vector2(cos(ang), sin(ang) * 0.7) * d
+			var tail := c + Vector2(cos(ang), sin(ang) * 0.7) * maxf(0.0, d - 22.0)
+			var fall := Vector2(0, 160.0 * t * t)
+			draw_line(tail + fall, start + fall, Color(1.0, 0.75, 0.25, 1.0 - t / 0.9), 3.0, true)
+	# 3) Smoke: dark puffs that billow up and spread out
+	if t > 0.12:
+		var st := t - 0.12
+		for i in 22:
+			var k := float((seed_v + i * 53) % 100) / 100.0
+			var born := k * 0.35
+			if st < born:
+				continue
+			var age := st - born
+			var drift := Vector2((k - 0.5) * 120.0 + sin(age * 2.0 + i) * 14.0, -40.0 - age * (55.0 + k * 40.0))
+			var r := 18.0 + age * 26.0 + k * 10.0
+			var a := clampf(1.0 - age / 2.7, 0.0, 1.0) * 0.75
+			var grey := 0.1 + k * 0.16
+			draw_circle(c + drift, r, Color(grey, grey * 0.96, grey * 0.93, a))
+	# 4) Fireball: layered, flickering, swelling then collapsing into the smoke
+	if t < 0.75:
+		var grow := minf(1.0, t / 0.12)
+		var fade := 1.0 - clampf((t - 0.25) / 0.5, 0.0, 1.0)
+		var layers := [[Color("ff3b1f"), 1.0], [Color("ff7a1a"), 0.78], [Color("ffb13b"), 0.55], [Color("fff1a8"), 0.3]]
+		for li in layers.size():
+			var lc: Color = layers[li][0]
+			var lr: float = layers[li][1]
+			for j in 7:
+				var ang := j * TAU / 7.0 + t * 3.0 + li
+				var wob := 0.75 + 0.25 * sin(t * 40.0 + j * 2.1 + li)
+				var off := Vector2(cos(ang), sin(ang) * 0.75) * 34.0 * lr * grow
+				draw_circle(c + off - Vector2(0, t * 30.0), 46.0 * lr * grow * wob, Color(lc, fade))
+	# 5) Ground glow
+	if t < 0.6:
+		draw_set_transform(ground, 0.0, Vector2(1.0, 0.5))
+		draw_circle(Vector2.ZERO, 110.0, Color(1.0, 0.5, 0.15, 0.35 * (1.0 - t / 0.6)))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Black scorch mark left on the floor by a bomb (fades with the smoke).
+func _draw_scorch(e: Dictionary) -> void:
+	var t: float = e["t"]
+	var a := clampf(minf(t * 6.0, (3.2 - t) / 1.2), 0.0, 1.0)
+	var g := World.iso(e["pos"])
+	draw_set_transform(g, 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2.ZERO, 70.0, Color(0.05, 0.04, 0.03, 0.55 * a))
+	for i in 9:
+		var ang := i * TAU / 9.0
+		draw_line(Vector2.from_angle(ang) * 50.0, Vector2.from_angle(ang) * 95.0, Color(0.05, 0.04, 0.03, 0.4 * a), 7.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## Pulsing outline round the furniture you can search, plus a magnifier.

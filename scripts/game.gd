@@ -468,10 +468,10 @@ func _on_event(e: Dictionary) -> void:
 			var trap_name: String = World.TRAP_NAMES[e["kind"]]
 			if me and e["owner"] == my_id:
 				_hud.toast("Caught in your own %s! Nice one.%s" % [trap_name, dropped], warn, 3.5)
-				_hud.flash(Color("ff3f8e"))
+				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif me:
 				_hud.toast("%s!%s" % [_exclamation(e["kind"]), " You walked into a %s.%s" % [trap_name, dropped]], warn, 3.5)
-				_hud.flash(Color("ff3f8e"))
+				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif e["owner"] == my_id:
 				_hud.toast("Your %s got %s!" % [trap_name, victim.display_name], col, 3.0)
 
@@ -485,7 +485,7 @@ static func _trap_for(gadget: String) -> String:
 
 static func _exclamation(kind: String) -> String:
 	match kind:
-		"BOMB": return "SPLAT"
+		"BOMB": return "KABOOM"
 		"SPRING": return "BOING"
 		_: return "TWANG"
 
