@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="Double Cross: two spies shaking hands, one hiding a bomb and the other a mallet" width="720">
+  <img src="docs/logo.png" alt="Double Cross: two spies shaking hands under crossing searchlights, one hiding a lit bomb behind his back, the other with his fingers crossed" width="760">
 </p>
 
 <p align="center">
@@ -29,12 +29,18 @@ same Wi-Fi network, so neither can see what the other is up to.
 - **Fight** when you meet in the same room: melee *or* a dart pistol.
 - **Escape** with everything before your own clock runs out. Dying costs you time.
 
-It's a love letter to the split-screen trap-and-sneak games of the 8-bit era,
-rebuilt with an original setting, original characters and a lot more polish.
+It's a love letter to **Spy vs. Spy**, the 1984 split-screen classic where two
+spies booby-trapped an embassy while hunting for a briefcase full of secrets.
+Double Cross keeps that mischievous trap-and-sneak spirit but is rebuilt from
+scratch: one device per player over Wi-Fi, an isometric secret base, its own
+characters, artwork, music and code. See [Acknowledgements](#acknowledgements).
 
 <p align="center">
-  <img src="docs/screenshot-room.png" alt="Isometric secret-base room with an agent in a red trench coat" width="49%">
-  <img src="docs/screenshot-menu.png" alt="Title screen with host, join and practice options" width="49%">
+  <img src="docs/screenshot-room.png" alt="Isometric laboratory with lamp light, wall monitors and the glowing exit, two agents facing off" width="49%">
+  <img src="docs/screenshot-bomb.png" alt="An agent blackened with soot after a bomb, smoke rising and a scorch mark on the floor" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshot-menu.png" alt="Title screen with codename, host, play vs bot and join options" width="60%">
 </p>
 
 ## Status and roadmap
@@ -171,6 +177,19 @@ build locally instead, install the Android SDK and OpenJDK 17, set their paths i
 `android/debug.keystore` is a throwaway **debug-only** signing key (password
 `android`). It's committed so that every build is signed the same way and
 installs over the previous one. Never use it for a store release.
+
+## Acknowledgements
+
+Double Cross is inspired by **Spy vs. Spy** (1984), the computer game by
+First Star Software based on Antonio Prohías's *Spy vs. Spy* comic strip in
+*MAD* Magazine, and by the many happy hours spent playing it split-screen on
+8-bit machines.
+
+Double Cross is an independent, original fan project. It does not use any
+artwork, characters, names, music or code from Spy vs. Spy, and is not
+affiliated with, endorsed by or connected to First Star Software, *MAD*
+Magazine, DC Comics or Warner Bros. *Spy vs. Spy* is a trademark of its
+respective owners.
 
 ## Licence
 

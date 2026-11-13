@@ -1,78 +1,164 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#5ab0ff" stroke-opacity="0.08" stroke-width="2"/>
-    </pattern>
-    <radialGradient id="spot" cx="50%" cy="45%" r="55%">
-      <stop offset="0" stop-color="#1b2a40"/>
-      <stop offset="1" stop-color="#070a0f"/>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#1d2c44"/>
+      <stop offset="0.55" stop-color="#0c121d"/>
+      <stop offset="1" stop-color="#05070b"/>
     </radialGradient>
+    <linearGradient id="beamRed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5a5f" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff5a5f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="beamBlue" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5ab0ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#5ab0ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="coatShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity="0.45"/>
+      <stop offset="0.45" stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.75" stop-color="#fff" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c2c36"/>
+      <stop offset="1" stop-color="#121218"/>
+    </linearGradient>
+    <radialGradient id="skin" cx="35%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#f2cba6"/>
+      <stop offset="1" stop-color="#c99470"/>
+    </radialGradient>
+    <radialGradient id="bombG" cx="35%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#4a4a58"/>
+      <stop offset="1" stop-color="#0c0c10"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff3b0" stop-opacity="1"/>
+      <stop offset="0.35" stop-color="#ffb13b" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titleFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd9d0"/>
+      <stop offset="0.45" stop-color="#ff6a62"/>
+      <stop offset="1" stop-color="#b3141f"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f3a5c"/>
+      <stop offset="1" stop-color="#10213a"/>
+    </linearGradient>
+    <filter id="blur8"><feGaussianBlur stdDeviation="8"/></filter>
+    <filter id="blur3"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+
     <!-- One agent, facing right, feet at (0,0). Coat colour = currentColor. -->
-    <g id="agent">
-      <ellipse cx="0" cy="0" rx="78" ry="14" fill="#000" opacity="0.4"/>
-      <rect x="-26" y="-112" width="20" height="106" rx="6" fill="#1b1e25"/>
-      <rect x="8" y="-112" width="20" height="106" rx="6" fill="#1b1e25"/>
-      <ellipse cx="-12" cy="-6" rx="22" ry="9" fill="#0c0d10"/>
-      <ellipse cx="24" cy="-6" rx="22" ry="9" fill="#0c0d10"/>
+    <g id="agent" stroke="#07080c" stroke-width="3" stroke-linejoin="round">
+      <ellipse cx="0" cy="2" rx="84" ry="16" fill="#000" opacity="0.55" stroke="none" filter="url(#blur3)"/>
+      <rect x="-26" y="-112" width="20" height="108" rx="6" fill="#1b1e25"/>
+      <rect x="8" y="-112" width="20" height="108" rx="6" fill="#20232b"/>
+      <path d="M-36 -2 Q-36 -14 -14 -14 L-2 -14 L-2 -1 Z" fill="#0c0d10"/>
+      <path d="M2 -2 Q2 -14 24 -14 L38 -14 Q46 -10 44 -1 Z" fill="#0c0d10"/>
       <!-- back arm, reaching behind -->
-      <path d="M-24 -222 Q-70 -200 -96 -158" fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round"/>
-      <path d="M-24 -222 Q-70 -200 -96 -158" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="28" stroke-linecap="round"/>
+      <path d="M-24 -222 Q-72 -198 -98 -156" fill="none" stroke="#07080c" stroke-width="34" stroke-linecap="round"/>
+      <path d="M-24 -222 Q-72 -198 -98 -156" fill="none" stroke="currentColor" stroke-width="27" stroke-linecap="round"/>
+      <path d="M-24 -222 Q-72 -198 -98 -156" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="27" stroke-linecap="round"/>
       <!-- trench coat -->
-      <path d="M-58 -96 L58 -96 L44 -238 L-44 -238 Z" fill="currentColor"/>
-      <path d="M-58 -96 L-14 -96 L-12 -238 L-44 -238 Z" fill="#000" opacity="0.22"/>
-      <rect x="-54" y="-164" width="108" height="13" fill="#000" opacity="0.35"/>
-      <rect x="-8" y="-166" width="16" height="17" rx="2" fill="#ffd23f"/>
-      <path d="M2 -238 L22 -186 L36 -238" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M-60 -96 L60 -96 L45 -240 L-45 -240 Z" fill="currentColor"/>
+      <path d="M-60 -96 L60 -96 L45 -240 L-45 -240 Z" fill="url(#coatShade)" stroke="none"/>
+      <path d="M-60 -96 Q0 -88 60 -96" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="4"/>
+      <rect x="-56" y="-166" width="112" height="14" fill="#000" opacity="0.4" stroke="none"/>
+      <rect x="-9" y="-168" width="18" height="18" rx="3" fill="#ffd23f"/>
+      <path d="M2 -240 L22 -186 L38 -240" fill="none" stroke="#fff" stroke-opacity="0.4" stroke-width="5"/>
+      <circle cx="20" cy="-140" r="4" fill="#000" opacity="0.35" stroke="none"/>
+      <circle cx="20" cy="-118" r="4" fill="#000" opacity="0.35" stroke="none"/>
       <!-- head, sly grin, sunglasses, spy nose -->
-      <circle cx="6" cy="-266" r="33" fill="#e0b48f"/>
-      <path d="M8 -246 Q24 -236 40 -252" fill="none" stroke="#6b2b1d" stroke-width="4" stroke-linecap="round"/>
-      <path d="M30 -272 Q70 -262 38 -252 Z" fill="#cf9670"/>
-      <rect x="8" y="-282" width="36" height="13" rx="5" fill="#0c0c10"/>
-      <rect x="14" y="-280" width="8" height="3" fill="#fff" opacity="0.6"/>
+      <circle cx="6" cy="-268" r="34" fill="url(#skin)"/>
+      <path d="M8 -246 Q24 -234 42 -252" fill="none" stroke="#6b2b1d" stroke-width="4" stroke-linecap="round"/>
+      <path d="M30 -274 Q76 -262 38 -252 Z" fill="#d79e78"/>
+      <rect x="6" y="-286" width="40" height="15" rx="6" fill="#0c0c10"/>
+      <rect x="13" y="-283" width="10" height="4" fill="#fff" opacity="0.7" stroke="none"/>
       <!-- fedora -->
-      <ellipse cx="2" cy="-294" rx="62" ry="13" fill="#15151a"/>
-      <path d="M-34 -294 L-28 -344 Q2 -358 30 -344 L36 -294 Z" fill="#1d1d24"/>
-      <path d="M-14 -350 Q2 -340 18 -350" fill="none" stroke="#000" stroke-opacity="0.5" stroke-width="4"/>
-      <rect x="-35" y="-310" width="71" height="13" fill="currentColor"/>
+      <ellipse cx="2" cy="-296" rx="66" ry="14" fill="url(#hat)"/>
+      <path d="M-35 -296 L-29 -348 Q2 -364 31 -348 L37 -296 Z" fill="url(#hat)"/>
+      <path d="M-14 -354 Q2 -344 18 -354" fill="none" stroke="#000" stroke-opacity="0.6" stroke-width="4"/>
+      <rect x="-36" y="-313" width="73" height="14" fill="currentColor"/>
       <!-- front arm, offering a handshake -->
-      <path d="M22 -222 Q80 -210 122 -176" fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round"/>
-      <circle cx="128" cy="-172" r="16" fill="#e0b48f"/>
+      <path d="M22 -222 Q82 -210 122 -176" fill="none" stroke="#07080c" stroke-width="34" stroke-linecap="round"/>
+      <path d="M22 -222 Q82 -210 122 -176" fill="none" stroke="currentColor" stroke-width="27" stroke-linecap="round"/>
+      <circle cx="128" cy="-172" r="17" fill="url(#skin)"/>
     </g>
   </defs>
 
-  <rect width="1200" height="630" rx="36" fill="url(#spot)"/>
-  <rect width="1200" height="630" rx="36" fill="url(#grid)"/>
+  <rect width="1200" height="630" rx="36" fill="url(#bg)"/>
 
-  <!-- Crimson: smiling, cartoon bomb behind the back -->
-  <g transform="translate(470 430)" style="color:#c62a33">
+  <!-- Isometric floor grid receding to the horizon -->
+  <g stroke="#5ab0ff" stroke-opacity="0.13" stroke-width="2">
+    <path d="M600 330 L-200 730 M600 330 L1400 730 M480 390 L1080 690 M720 390 L120 690 M360 450 L840 690 M840 450 L360 690 M240 510 L600 690 M960 510 L600 690"/>
+    <path d="M520 370 L1200 710 M680 370 L0 710 M400 430 L960 710 M800 430 L240 710" stroke-opacity="0.07"/>
+  </g>
+
+  <!-- Crossing searchlights -->
+  <g filter="url(#blur8)">
+    <path d="M-40 -40 L140 -40 L760 470 L520 520 Z" fill="url(#beamRed)"/>
+    <path d="M1240 -40 L1060 -40 L440 470 L680 520 Z" fill="url(#beamBlue)"/>
+  </g>
+  <ellipse cx="600" cy="450" rx="330" ry="46" fill="#ffffff" opacity="0.06" filter="url(#blur8)"/>
+
+  <!-- Crimson: smiling, lit bomb behind the back -->
+  <g transform="translate(470 445)" style="color:#c62a33" filter="url(#shadow)">
     <use xlink:href="#agent"/>
-    <circle cx="-118" cy="-150" r="40" fill="#15151a"/>
-    <circle cx="-130" cy="-164" r="10" fill="#fff" opacity="0.35"/>
-    <rect x="-128" y="-198" width="20" height="14" rx="3" fill="#2b2b33"/>
-    <path d="M-118 -198 Q-110 -228 -136 -236" fill="none" stroke="#c9a46a" stroke-width="5"/>
-    <g transform="translate(-138 -238)">
-      <path d="M0 -22 L6 -6 L22 -8 L9 3 L16 18 L0 9 L-16 18 L-9 3 L-22 -8 L-6 -6 Z" fill="#ffd23f"/>
+    <circle cx="-120" cy="-150" r="42" fill="url(#bombG)" stroke="#07080c" stroke-width="3"/>
+    <ellipse cx="-134" cy="-166" rx="11" ry="7" fill="#fff" opacity="0.35" transform="rotate(-30 -134 -166)"/>
+    <rect x="-131" y="-200" width="22" height="15" rx="3" fill="#2b2b33" stroke="#07080c" stroke-width="3"/>
+    <path d="M-120 -200 Q-110 -232 -138 -240" fill="none" stroke="#c9a46a" stroke-width="5"/>
+    <circle cx="-140" cy="-242" r="34" fill="url(#glow)"/>
+    <g transform="translate(-140 -242)">
+      <path d="M0 -24 L6 -7 L24 -8 L10 3 L17 20 L0 10 L-17 20 L-10 3 L-24 -8 L-6 -7 Z" fill="#ffe066"/>
       <circle r="6" fill="#fff"/>
     </g>
   </g>
 
-  <!-- Cobalt: mirrored, enormous mallet behind the back -->
-  <g transform="translate(730 430) scale(-1 1)" style="color:#1f5fae">
+  <!-- Cobalt: mirrored, fingers firmly crossed behind the back -->
+  <g transform="translate(730 445) scale(-1 1)" style="color:#1f5fae" filter="url(#shadow)">
     <use xlink:href="#agent"/>
-    <rect x="-112" y="-170" width="14" height="150" rx="6" fill="#8a5a33" transform="rotate(-18 -105 -160)"/>
-    <rect x="-150" y="-240" width="96" height="58" rx="12" fill="#a8703f" transform="rotate(-18 -105 -160)"/>
-    <rect x="-150" y="-240" width="96" height="14" rx="7" fill="#c98d55" transform="rotate(-18 -105 -160)"/>
+    <g transform="translate(-104 -150) rotate(-8) scale(1.15)">
+      <!-- index and middle finger, crossed -->
+      <path d="M-7 -14 Q-6 -38 8 -62" fill="none" stroke="#07080c" stroke-width="15" stroke-linecap="round"/>
+      <path d="M-7 -14 Q-6 -38 8 -62" fill="none" stroke="#e5b791" stroke-width="10" stroke-linecap="round"/>
+      <path d="M7 -14 Q7 -36 -5 -58" fill="none" stroke="#07080c" stroke-width="15" stroke-linecap="round"/>
+      <path d="M7 -14 Q7 -36 -5 -58" fill="none" stroke="#f2cba6" stroke-width="10" stroke-linecap="round"/>
+      <circle r="21" fill="url(#skin)" stroke="#07080c" stroke-width="3"/>
+      <path d="M-12 4 Q0 12 12 4" fill="none" stroke="#a3714f" stroke-width="3"/>
+    </g>
+    <!-- motion marks: "nothing to see here" -->
+    <path d="M-150 -210 q-10 -10 0 -20 M-162 -196 q-12 -12 0 -24" fill="none" stroke="#5ab0ff" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
   </g>
 
-  <!-- shine on the handshake -->
-  <g fill="#ffd23f">
-    <path d="M600 222 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5z"/>
-    <path d="M640 200 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z" opacity="0.7"/>
+  <!-- Gleam on the handshake -->
+  <g fill="#ffe066">
+    <circle cx="600" cy="273" r="26" fill="url(#glow)" opacity="0.6"/>
+    <path d="M600 246 l6 15 15 6 -15 6 -6 15 -6 -15 -15 -6 15 -6z"/>
+    <path d="M645 222 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z" opacity="0.8"/>
+    <path d="M560 225 l2 7 7 2 -7 2 -2 7 -2 -7 -7 -2 7 -2z" opacity="0.7"/>
   </g>
 
-  <g font-family="Impact, 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" text-anchor="middle">
-    <text x="606" y="556" font-size="118" fill="#5ab0ff" letter-spacing="4">DOUBLE CROSS</text>
-    <text x="600" y="550" font-size="118" fill="#ff5a5f" letter-spacing="4">DOUBLE CROSS</text>
-    <text x="600" y="600" font-size="30" fill="#ffffff" fill-opacity="0.75" font-weight="700" letter-spacing="6" font-family="'Helvetica Neue', Arial, sans-serif">SHAKE ON IT. THEN RUN.</text>
+  <!-- Title: extruded, outlined, gradient-filled -->
+  <g font-family="Impact, 'Anton', 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" font-size="128" text-anchor="middle" letter-spacing="5" transform="translate(600 556) skewX(-6)">
+    <text x="10" y="10" fill="#000" opacity="0.5" filter="url(#blur3)">DOUBLE CROSS</text>
+    <text x="8" y="8" fill="#0b2a52">DOUBLE CROSS</text>
+    <text x="6" y="6" fill="#1f5fae">DOUBLE CROSS</text>
+    <text x="4" y="4" fill="#2f77cc">DOUBLE CROSS</text>
+    <text x="2" y="2" fill="#5ab0ff">DOUBLE CROSS</text>
+    <text x="0" y="0" fill="url(#titleFill)" stroke="#2a0508" stroke-width="5" paint-order="stroke">DOUBLE CROSS</text>
+    <text x="0" y="0" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="1.5">DOUBLE CROSS</text>
   </g>
+
+  <!-- Tagline ribbon -->
+  <g transform="translate(600 598)">
+    <path d="M-250 -22 L250 -22 L270 0 L250 22 L-250 22 L-270 0 Z" fill="url(#ribbon)" stroke="#5ab0ff" stroke-opacity="0.6" stroke-width="2"/>
+    <text x="0" y="9" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="26" letter-spacing="8" fill="#ffffff">SHAKE ON IT. THEN RUN.</text>
+  </g>
+
+  <!-- Vignette -->
+  <rect width="1200" height="630" rx="36" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="40" filter="url(#blur8)"/>
 </svg>
