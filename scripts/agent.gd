@@ -387,7 +387,7 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(-2, 0, 4, 3), Color("e8c25a"))
 		ci.draw_rect(Rect2(-10, -2, 20, 14), Color(0, 0, 0, 0.6), false, 1.5)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 14.0 if not (ko and ko_kind == "DOWN") else 50.0)
+	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 24.0 if not (ko and ko_kind == "DOWN") else 50.0)
 
 
 # ---------------------------------------------------------------- drawn fallback

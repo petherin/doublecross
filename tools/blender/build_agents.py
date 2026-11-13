@@ -11,12 +11,15 @@ Run it with a Python that has the `bpy` module (Blender 4.2 as a module):
     .blendenv/bin/python tools/blender/build_agents.py --preview  # quick test
 
 Output (in assets/sprites/):
-    agent_crimson.png, agent_cobalt.png   sprite sheets
+    agent_crimson.png, agent_cobalt.png   colour sprite sheets
+    agent_*_n.png                         matching normal maps
     agents.json                           frame size, foot anchor, animations
 
-Sheet layout: one row per direction (8 rows, direction d faces the game's
-floor angle d * 45 degrees), animations laid out left to right in the order
-listed in ANIMS. The camera matches the game's 2:1 isometric projection.
+Sheet layout: frames are numbered direction by direction (direction d faces
+the game's floor angle d * 45 degrees), animations in the order listed in
+ANIMS, and laid out SHEET_COLS to a row. Each colour sheet has a matching
+normal-map sheet (camera-space normals, OpenGL convention) so the game can
+light the agents dynamically. The camera matches the game's isometric view.
 """
 import json
 import math
@@ -36,12 +39,13 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT_DIR = os.path.join(ROOT, "assets", "sprites")
 PREVIEW = "--preview" in sys.argv
 
-FRAME = 96 if PREVIEW else 192          # pixels per frame (square)
+FRAME = 96 if PREVIEW else 224          # pixels per frame (square)
+SHEET_COLS = 18                          # frames per sheet row (keeps sheets <= 4096 wide)
 SAMPLES = 8 if PREVIEW else 32
 DIRECTIONS = 8
 
 # Animation name -> number of frames.
-ANIMS = [("idle", 2), ("walk", 8), ("search", 4), ("swing", 4), ("hurt", 1), ("down", 1)]
+ANIMS = [("idle", 2), ("walk", 12), ("run", 8), ("search", 4), ("swing", 4), ("hurt", 1), ("down", 1), ("victory", 6)]
 
 AGENTS = {
     "crimson": {"coat": (0.5, 0.025, 0.04), "band": (1.0, 0.18, 0.2), "hat": (0.05, 0.02, 0.02)},
@@ -408,11 +412,54 @@ def foot_anchor(scene, cam):
     return ax, ay, ppm_vertical
 
 
+def normal_material():
+    """Emits the surface normal in camera space as a colour (normal map)."""
+    m = bpy.data.materials.new("normals")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    vt = nt.nodes.new("ShaderNodeVectorTransform")
+    vt.vector_type = "NORMAL"
+    vt.convert_from = "WORLD"
+    vt.convert_to = "CAMERA"
+    ma = nt.nodes.new("ShaderNodeVectorMath")
+    ma.operation = "MULTIPLY_ADD"
+    # Cycles' camera space looks down +Z, so flip Z to get "towards the viewer".
+    ma.inputs[1].default_value = (0.5, 0.5, -0.5)
+    ma.inputs[2].default_value = (0.5, 0.5, 0.5)
+    em = nt.nodes.new("ShaderNodeEmission")
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    nt.links.new(geo.outputs["Normal"], vt.inputs["Vector"])
+    nt.links.new(vt.outputs["Vector"], ma.inputs[0])
+    nt.links.new(ma.outputs["Vector"], em.inputs["Color"])
+    nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+    return m
+
+
+def render_normal(scene, path, nmat):
+    """Re-renders the current pose as a normal map, then restores settings."""
+    vl = scene.view_layers[0]
+    saved = (scene.cycles.samples, scene.cycles.use_denoising, scene.render.use_freestyle,
+             scene.view_settings.view_transform)
+    vl.material_override = nmat
+    scene.cycles.samples = 4
+    scene.cycles.use_denoising = False
+    scene.render.use_freestyle = False
+    scene.view_settings.view_transform = "Raw"
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+    vl.material_override = None
+    (scene.cycles.samples, scene.cycles.use_denoising, scene.render.use_freestyle,
+     scene.view_settings.view_transform) = saved
+
+
 def render_agent(name, colors, tmp):
     scene = reset_scene()
     add_lights()
     cam = add_camera()
     agent = agent_model.Agent(colors)
+    nmat = normal_material()
     frames = []
     for d in range(DIRECTIONS):
         agent.root.rotation_euler = Euler((0, 0, math.radians(-45 * d)))
@@ -423,37 +470,49 @@ def render_agent(name, colors, tmp):
                 path = os.path.join(tmp, f"{name}_{d}_{anim}_{i}.png")
                 scene.render.filepath = path
                 bpy.ops.render.render(write_still=True)
-                row.append(path)
+                npath = os.path.join(tmp, f"{name}_{d}_{anim}_{i}_n.png")
+                render_normal(scene, npath, nmat)
+                row.append((path, npath))
         frames.append(row)
         print(f"  {name}: direction {d + 1}/{DIRECTIONS}", flush=True)
     return frames, foot_anchor(scene, cam)
 
 
-def build_sheet(frames, out_path):
+def build_sheet(frames, out_path, which):
+    """Packs all frames (direction-major) SHEET_COLS to a row."""
     from PIL import Image
-    cols = len(frames[0])
-    sheet = Image.new("RGBA", (cols * FRAME, len(frames) * FRAME), (0, 0, 0, 0))
-    for r, row in enumerate(frames):
-        for c, path in enumerate(row):
-            sheet.paste(Image.open(path).convert("RGBA"), (c * FRAME, r * FRAME))
+    flat = [f[which] for row in frames for f in row]
+    rows = (len(flat) + SHEET_COLS - 1) // SHEET_COLS
+    sheet = Image.new("RGBA", (SHEET_COLS * FRAME, rows * FRAME), (0, 0, 0, 0))
+    for k, path in enumerate(flat):
+        img = Image.open(path).convert("RGBA")
+        if which == 1:
+            # Normal maps: keep the colour opaque only where the agent is.
+            img.putalpha(Image.open(flat_alpha[k]).convert("RGBA").getchannel("A"))
+        sheet.paste(img, ((k % SHEET_COLS) * FRAME, (k // SHEET_COLS) * FRAME))
     sheet.save(out_path, optimize=True)
 
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="agents_")
-    meta = {"frame": FRAME, "directions": DIRECTIONS, "anims": {}, "sheets": {}}
+    meta = {"frame": FRAME, "directions": DIRECTIONS, "cols": SHEET_COLS, "anims": {}, "sheets": {}, "normals": {}}
     col = 0
     for anim, n in ANIMS:
         meta["anims"][anim] = {"start": col, "count": n}
         col += n
+    meta["frames_per_direction"] = col
     try:
         for name, colors in AGENTS.items():
             print("Rendering", name, flush=True)
             frames, (ax, ay, ppm) = render_agent(name, colors, tmp)
+            global flat_alpha
+            flat_alpha = [f[0] for row in frames for f in row]
             out = os.path.join(OUT_DIR, f"agent_{name}.png")
-            build_sheet(frames, out)
+            build_sheet(frames, out, 0)
+            build_sheet(frames, os.path.join(OUT_DIR, f"agent_{name}_n.png"), 1)
             meta["sheets"][name] = f"res://assets/sprites/agent_{name}.png"
+            meta["normals"][name] = f"res://assets/sprites/agent_{name}_n.png"
             meta["anchor"] = [round(ax, 2), round(ay, 2)]
             meta["pixels_per_metre"] = round(ppm, 3)
             print("  wrote", out, flush=True)

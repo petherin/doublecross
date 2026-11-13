@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dai3c74qm6746"
-path="res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.ctex"
+path.s3tc="res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.s3tc.ctex"
+path.etc2="res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/sprites/agent_crimson.png"
-dest_files=["res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.ctex"]
+dest_files=["res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.s3tc.ctex", "res://.godot/imported/agent_crimson.png-ce3bf7576ecd03118c05a5f88c254d13.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

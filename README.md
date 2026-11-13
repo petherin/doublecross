@@ -180,8 +180,10 @@ wraparound shades, a snap-brim fedora with pinched crown and ribbon, a
 popped-collar trench coat with belt and double-breasted buttons, gloves and
 polished shoes, all with woven-fabric, felt, leather and skin materials.
 `tools/blender/build_agents.py` poses it (forward kinematics) and renders 8
-directions × 20 frames (idle, walk, search, cosh swing, hurt, knocked down)
-with ink outlines from an orthographic camera at the game's isometric angle.
+directions × 38 frames (idle, 12-frame walk, 8-frame run, search, cosh swing,
+hurt, knocked down and a victory celebration) with ink outlines from an
+orthographic camera at the game's isometric angle, plus a matching normal map
+for every frame so the game's lights shade the agents.
 
 ```bash
 python3.11 -m venv .blendenv

@@ -1,6 +1,7 @@
 {
-  "frame": 192,
+  "frame": 224,
   "directions": 8,
+  "cols": 18,
   "anims": {
     "idle": {
       "start": 0,
@@ -8,32 +9,45 @@
     },
     "walk": {
       "start": 2,
+      "count": 12
+    },
+    "run": {
+      "start": 14,
       "count": 8
     },
     "search": {
-      "start": 10,
+      "start": 22,
       "count": 4
     },
     "swing": {
-      "start": 14,
+      "start": 26,
       "count": 4
     },
     "hurt": {
-      "start": 18,
+      "start": 30,
       "count": 1
     },
     "down": {
-      "start": 19,
+      "start": 31,
       "count": 1
+    },
+    "victory": {
+      "start": 32,
+      "count": 6
     }
   },
   "sheets": {
     "crimson": "res://assets/sprites/agent_crimson.png",
     "cobalt": "res://assets/sprites/agent_cobalt.png"
   },
+  "normals": {
+    "crimson": "res://assets/sprites/agent_crimson_n.png",
+    "cobalt": "res://assets/sprites/agent_cobalt_n.png"
+  },
+  "frames_per_direction": 38,
   "anchor": [
-    96.0,
-    154.84
+    112.0,
+    180.64
   ],
-  "pixels_per_metre": 63.953
+  "pixels_per_metre": 74.611
 }
