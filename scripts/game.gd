@@ -35,6 +35,7 @@ const TIME_LIMIT := 360.0       # each agent's clock, in seconds
 const TRAP_PENALTY := 20.0      # seconds lost when caught by a trap
 const DOWN_PENALTY := 30.0      # seconds lost when taken out in a fight
 const DOWN_TIME := 3.0
+const PROTECT_TIME := 3.0       # can't be hit for this long after getting up
 const MAX_HP := 3
 const MAX_DARTS := 3
 const MELEE_RANGE := 85.0
@@ -615,7 +616,7 @@ func _handle_hit(by: int, target: int, kind: String) -> void:
 		return
 	var ta: Agent = _agent_by_id[target]
 	var ba: Agent = _agent_by_id[by]
-	if ta.ko_time > 0.0:
+	if ta.ko_time > 0.0 or ta.protect_time > 0.0:
 		return
 	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > MELEE_RANGE * 2.0):
 		return
@@ -782,6 +783,7 @@ func _on_event(e: Dictionary) -> void:
 			var victim: Agent = _agent_by_id[pid]
 			victim.hurt(victim.position - e["from"])
 			victim.knock_out("DOWN", DOWN_TIME)
+			victim.protect_time = PROTECT_TIME
 			_view.add_effect("DOWN", e["room"], victim.position)
 			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
 			if me:

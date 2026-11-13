@@ -43,6 +43,9 @@ var _f: Dictionary = FIGHT["hard"]
 var _engaged := false
 var _met_in := Vector2i(-1, -1)
 var _attack_cd := 0.0
+var _fight_time := 0.0
+var _chase: PackedVector2Array = PackedVector2Array()
+var _chase_replan := 0.0
 
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
@@ -95,6 +98,8 @@ func on_event(e: Dictionary) -> void:
 			# trapped furniture, so a careful bot never needs to come back to it.
 			_maybe_trap(key, _p["trap"])
 		"ko", "down":
+			if e.get("type") == "down" and e.get("by", 0) == id:
+				_engaged = false
 			var room: Vector2i = e["room"]
 			if pid == id or _p["sneaky"]:
 				# Intel just went flying in that room: worth searching it again.
@@ -149,9 +154,9 @@ func _physics_process(delta: float) -> void:
 # ------------------------------------------------------------------ fighting
 
 ## Returns true while the bot is busy fighting (and not exploring).
-func _fight(_delta: float) -> bool:
+func _fight(delta: float) -> bool:
 	var rival: Agent = game.local_agent
-	if rival == null or rival == agent or rival.room != agent.room or rival.ko_time > 0.0:
+	if rival == null or rival == agent or rival.room != agent.room:
 		_met_in = Vector2i(-1, -1)
 		_engaged = false
 		return false
@@ -159,13 +164,20 @@ func _fight(_delta: float) -> bool:
 	if _met_in != agent.room:
 		_met_in = agent.room
 		_engaged = _rng.randf() < _f["aggro"]
+		_fight_time = 0.0
 		_attack_cd = _rng.randf_range(_f["react"][0], _f["react"][1])
-	# Carrying everything? Ignore the rival and run for it.
-	if not _engaged or game._missing(id).is_empty():
+	# Carrying everything? Ignore the rival and run for it. Also leave a rival
+	# who's down or just back on their feet alone.
+	if not _engaged or game._missing(id).is_empty() or rival.ko_time > 0.0 or rival.protect_time > 0.0:
 		return false
 	var to := rival.position - agent.position
 	var dist := to.length()
 	if dist > _f["chase"]:
+		return false
+	# Don't keep at a fight that's going nowhere.
+	_fight_time += delta
+	if _fight_time > 6.0:
+		_engaged = false
 		return false
 	_path = PackedVector2Array()
 	_action = {}
@@ -179,8 +191,16 @@ func _fight(_delta: float) -> bool:
 		game.do_fire(id, _f["aim"])
 		_attack_cd = game.DART_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
 		return true
-	# Close in.
-	agent.move_input = to.normalized() * _p["speed"]
+	# Close in, going round any furniture in the way.
+	_chase_replan -= delta
+	if _chase_replan <= 0.0 or _chase.is_empty():
+		_chase_replan = 0.4
+		var grid := _grid(agent.room)
+		_chase = grid.get_point_path(_cell_of(agent.position, grid), _cell_of(rival.position, grid), true)
+	while not _chase.is_empty() and agent.position.distance_to(_chase[0]) < 12.0:
+		_chase.remove_at(0)
+	var goal: Vector2 = _chase[0] if not _chase.is_empty() else rival.position
+	agent.move_input = (goal - agent.position).normalized() * _p["speed"]
 	return true
 
 

@@ -49,6 +49,8 @@ var hp := 3
 var max_hp := 3
 var attack_anim := 0.0       # counts down while swinging the cosh
 var hurt_time := 0.0         # red flash after being hit
+## Can't be hit for a moment after getting back up (flickers).
+var protect_time := 0.0
 var _knock := Vector2.ZERO   # knock-back velocity
 
 var _busy_kind := ""       # "search" or "trap"
@@ -87,6 +89,8 @@ func _physics_process(delta: float) -> void:
 	if moving or searching:
 		_walk += delta * 12.0
 	attack_anim = maxf(0.0, attack_anim - delta)
+	if ko_time <= 0.0:
+		protect_time = maxf(0.0, protect_time - delta)
 	hurt_time = maxf(0.0, hurt_time - delta)
 	if ko_time > 0.0:
 		ko_time = maxf(0.0, ko_time - delta)
@@ -346,6 +350,8 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		tint = tint.lerp(Color(0.28, 0.25, 0.23), minf(1.0, soot * 1.4))
 	if hurt_time > 0.0:
 		tint = tint.lerp(Color(1.0, 0.45, 0.45), hurt_time / 0.3)
+	if protect_time > 0.0 and ko_time <= 0.0:
+		tint.a = 0.35 if int(Time.get_ticks_msec() / 90) % 2 == 0 else 0.85
 	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f))
 	ci.draw_texture_rect_region(tex, Rect2(-anchor, Vector2(fsize, fsize)), region, tint)
 	if has_case and not searching and attack_anim <= 0.0 and not ko:
