@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#5ab0ff" stroke-opacity="0.08" stroke-width="2"/>
+    </pattern>
+    <radialGradient id="spot" cx="50%" cy="45%" r="55%">
+      <stop offset="0" stop-color="#1b2a40"/>
+      <stop offset="1" stop-color="#070a0f"/>
+    </radialGradient>
+    <!-- One agent, facing right, feet at (0,0). Coat colour = currentColor. -->
+    <g id="agent">
+      <ellipse cx="0" cy="0" rx="78" ry="14" fill="#000" opacity="0.4"/>
+      <rect x="-26" y="-112" width="20" height="106" rx="6" fill="#1b1e25"/>
+      <rect x="8" y="-112" width="20" height="106" rx="6" fill="#1b1e25"/>
+      <ellipse cx="-12" cy="-6" rx="22" ry="9" fill="#0c0d10"/>
+      <ellipse cx="24" cy="-6" rx="22" ry="9" fill="#0c0d10"/>
+      <!-- back arm, reaching behind -->
+      <path d="M-24 -222 Q-70 -200 -96 -158" fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round"/>
+      <path d="M-24 -222 Q-70 -200 -96 -158" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="28" stroke-linecap="round"/>
+      <!-- trench coat -->
+      <path d="M-58 -96 L58 -96 L44 -238 L-44 -238 Z" fill="currentColor"/>
+      <path d="M-58 -96 L-14 -96 L-12 -238 L-44 -238 Z" fill="#000" opacity="0.22"/>
+      <rect x="-54" y="-164" width="108" height="13" fill="#000" opacity="0.35"/>
+      <rect x="-8" y="-166" width="16" height="17" rx="2" fill="#ffd23f"/>
+      <path d="M2 -238 L22 -186 L36 -238" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="5" stroke-linejoin="round"/>
+      <!-- head, sly grin, sunglasses, spy nose -->
+      <circle cx="6" cy="-266" r="33" fill="#e0b48f"/>
+      <path d="M8 -246 Q24 -236 40 -252" fill="none" stroke="#6b2b1d" stroke-width="4" stroke-linecap="round"/>
+      <path d="M30 -272 Q70 -262 38 -252 Z" fill="#cf9670"/>
+      <rect x="8" y="-282" width="36" height="13" rx="5" fill="#0c0c10"/>
+      <rect x="14" y="-280" width="8" height="3" fill="#fff" opacity="0.6"/>
+      <!-- fedora -->
+      <ellipse cx="2" cy="-294" rx="62" ry="13" fill="#15151a"/>
+      <path d="M-34 -294 L-28 -344 Q2 -358 30 -344 L36 -294 Z" fill="#1d1d24"/>
+      <path d="M-14 -350 Q2 -340 18 -350" fill="none" stroke="#000" stroke-opacity="0.5" stroke-width="4"/>
+      <rect x="-35" y="-310" width="71" height="13" fill="currentColor"/>
+      <!-- front arm, offering a handshake -->
+      <path d="M22 -222 Q80 -210 122 -176" fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round"/>
+      <circle cx="128" cy="-172" r="16" fill="#e0b48f"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="630" rx="36" fill="url(#spot)"/>
+  <rect width="1200" height="630" rx="36" fill="url(#grid)"/>
+
+  <!-- Crimson: smiling, cartoon bomb behind the back -->
+  <g transform="translate(470 430)" style="color:#c62a33">
+    <use xlink:href="#agent"/>
+    <circle cx="-118" cy="-150" r="40" fill="#15151a"/>
+    <circle cx="-130" cy="-164" r="10" fill="#fff" opacity="0.35"/>
+    <rect x="-128" y="-198" width="20" height="14" rx="3" fill="#2b2b33"/>
+    <path d="M-118 -198 Q-110 -228 -136 -236" fill="none" stroke="#c9a46a" stroke-width="5"/>
+    <g transform="translate(-138 -238)">
+      <path d="M0 -22 L6 -6 L22 -8 L9 3 L16 18 L0 9 L-16 18 L-9 3 L-22 -8 L-6 -6 Z" fill="#ffd23f"/>
+      <circle r="6" fill="#fff"/>
+    </g>
+  </g>
+
+  <!-- Cobalt: mirrored, enormous mallet behind the back -->
+  <g transform="translate(730 430) scale(-1 1)" style="color:#1f5fae">
+    <use xlink:href="#agent"/>
+    <rect x="-112" y="-170" width="14" height="150" rx="6" fill="#8a5a33" transform="rotate(-18 -105 -160)"/>
+    <rect x="-150" y="-240" width="96" height="58" rx="12" fill="#a8703f" transform="rotate(-18 -105 -160)"/>
+    <rect x="-150" y="-240" width="96" height="14" rx="7" fill="#c98d55" transform="rotate(-18 -105 -160)"/>
+  </g>
+
+  <!-- shine on the handshake -->
+  <g fill="#ffd23f">
+    <path d="M600 222 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5z"/>
+    <path d="M640 200 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z" opacity="0.7"/>
+  </g>
+
+  <g font-family="Impact, 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" text-anchor="middle">
+    <text x="606" y="556" font-size="118" fill="#5ab0ff" letter-spacing="4">DOUBLE CROSS</text>
+    <text x="600" y="550" font-size="118" fill="#ff5a5f" letter-spacing="4">DOUBLE CROSS</text>
+    <text x="600" y="600" font-size="30" fill="#ffffff" fill-opacity="0.75" font-weight="700" letter-spacing="6" font-family="'Helvetica Neue', Arial, sans-serif">SHAKE ON IT. THEN RUN.</text>
+  </g>
+</svg>
