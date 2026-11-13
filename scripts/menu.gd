@@ -10,11 +10,21 @@ var _ip_edit: LineEdit
 var _main_buttons: Control
 var _cancel: Button
 var _t := 0.0
+var _content: Control
+var _lift := 0.0
+
+const Ui = preload("res://scripts/ui.gd")
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = _make_theme()
+	# All menu widgets live in a 1280x800 panel that is centred (and lifted
+	# above the on-screen keyboard) in _process.
+	_content = Control.new()
+	_content.size = Ui.BASE
+	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_content)
 
 	var title := Label.new()
 	title.text = "DOUBLE CROSS"
@@ -26,7 +36,7 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.position = Vector2(0, 60)
 	title.size = Vector2(1280, 110)
-	add_child(title)
+	_content.add_child(title)
 
 	var sub := Label.new()
 	sub.text = "Two agents. One secret base. Only one gets out."
@@ -35,14 +45,14 @@ func _ready() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.position = Vector2(0, 175)
 	sub.size = Vector2(1280, 40)
-	add_child(sub)
+	_content.add_child(sub)
 
 	# Left column: host / practice
 	var left := VBoxContainer.new()
 	left.position = Vector2(140, 280)
 	left.size = Vector2(440, 300)
 	left.add_theme_constant_override("separation", 22)
-	add_child(left)
+	_content.add_child(left)
 	_main_buttons = left
 	left.add_child(_big_button("HOST GAME", _on_host))
 	left.add_child(_big_button("PRACTICE SOLO", func(): practice_requested.emit()))
@@ -52,7 +62,7 @@ func _ready() -> void:
 	right.position = Vector2(700, 280)
 	right.size = Vector2(440, 400)
 	right.add_theme_constant_override("separation", 14)
-	add_child(right)
+	_content.add_child(right)
 	var jl := Label.new()
 	jl.text = "GAMES ON YOUR NETWORK"
 	jl.add_theme_color_override("font_color", Color("5ab0ff"))
@@ -93,7 +103,7 @@ func _ready() -> void:
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", Color("ffd23f"))
-	add_child(_status)
+	_content.add_child(_status)
 
 	_cancel = Button.new()
 	_cancel.text = "CANCEL"
@@ -104,7 +114,7 @@ func _ready() -> void:
 		Net.end_session("")
 		_set_waiting(false)
 		set_status(""))
-	add_child(_cancel)
+	_content.add_child(_cancel)
 
 	Net.hosts_changed.connect(_refresh_hosts)
 	Net.joined_host.connect(func(): set_status("Connected! Briefing incoming…"))
@@ -121,6 +131,21 @@ func set_status(msg: String) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	var vp := Ui.view_size(self)
+	var k := minf(vp.x / Ui.BASE.x, vp.y / Ui.BASE.y)
+	_content.scale = Vector2(k, k)
+	# Lift the menu so the IP box stays visible above the on-screen keyboard.
+	var target := 0.0
+	var kb := 0.0
+	if _ip_edit.has_focus() and DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		kb = float(DisplayServer.virtual_keyboard_get_height())
+	if kb > 0.0:
+		var screen_to_view := vp.y / float(DisplayServer.window_get_size().y)
+		var kb_top := vp.y - kb * screen_to_view
+		var field_bottom := (_ip_edit.get_global_rect().end.y + _lift) + 20.0
+		target = maxf(0.0, field_bottom - kb_top)
+	_lift = lerpf(_lift, target, minf(1.0, delta * 12.0))
+	_content.position = ((vp - Ui.BASE * k) / 2.0).floor() - Vector2(0, _lift)
 	queue_redraw()
 
 
@@ -128,12 +153,12 @@ func _draw() -> void:
 	# Animated radar-grid backdrop
 	draw_rect(Rect2(Vector2.ZERO, size), Color("070a0f"))
 	var off := fmod(_t * 20.0, 64.0)
-	for x in range(-64, 1344, 64):
-		draw_line(Vector2(x + off, 0), Vector2(x + off, 800), Color(0.35, 0.69, 1.0, 0.06), 1.0)
-	for y in range(-64, 864, 64):
-		draw_line(Vector2(0, y + off), Vector2(1280, y + off), Color(0.35, 0.69, 1.0, 0.06), 1.0)
-	var sweep := fmod(_t * 0.6, 1.0) * 1400.0 - 60.0
-	draw_rect(Rect2(sweep, 0, 60, 800), Color(1.0, 0.35, 0.37, 0.05))
+	for x in range(-64, int(size.x) + 64, 64):
+		draw_line(Vector2(x + off, 0), Vector2(x + off, size.y), Color(0.35, 0.69, 1.0, 0.06), 1.0)
+	for y in range(-64, int(size.y) + 64, 64):
+		draw_line(Vector2(0, y + off), Vector2(size.x, y + off), Color(0.35, 0.69, 1.0, 0.06), 1.0)
+	var sweep := fmod(_t * 0.6, 1.0) * (size.x + 120.0) - 60.0
+	draw_rect(Rect2(sweep, 0, 60, size.y), Color(1.0, 0.35, 0.37, 0.05))
 
 
 func _on_host() -> void:

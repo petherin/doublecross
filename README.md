@@ -53,6 +53,7 @@ What works today:
 - A seeded 3×3 secret base. Both tablets build the identical map from one shared number.
 - Isometric rooms with depth-sorted furniture, doors and a mini-map.
 - Touch joystick (left half of the screen), plus WASD or arrow keys on a computer.
+- Works on phones as well as tablets: wide screens get a wider view, and on small screens the controls and text are scaled up. You can mix a phone and a tablet in one match.
 - You only see your rival when you're in the same room.
 - Four pieces of intel (PASSPORT, CASH, MICROFILM, KEYCARD) and a BRIEFCASE are hidden in the furniture. There's only one of each, so it's a race.
 - Without the briefcase you can carry just one item. Search with full hands and you swap: your item stays behind in that furniture for your rival to find.
@@ -61,7 +62,7 @@ What works today:
 
 ## Playing it
 
-### On two Android tablets
+### On two Android tablets (or phones)
 
 1. Open the [**Actions** tab](../../actions/workflows/android.yml), click the latest green run,
    and download the **double-cross-apk** artifact (it's a zip with the APK inside).

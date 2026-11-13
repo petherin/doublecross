@@ -7,6 +7,7 @@ signal exit_touched
 signal search_finished(room: Vector2i, idx: int)
 
 const World = preload("res://scripts/world.gd")
+const Ui = preload("res://scripts/ui.gd")
 const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
@@ -235,7 +236,7 @@ func paint(ci: CanvasItem) -> void:
 	# Name tag (unflipped)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var font := ThemeDB.fallback_font
-	var size := 16
+	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
 

@@ -12,6 +12,7 @@ const World = preload("res://scripts/world.gd")
 const Agent = preload("res://scripts/agent.gd")
 const RoomView = preload("res://scripts/room_view.gd")
 const Hud = preload("res://scripts/hud.gd")
+const Ui = preload("res://scripts/ui.gd")
 
 const SEARCH_TIME := 0.8
 const SEARCH_REACH := 46.0
@@ -46,6 +47,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array) -> void:
 	_view = RoomView.new()
 	_view.world = world
 	add_child(_view)
+	_view.position = Ui.center_offset(self)
+	get_viewport().size_changed.connect(func(): _view.position = Ui.center_offset(self))
 
 	ids.sort()
 	for i in ids.size():

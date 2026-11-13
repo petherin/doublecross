@@ -37,7 +37,7 @@ func _input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	if _touch == -1:
-		var hint := Vector2(150, size.y - 150)
+		var hint := Vector2(160, size.y - 130)
 		draw_circle(hint, MAX_DIST, Color(1, 1, 1, 0.05))
 		draw_arc(hint, MAX_DIST, 0, TAU, 48, Color(1, 1, 1, 0.15), 2.0, true)
 		draw_circle(hint, 34, Color(1, 1, 1, 0.12))
