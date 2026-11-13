@@ -21,6 +21,10 @@ var world: World
 var room := Vector2i.ZERO
 var facing := 0.0
 var moving := false
+## Moving at (nearly) full speed: uses the run animation.
+var running := false
+## Plays the victory animation (set when this agent wins).
+var celebrating := false
 var is_local := false
 var move_input := Vector2.ZERO
 
@@ -87,7 +91,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		position = position.lerp(_target, minf(1.0, delta * 15.0))
 	if moving or searching:
-		_walk += delta * 12.0
+		_walk += delta * (15.0 if running else 12.0)
 	attack_anim = maxf(0.0, attack_anim - delta)
 	if ko_time <= 0.0:
 		protect_time = maxf(0.0, protect_time - delta)
@@ -178,6 +182,7 @@ func _local_move(delta: float) -> void:
 	if frozen or searching or ko_time > 0.0:
 		v = Vector2.ZERO
 	moving = v.length() > 25.0
+	running = v.length() > SPEED * 0.8
 	if moving:
 		facing = v.angle()
 	var p := position + (v + _knock) * delta
@@ -252,18 +257,19 @@ func _enter(dir: int) -> Vector2:
 
 func _send_state() -> void:
 	if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
-		net_state.rpc(room, position, facing, moving, searching)
+		net_state.rpc(room, position, facing, (2 if running else 1) if moving else 0, searching)
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func net_state(r: Vector2i, pos: Vector2, f: float, m: bool, s: bool) -> void:
+func net_state(r: Vector2i, pos: Vector2, f: float, m: int, s: bool) -> void:
 	searching = s
 	if r != room:
 		room = r
 		position = pos
 	_target = pos
 	facing = f
-	moving = m
+	moving = m > 0
+	running = m == 2
 
 
 ## Draws this agent onto the room renderer `ci` (so it can be depth-sorted
@@ -299,7 +305,13 @@ func _sheet() -> Texture2D:
 		var m := _load_meta()
 		var tex: Texture2D = null
 		if m.has("sheets") and m["sheets"].has(sheet_name) and ResourceLoader.exists(m["sheets"][sheet_name]):
-			tex = load(m["sheets"][sheet_name])
+			var ct := CanvasTexture.new()
+			ct.diffuse_texture = load(m["sheets"][sheet_name])
+			# A normal map lets the room's lights shade the agent.
+			var normals: Dictionary = m.get("normals", {})
+			if normals.has(sheet_name) and ResourceLoader.exists(normals[sheet_name]):
+				ct.normal_texture = load(normals[sheet_name])
+			tex = ct
 		_sheets[sheet_name] = tex
 	return _sheets[sheet_name]
 
@@ -315,8 +327,13 @@ func _sprite_frame() -> Array:
 		return ["swing", int(clampf(1.0 - attack_anim / 0.3, 0.0, 0.999) * 4.0)]
 	if searching:
 		return ["search", int(_walk * 0.6) % 4]
+	var m := _load_meta()
+	if celebrating and m["anims"].has("victory"):
+		return ["victory", int(Time.get_ticks_msec() / 110) % int(m["anims"]["victory"]["count"])]
 	if moving:
-		return ["walk", int(fposmod(_walk, TAU) / TAU * 8.0) % 8]
+		var anim := "run" if running and m["anims"].has("run") else "walk"
+		var n: int = m["anims"][anim]["count"]
+		return [anim, int(fposmod(_walk, TAU) / TAU * n) % n]
 	return ["idle", int(Time.get_ticks_msec() / 700) % 2]
 
 
@@ -340,9 +357,15 @@ func _paint_sprite(ci: CanvasItem) -> void:
 
 	var fr := _sprite_frame()
 	var anim: Dictionary = m["anims"][fr[0]]
-	var col: int = int(anim["start"]) + int(fr[1])
 	var d := posmod(int(round(facing / (TAU / dirs))), dirs)
-	var region := Rect2(col * fsize, d * fsize, fsize, fsize)
+	var region: Rect2
+	if m.has("cols"):
+		var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
+		var cols: int = m["cols"]
+		region = Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
+	else:
+		var col: int = int(anim["start"]) + int(fr[1])
+		region = Rect2(col * fsize, d * fsize, fsize, fsize)
 	# Dizzy wobble while knocked out by a trap.
 	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" else 0.0
 	var tint := Color.WHITE

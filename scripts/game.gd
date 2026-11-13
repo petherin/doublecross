@@ -90,6 +90,10 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	_rng.randomize()
 	world = World.new(seed_value)
 	contents = world.hidden.duplicate()
+	# Darken the world a touch so the room's lights have something to do.
+	var ambient := CanvasModulate.new()
+	ambient.color = Color(0.66, 0.68, 0.76)
+	add_child(ambient)
 	_view = RoomView.new()
 	_view.world = world
 	add_child(_view)
@@ -216,6 +220,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	_view.room = room
+	_view.lights.rebuild(world, room)
 	_hud.show_room(room, animate)
 	if animate:
 		Sound.play("door", -6.0)
@@ -867,6 +872,8 @@ func game_over(winner: int, reason := "escape") -> void:
 	over = true
 	for a in agents:
 		a.frozen = true
+	if _agent_by_id.has(winner):
+		_agent_by_id[winner].celebrating = true
 	var name := ""
 	if _agent_by_id.has(winner):
 		name = _agent_by_id[winner].display_name

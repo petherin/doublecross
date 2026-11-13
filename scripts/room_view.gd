@@ -7,6 +7,7 @@ const World = preload("res://scripts/world.gd")
 const Icons = preload("res://scripts/icons.gd")
 const Art = preload("res://scripts/art.gd")
 const LightLayer = preload("res://scripts/light_layer.gd")
+const RoomLights = preload("res://scripts/room_lights.gd")
 const POSTERS := ["TRUST NO ONE", "WALLS HAVE EARS", "SHRED AFTER READING", "LOOK BUSY"]
 const SIGNS := ["RESTRICTED", "AUTHORISED ONLY", "NO ENTRY", "DANGER: HIGH VOLTAGE"]
 
@@ -21,7 +22,10 @@ var world: World
 var room := Vector2i.ZERO:
 	set(v):
 		room = v
+		if lights and world:
+			lights.rebuild(world, room)
 		queue_redraw()
+var lights: RoomLights
 ## Agents to draw; only those in `room` are shown.
 var agents: Array = []
 ## Index of the furniture the local agent can search right now (-1 = none).
@@ -42,9 +46,11 @@ func _ready() -> void:
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	# Smooth down-scaling of the agent sprite sheets (they're rendered large).
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	var lights := LightLayer.new()
-	lights.view = self
+	lights = RoomLights.new()
 	add_child(lights)
+	var glow := LightLayer.new()
+	glow.view = self
+	add_child(glow)
 
 
 ## Affine transforms for drawing "flat" in the isometric world:
@@ -81,6 +87,11 @@ static func _life(kind: String) -> float:
 
 func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
 	_effects.append({"kind": kind, "room": effect_room, "pos": pos, "t": 0.0})
+	if effect_room == room and lights:
+		if kind == "BOMB":
+			lights.flash(pos, Color(1.0, 0.55, 0.2), 2.2)
+		elif kind == "DOWN":
+			lights.flash(pos, Color(1.0, 0.9, 0.6), 1.0)
 
 
 static func P(x: float, y: float, z := 0.0) -> Vector2:
@@ -664,7 +675,47 @@ func _draw_front_ledges(R: Rect2, tint: Color) -> void:
 
 # ---------------------------------------------------------------- furniture
 
+static var _furn_meta := {}
+static var _furn_tex := {}
+
+
+## The Blender-rendered sprite for this furniture (with normal map), if any.
+static func _furniture_sprite(kind: String, wall: String) -> Array:
+	if _furn_meta.is_empty():
+		_furn_meta = {"sprites": {}}
+		if FileAccess.file_exists("res://assets/sprites/furniture.json"):
+			var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://assets/sprites/furniture.json"))
+			if parsed is Dictionary:
+				_furn_meta = parsed
+	var key := kind + "_" + wall
+	if not _furn_tex.has(key):
+		var info: Dictionary = _furn_meta["sprites"].get(key, {})
+		var tex: CanvasTexture = null
+		if not info.is_empty() and ResourceLoader.exists(info["color"]):
+			tex = CanvasTexture.new()
+			tex.diffuse_texture = load(info["color"])
+			if ResourceLoader.exists(info["normal"]):
+				tex.normal_texture = load(info["normal"])
+		_furn_tex[key] = tex
+	if _furn_tex[key] == null:
+		return []
+	return [_furn_tex[key], Vector2(_furn_meta["sprites"][key]["anchor"][0], _furn_meta["sprites"][key]["anchor"][1]), float(_furn_meta.get("scale", 1.0))]
+
+
 func _draw_furniture(f: Dictionary, tint: Color) -> void:
+	var sprite := _furniture_sprite(f["type"], f["wall"])
+	if not sprite.is_empty():
+		var at := World.iso((f["rect"] as Rect2).get_center())
+		var sc: float = sprite[2]
+		draw_set_transform(at, 0.0, Vector2(sc, sc))
+		draw_texture(sprite[0], -sprite[1])
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		return
+	_draw_furniture_drawn(f, tint)
+
+
+## The original drawn-in-code furniture (used if the sprites are missing).
+func _draw_furniture_drawn(f: Dictionary, tint: Color) -> void:
 	var r: Rect2 = f["rect"]
 	var d: int = f["detail"]
 	var h: float = HEIGHTS.get(f["type"], 50.0)

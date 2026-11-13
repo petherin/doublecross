@@ -43,10 +43,6 @@ func _draw() -> void:
 		var flicker := 1.0
 		if (hash_v + i) % 4 == 0:
 			flicker = 0.75 + 0.25 * signf(sin(t * 13.0 + sin(t * 3.1) * 4.0))
-		draw_set_transform_matrix(_floor_xf())
-		draw_texture_rect(soft, Rect2(lp - Vector2(300, 300), Vector2(600, 600)), false, Color(warm, 0.2 * flicker))
-		draw_texture_rect(soft, Rect2(lp - Vector2(130, 130), Vector2(260, 260)), false, Color(warm, 0.12 * flicker))
-		draw_set_transform_matrix(Transform2D.IDENTITY)
 		var top := World.iso(lp, 210.0)
 		var l := World.iso(lp + Vector2(-140, 140), 0.0)
 		var r := World.iso(lp + Vector2(140, -140), 0.0)
@@ -64,12 +60,6 @@ func _draw() -> void:
 	draw_texture_rect(soft, Rect2(R.position.x - 200, R.position.y - 160, R.size.x + 400, 320), false, Color(tint, 0.09))
 	draw_texture_rect(soft, Rect2(R.position.x - 160, R.position.y - 200, 320, R.size.y + 400), false, Color(tint, 0.07))
 
-	# Screens and monitors glow onto the floor in front of them.
-	for f in world.furniture(room):
-		if f["type"] == "console" or f["type"] == "desk":
-			var c: Rect2 = f["rect"]
-			var pulse := 0.8 + 0.2 * sin(t * 3.0 + f["detail"])
-			draw_texture_rect(soft, Rect2(c.get_center() - Vector2(110, 110), Vector2(220, 220)), false, Color(tint.lightened(0.3), 0.12 * pulse))
 
 	# Daylight from the exit.
 	for dir in [World.Dir.UP, World.Dir.LEFT]:
