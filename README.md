@@ -189,6 +189,8 @@ python3.11 -m venv .blendenv
 .blendenv/bin/python tools/blender/build_agents.py
 ```
 
+<p align="center"><img src="docs/agent-turnaround.png" alt="The crimson agent from eight directions, plus walk, search, swing, hurt and knocked-down poses" width="90%"></p>
+
 `--preview` renders small, fast sheets for trying out changes. If the sheets
 are missing, the game falls back to the original drawn-in-code agents.
 
