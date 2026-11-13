@@ -54,7 +54,15 @@ const WALL_TYPES := ["desk", "console", "cabinet", "locker", "shelf", "safe", "p
 const FRONT_TYPES := ["desk", "crate", "safe", "plant", "sofa", "console"]
 const FREE_TYPES := ["crate", "desk", "plant", "crate"]
 
+const INTEL := ["PASSPORT", "CASH", "MICROFILM", "KEYCARD"]
+const BRIEFCASE := "BRIEFCASE"
+
 var seed_value := 0
+## The one room with a way out, and which (outer, back) wall it's on.
+var exit_room := Vector2i(1, 0)
+var exit_dir: int = Dir.UP
+## Starting contents of the furniture: furniture_key -> item name.
+var hidden := {}
 ## Vector2i -> { "name": String, "tint": Color, "furniture": Array[Dictionary] }
 var rooms := {}
 
@@ -74,11 +82,38 @@ func _init(seed_in: int) -> void:
 				"furniture": _make_furniture(rng),
 			}
 			i += 1
+	# The exit is on a back (upper) outer wall so it's always in view,
+	# and never in a starting room.
+	var exits := [
+		[Vector2i(1, 0), Dir.UP], [Vector2i(2, 0), Dir.UP],
+		[Vector2i(0, 1), Dir.LEFT], [Vector2i(0, 2), Dir.LEFT],
+	]
+	var e: Array = exits[rng.randi_range(0, exits.size() - 1)]
+	exit_room = e[0]
+	exit_dir = e[1]
+	_hide_items(rng)
 
 
 func has_door(room: Vector2i, dir: int) -> bool:
 	var n: Vector2i = room + DIR_VEC[dir]
 	return n.x >= 0 and n.y >= 0 and n.x < COLS and n.y < ROWS
+
+
+func is_exit(room: Vector2i, dir: int) -> bool:
+	return room == exit_room and dir == exit_dir
+
+
+## 0 = solid wall, 1 = door to another room, 2 = the exit.
+func opening(room: Vector2i, dir: int) -> int:
+	if has_door(room, dir):
+		return 1
+	if is_exit(room, dir):
+		return 2
+	return 0
+
+
+static func furniture_key(room: Vector2i, idx: int) -> String:
+	return "%d,%d,%d" % [room.x, room.y, idx]
 
 
 func furniture(room: Vector2i) -> Array:
@@ -155,6 +190,24 @@ func _make_furniture(rng: RandomNumberGenerator) -> Array:
 		if not clash:
 			out.append({"type": t, "rect": r, "wall": s["wall"], "detail": rng.randi()})
 	return out
+
+
+## Hides each intel item and the briefcase in a different room.
+func _hide_items(rng: RandomNumberGenerator) -> void:
+	var spots := []
+	for r in rooms:
+		for i in (rooms[r]["furniture"] as Array).size():
+			spots.append([r, i])
+	spots = _shuffled(spots, rng)
+	var used_rooms := {}
+	for item in INTEL + [BRIEFCASE]:
+		for spot in spots:
+			var key := furniture_key(spot[0], spot[1])
+			if hidden.has(key) or used_rooms.has(spot[0]):
+				continue
+			hidden[key] = item
+			used_rooms[spot[0]] = true
+			break
 
 
 static func _shuffled(arr: Array, rng: RandomNumberGenerator) -> Array:

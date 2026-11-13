@@ -42,8 +42,8 @@ rebuilt with an original setting, original characters and a lot more polish.
 | | Milestone | Status |
 |---|---|---|
 | 1 | Two players on separate tablets moving through a shared, synced base over the local network | ✅ Done |
-| 2 | Searching furniture, mission items, escape door and the win condition | ⏳ Next |
-| 3 | Traps and counter-gadgets (tripwire ⇄ wire cutters, paint bomb ⇄ extinguisher…) | 🔜 |
+| 2 | Searching furniture, mission items, briefcase, escape door and the win condition | ✅ Done |
+| 3 | Traps and counter-gadgets (tripwire ⇄ wire cutters, paint bomb ⇄ extinguisher…) | ⏳ Next |
 | 4 | Combat (melee and dart pistol), per-player countdown and respawn penalty | 🔜 |
 | 5 | Art pass, sound, music, menus, settings | 🔜 |
 
@@ -54,6 +54,10 @@ What works today:
 - Isometric rooms with depth-sorted furniture, doors and a mini-map.
 - Touch joystick (left half of the screen), plus WASD or arrow keys on a computer.
 - You only see your rival when you're in the same room.
+- Four pieces of intel (PASSPORT, CASH, MICROFILM, KEYCARD) and a BRIEFCASE are hidden in the furniture. There's only one of each, so it's a race.
+- Without the briefcase you can carry just one item. Search with full hands and you swap: your item stays behind in that furniture for your rival to find.
+- The EXIT (green on the mini-map) only opens for an agent carrying all four pieces of intel. First one out wins, then the host can call a rematch on a freshly shuffled base.
+- The host's tablet referees every search and escape, so both tablets always agree on who has what.
 
 ## Playing it
 
@@ -89,9 +93,11 @@ against itself.
 | Action | Tablet | Keyboard |
 |---|---|---|
 | Move | Drag anywhere on the left half of the screen | WASD / arrow keys |
+| Search nearby furniture (it glows) | **SEARCH** button (bottom right) | <kbd>E</kbd> or <kbd>Space</kbd> |
+| Escape | Walk into the EXIT with all four items | |
 | Leave match | **LEAVE** button / Android back | Close window |
 
-Search, trap and attack buttons arrive with milestones 2 to 4.
+Trap and attack buttons arrive with milestones 3 and 4.
 
 ## How it's built
 
@@ -105,12 +111,14 @@ scripts/
   main.gd       menu ⇄ match flow, starts the match on both tablets
   net.gd        hosting, joining, LAN discovery (autoload "Net")
   world.gd      the seeded base layout + isometric projection maths
-  game.gd       one match: spawns agents, reads input
+  game.gd       one match: spawns agents, reads input, rules (search/swap/escape)
   agent.gd      movement, collisions, doors, network sync, agent artwork
   room_view.gd  isometric room renderer (walls, floor, furniture, depth sorting)
   hud.gd        top bar, mini-map, joystick, room-change fade
   joystick.gd   floating touch joystick
   menu.gd       title screen
+  action_button.gd  multi-touch round button (SEARCH, and later TRAP/ATTACK)
+  icons.gd      drawn item icons
 .github/workflows/android.yml   builds the APK on every push
 ```
 

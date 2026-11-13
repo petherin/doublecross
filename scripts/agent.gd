@@ -3,6 +3,8 @@ extends Node2D
 ## streams its state; the other tablet just shows the received state.
 
 signal room_changed(room: Vector2i)
+signal exit_touched
+signal search_finished(room: Vector2i, idx: int)
 
 const World = preload("res://scripts/world.gd")
 const SPEED := 340.0
@@ -21,6 +23,17 @@ var coat := Color("b3262e")
 var hat := Color("2a0d10")
 var accent := Color("ff5a5f")
 
+## Set by the game: no movement at all (e.g. after the match ends).
+var frozen := false
+var has_case := false
+## True while rummaging through furniture (sent to the other tablet too).
+var searching := false
+var search_progress := 0.0
+
+var _search_time := 0.0
+var _search_left := 0.0
+var _search_room := Vector2i.ZERO
+var _search_idx := -1
 var _target := Vector2.ZERO
 var _walk := 0.0
 var _send_timer := 0.0
@@ -47,12 +60,31 @@ func _physics_process(delta: float) -> void:
 			_send_state()
 	else:
 		position = position.lerp(_target, minf(1.0, delta * 15.0))
-	if moving:
+	if moving or searching:
 		_walk += delta * 12.0
 
 
+func start_search(idx: int, duration: float) -> void:
+	searching = true
+	_search_time = duration
+	_search_left = duration
+	_search_room = room
+	_search_idx = idx
+	_send_state()
+
+
 func _local_move(delta: float) -> void:
+	if searching:
+		_search_left -= delta
+		search_progress = 1.0 - _search_left / _search_time
+		if _search_left <= 0.0:
+			searching = false
+			search_progress = 0.0
+			_send_state()
+			search_finished.emit(_search_room, _search_idx)
 	var v := move_input.limit_length(1.0) * SPEED
+	if frozen or searching:
+		v = Vector2.ZERO
 	moving = v.length() > 25.0
 	if moving:
 		facing = v.angle()
@@ -63,43 +95,41 @@ func _local_move(delta: float) -> void:
 		position = p
 
 
-## Keeps the agent inside the room, except through doorways. Walking far
+## Keeps the agent inside the room, except through openings. Walking far
 ## enough into a doorway moves the agent to the neighbouring room and
 ## returns Vector2.INF to signal that the position was already set.
+## Walking into the exit emits `exit_touched` (the game decides what happens).
 func _resolve_walls(p: Vector2) -> Vector2:
 	var R := World.ROOM
 	var c := R.get_center()
 	var gap := World.DOOR_HALF - RADIUS
-	# Top / bottom walls
-	if p.y < R.position.y + RADIUS:
-		if world.has_door(room, World.Dir.UP) and absf(position.x - c.x) <= gap:
-			p.x = clampf(p.x, c.x - gap, c.x + gap)
-			if p.y < R.position.y - 20.0:
-				return _enter(World.Dir.UP)
+	var through := 20.0
+	# [dir, axis (0 = x wall position / 1 = y), wall coordinate, sign pointing outwards]
+	var walls := [
+		[World.Dir.UP, 1, R.position.y, -1.0],
+		[World.Dir.DOWN, 1, R.end.y, 1.0],
+		[World.Dir.LEFT, 0, R.position.x, -1.0],
+		[World.Dir.RIGHT, 0, R.end.x, 1.0],
+	]
+	for w in walls:
+		var dir: int = w[0]
+		var ax: int = w[1]
+		var wall: float = w[2]
+		var out: float = w[3]
+		var other := 1 - ax
+		# How far past the "touching the wall" line the agent is trying to go.
+		if (p[ax] - (wall - out * RADIUS)) * out <= 0.0:
+			continue
+		var kind := world.opening(room, dir)
+		if kind != 0 and absf(position[other] - c[other]) <= gap:
+			p[other] = clampf(p[other], c[other] - gap, c[other] + gap)
+			if (p[ax] - wall) * out > through:
+				if kind == 1:
+					return _enter(dir)
+				p[ax] = wall + out * through
+				exit_touched.emit()
 		else:
-			p.y = R.position.y + RADIUS
-	elif p.y > R.end.y - RADIUS:
-		if world.has_door(room, World.Dir.DOWN) and absf(position.x - c.x) <= gap:
-			p.x = clampf(p.x, c.x - gap, c.x + gap)
-			if p.y > R.end.y + 20.0:
-				return _enter(World.Dir.DOWN)
-		else:
-			p.y = R.end.y - RADIUS
-	# Left / right walls
-	if p.x < R.position.x + RADIUS:
-		if world.has_door(room, World.Dir.LEFT) and absf(position.y - c.y) <= gap:
-			p.y = clampf(p.y, c.y - gap, c.y + gap)
-			if p.x < R.position.x - 20.0:
-				return _enter(World.Dir.LEFT)
-		else:
-			p.x = R.position.x + RADIUS
-	elif p.x > R.end.x - RADIUS:
-		if world.has_door(room, World.Dir.RIGHT) and absf(position.y - c.y) <= gap:
-			p.y = clampf(p.y, c.y - gap, c.y + gap)
-			if p.x > R.end.x + 20.0:
-				return _enter(World.Dir.RIGHT)
-		else:
-			p.x = R.end.x - RADIUS
+			p[ax] = wall - out * RADIUS
 	return p
 
 
@@ -128,11 +158,12 @@ func _enter(dir: int) -> Vector2:
 
 func _send_state() -> void:
 	if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
-		net_state.rpc(room, position, facing, moving)
+		net_state.rpc(room, position, facing, moving, searching)
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func net_state(r: Vector2i, pos: Vector2, f: float, m: bool) -> void:
+func net_state(r: Vector2i, pos: Vector2, f: float, m: bool, s: bool) -> void:
+	searching = s
 	if r != room:
 		room = r
 		position = pos
@@ -190,9 +221,16 @@ func paint(ci: CanvasItem) -> void:
 	ci.draw_colored_polygon(PackedVector2Array([
 		Vector2(-10, -81), Vector2(10, -81), Vector2(8, -95), Vector2(-8, -95)]), hat)
 	ci.draw_rect(Rect2(-10, -85, 20, 4), accent)
-	# Front arm with hand
-	ci.draw_line(Vector2(8, -60), Vector2(12 + stride * 0.8, -36), dark, 7.0, true)
-	ci.draw_circle(Vector2(12 + stride * 0.8, -35), 4.0, skin)
+	# Front arm with hand (rummaging while searching), maybe holding the briefcase
+	var hand := Vector2(12 + stride * 0.8, -35)
+	if searching:
+		hand = Vector2(18, -40 + sin(_walk * 3.0) * 4.0)
+	ci.draw_line(Vector2(8, -60), hand, dark, 7.0, true)
+	if has_case and not searching:
+		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 14)), Color("7a5238"))
+		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 3)), Color("946645"))
+		ci.draw_rect(Rect2(hand + Vector2(-1, 4), Vector2(4, 3)), Color("e8c25a"))
+	ci.draw_circle(hand, 4.0, skin)
 
 	# Name tag (unflipped)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -200,3 +238,14 @@ func paint(ci: CanvasItem) -> void:
 	var size := 16
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+
+	# Thought bubble while searching (with a progress ring for your own agent)
+	if searching:
+		var b := foot + Vector2(30, -128)
+		ci.draw_circle(foot + Vector2(18, -104), 3.0, Color.WHITE)
+		ci.draw_circle(b, 17.0, Color.WHITE)
+		if is_local:
+			ci.draw_arc(b, 21.0, -PI / 2, -PI / 2 + TAU * search_progress, 32, accent, 4.0, true)
+		var q := "?"
+		var qw := font.get_string_size(q, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		ci.draw_string(font, b + Vector2(-qw / 2, 8), q, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("15171c"))

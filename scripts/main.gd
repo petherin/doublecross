@@ -58,7 +58,16 @@ func start_game(seed_value: int) -> void:
 	_begin(seed_value, ids)
 
 
+func _rematch() -> void:
+	if multiplayer.is_server():
+		start_game.rpc(randi())
+
+
 func _begin(seed_value: int, ids: Array) -> void:
+	if _game:
+		remove_child(_game)
+		_game.queue_free()
+		_game = null
 	if _menu:
 		Net.stop_listening()
 		remove_child(_menu)
@@ -69,3 +78,4 @@ func _begin(seed_value: int, ids: Array) -> void:
 	add_child(_game)
 	_game.setup(seed_value, multiplayer.get_unique_id(), ids)
 	_game.leave_requested.connect(_leave)
+	_game.rematch_requested.connect(_rematch)

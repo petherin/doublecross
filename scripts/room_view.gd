@@ -4,6 +4,7 @@ extends Node2D
 ## Everything is drawn in code for now; real art can replace each piece later.
 
 const World = preload("res://scripts/world.gd")
+const Icons = preload("res://scripts/icons.gd")
 
 const DOOR_TOP := 82.0
 const LEDGE_H := 16.0
@@ -19,6 +20,9 @@ var room := Vector2i.ZERO:
 		queue_redraw()
 ## Agents to draw; only those in `room` are shown.
 var agents: Array = []
+## Index of the furniture the local agent can search right now (-1 = none).
+var highlight := -1
+var highlight_color := Color.WHITE
 
 var _t := 0.0
 
@@ -43,8 +47,9 @@ func _draw() -> void:
 	# Depth-sort furniture and agents. Footprints never overlap, so A is in
 	# front of B when A starts beyond B's far edge on either floor axis.
 	var things := []
-	for f in world.furniture(room):
-		things.append({"rect": f["rect"], "f": f})
+	var items: Array = world.furniture(room)
+	for i in items.size():
+		things.append({"rect": items[i]["rect"], "f": items[i], "i": i})
 	for a in agents:
 		if a.room == room:
 			things.append({"rect": Rect2(a.position, Vector2.ZERO), "agent": a})
@@ -54,6 +59,8 @@ func _draw() -> void:
 			t["agent"].paint(self)
 		else:
 			_draw_furniture(t["f"], tint)
+			if t["i"] == highlight:
+				_draw_highlight(t["f"])
 
 	_draw_front_ledges(R, tint)
 
@@ -106,10 +113,24 @@ func _draw_floor(R: Rect2, tint: Color) -> void:
 		var c := Color(tint, 0.05)
 		_quad(P(x0, y0), P(x1, y0), P(x1, y0 + d), P(x0 + d, y0 + d), c)
 		_quad(P(x0, y0), P(x0 + d, y0 + d), P(x0 + d, y1), P(x0, y1), c)
+	# Daylight spilling in from the exit
+	for dir in [World.Dir.UP, World.Dir.LEFT]:
+		if world.is_exit(room, dir):
+			var c := R.get_center()
+			var dh := World.DOOR_HALF
+			for i in 4:
+				var depth := 40.0 + i * 35.0
+				var spread := dh + i * 18.0
+				var col := Color(1.0, 0.93, 0.7, 0.07)
+				if dir == World.Dir.UP:
+					_quad(P(c.x - dh, y0), P(c.x + dh, y0), P(c.x + spread, y0 + depth), P(c.x - spread, y0 + depth), col)
+				else:
+					_quad(P(x0, c.y - dh), P(x0, c.y + dh), P(x0 + depth, c.y + spread), P(x0 + depth, c.y - spread), col)
 	# Floor arrows towards each door
 	for dir in [World.Dir.UP, World.Dir.DOWN, World.Dir.LEFT, World.Dir.RIGHT]:
-		if world.has_door(room, dir):
-			_floor_arrow(dir, tint)
+		match world.opening(room, dir):
+			1: _floor_arrow(dir, tint)
+			2: _floor_arrow(dir, Color("5dff8a"))
 
 
 func _floor_arrow(dir: int, tint: Color) -> void:
@@ -137,24 +158,24 @@ func _draw_back_walls(R: Rect2, tint: Color) -> void:
 	var col_up := Color("2c3443")   # faces down-left, catches the light
 	var col_left := Color("222935")
 	# UP wall runs along x at y = y0 (upper-right on screen)
-	var up_door := world.has_door(room, World.Dir.UP)
+	var up_kind := world.opening(room, World.Dir.UP)
+	var up_door := up_kind != 0
 	var up_spans := [[x0, c.x - dh], [c.x + dh, x1]] if up_door else [[x0, x1]]
 	for s in up_spans:
 		_quad(P(s[0], y0, 0), P(s[1], y0, 0), P(s[1], y0, h), P(s[0], y0, h), col_up)
 	# LEFT wall runs along y at x = x0 (upper-left on screen)
-	var left_door := world.has_door(room, World.Dir.LEFT)
+	var left_kind := world.opening(room, World.Dir.LEFT)
+	var left_door := left_kind != 0
 	var left_spans := [[y0, c.y - dh], [c.y + dh, y1]] if left_door else [[y0, y1]]
 	for s in left_spans:
 		_quad(P(x0, s[0], 0), P(x0, s[1], 0), P(x0, s[1], h), P(x0, s[0], h), col_left)
 	# Lintels and doorways
 	if up_door:
 		_quad(P(c.x - dh, y0, DOOR_TOP), P(c.x + dh, y0, DOOR_TOP), P(c.x + dh, y0, h), P(c.x - dh, y0, h), col_up.darkened(0.1))
-		_quad(P(c.x - dh, y0, 0), P(c.x + dh, y0, 0), P(c.x + dh, y0, DOOR_TOP), P(c.x - dh, y0, DOOR_TOP), Color("07090c"))
-		_door_frame(P(c.x - dh, y0), P(c.x + dh, y0))
+		_doorway(P(c.x - dh, y0), P(c.x + dh, y0), up_kind == 2)
 	if left_door:
 		_quad(P(x0, c.y - dh, DOOR_TOP), P(x0, c.y + dh, DOOR_TOP), P(x0, c.y + dh, h), P(x0, c.y - dh, h), col_left.darkened(0.1))
-		_quad(P(x0, c.y - dh, 0), P(x0, c.y + dh, 0), P(x0, c.y + dh, DOOR_TOP), P(x0, c.y - dh, DOOR_TOP), Color("07090c"))
-		_door_frame(P(x0, c.y - dh), P(x0, c.y + dh))
+		_doorway(P(x0, c.y - dh), P(x0, c.y + dh), left_kind == 2)
 	# Wall panels, light strips and skirting
 	var pulse := 0.75 + 0.25 * sin(_t * 2.0)
 	for s in up_spans:
@@ -187,6 +208,49 @@ func _wall_details(a: Vector2, b: Vector2, tint: Color, pulse: float) -> void:
 	var lb := b - dir * 16
 	_quad(World.iso(la, 86), World.iso(lb, 86), World.iso(lb, 92), World.iso(la, 92), Color(tint, 0.85 * pulse))
 	_quad(World.iso(la, 80), World.iso(lb, 80), World.iso(lb, 98), World.iso(la, 98), Color(tint, 0.12 * pulse))
+
+
+## A doorway cut into a back wall, from floor point `a` to floor point `b`
+## (already projected). The exit glows with daylight and has a sign.
+func _doorway(a: Vector2, b: Vector2, is_exit: bool) -> void:
+	var top_a := a - Vector2(0, DOOR_TOP)
+	var top_b := b - Vector2(0, DOOR_TOP)
+	if not is_exit:
+		_quad(a, b, top_b, top_a, Color("07090c"))
+		_door_frame(a, b)
+		return
+	var glow := 0.85 + 0.15 * sin(_t * 3.0)
+	_quad(a, b, top_b, top_a, Color("fff6d8"))
+	for i in 4:
+		var f := (i + 1) / 5.0
+		_quad(a.lerp(top_a, f), b.lerp(top_b, f), top_b, top_a, Color("ffe7a3", 0.25))
+	for p: Vector2 in [a, b]:
+		draw_rect(Rect2(p.x - 4, p.y - DOOR_TOP, 8, DOOR_TOP), Color("2e7d32"))
+	var mid := (top_a + top_b) / 2 - Vector2(0, 16)
+	draw_rect(Rect2(mid - Vector2(34, 13), Vector2(68, 26)), Color("1b5e20"))
+	draw_rect(Rect2(mid - Vector2(34, 13), Vector2(68, 26)), Color("5dff8a", glow), false, 2.0)
+	var font := ThemeDB.fallback_font
+	var w := font.get_string_size("EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+	draw_string(font, mid + Vector2(-w / 2, 7), "EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("eaffea"))
+
+
+## Pulsing outline round the furniture you can search, plus a magnifier.
+func _draw_highlight(f: Dictionary) -> void:
+	var r: Rect2 = f["rect"].grow(4)
+	var h: float = HEIGHTS.get(f["type"], 50.0) + (20.0 if f["type"] == "plant" else 0.0)
+	var a := 0.55 + 0.45 * sin(_t * 6.0)
+	var col := Color(highlight_color, a)
+	var top := PackedVector2Array([
+		P(r.position.x, r.position.y, h), P(r.end.x, r.position.y, h),
+		P(r.end.x, r.end.y, h), P(r.position.x, r.end.y, h), P(r.position.x, r.position.y, h)])
+	draw_polyline(top, col, 3.0, true)
+	draw_polyline(PackedVector2Array([P(r.position.x, r.end.y, 0), P(r.end.x, r.end.y, 0), P(r.end.x, r.position.y, 0)]), col, 3.0, true)
+	draw_line(P(r.position.x, r.end.y, 0), P(r.position.x, r.end.y, h), col, 3.0)
+	draw_line(P(r.end.x, r.end.y, 0), P(r.end.x, r.end.y, h), col, 3.0)
+	draw_line(P(r.end.x, r.position.y, 0), P(r.end.x, r.position.y, h), col, 3.0)
+	var above := World.iso(r.get_center(), h + 34 + 4 * sin(_t * 4.0))
+	draw_circle(above, 15.0, Color(0, 0, 0, 0.55))
+	Icons.magnifier(self, above, 26.0, Color.WHITE)
 
 
 func _door_frame(a: Vector2, b: Vector2) -> void:
