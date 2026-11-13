@@ -27,6 +27,9 @@ import tempfile
 
 import bpy
 from mathutils import Euler, Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import agent_model  # noqa: E402  (the detailed, skeleton-posed model)
 from bpy_extras.object_utils import world_to_camera_view
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -77,7 +80,8 @@ def reset_scene():
     ls.select_by_visibility = True
     ls.select_by_edge_types = True
     ls.select_silhouette = True
-    ls.select_border = True
+    ls.select_external_contour = True
+    ls.select_border = False
     ls.select_crease = False
     if ls.linestyle is None:
         ls.linestyle = bpy.data.linestyles.new("ink")
@@ -93,26 +97,46 @@ def reset_scene():
     return scene
 
 
+def _aimed(obj, at=(0, 0, 0.9)):
+    aim = bpy.data.objects.new(obj.name + "_aim", None)
+    bpy.context.collection.objects.link(aim)
+    aim.location = at
+    t = obj.constraints.new("TRACK_TO")
+    t.target = aim
+    t.track_axis = "TRACK_NEGATIVE_Z"
+    t.up_axis = "UP_Y"
+
+
 def add_lights():
     # Key light from the upper left of the screen, like the game's lamps.
-    bpy.ops.object.light_add(type="SUN", rotation=(math.radians(50), 0, math.radians(200)))
+    bpy.ops.object.light_add(type="SUN", location=(-2.0, -2.5, 5.0))
     key = bpy.context.object
     key.data.energy = 3.8
     key.data.color = (1.0, 0.93, 0.82)
     key.data.angle = math.radians(12)
+    _aimed(key)
+    # Soft fill from the camera side.
+    bpy.ops.object.light_add(type="SUN", location=(4.0, -4.0, 2.0))
+    fill = bpy.context.object
+    fill.data.energy = 1.7
+    fill.data.color = (0.85, 0.9, 1.0)
+    _aimed(fill)
     # Cool rim light from behind.
-    bpy.ops.object.light_add(type="SUN", rotation=(math.radians(-60), 0, math.radians(45)))
+    bpy.ops.object.light_add(type="SUN", location=(-4.0, 4.0, 3.0))
     rim = bpy.context.object
-    rim.data.energy = 2.0
+    rim.data.energy = 2.4
     rim.data.color = (0.6, 0.75, 1.0)
+    _aimed(rim)
 
 
 def add_camera():
     """Orthographic camera at the game's isometric angle.
 
     The game draws floor x towards the screen's lower right and floor y
-    towards the lower left, squashed 2:1 vertically: that's a camera 30
-    degrees above the horizon, looking along the (-1, -1) diagonal.
+    towards the lower left, squashed 2:1 vertically. The game's floor axes
+    are mirror-image to Blender's, so game (x, y) is Blender (x, -y): the
+    camera sits 30 degrees above the horizon on the (+1, -1) diagonal, and
+    a game facing angle a is a Blender rotation of -a.
     """
     cam_data = bpy.data.cameras.new("cam")
     cam_data.type = "ORTHO"
@@ -122,7 +146,7 @@ def add_camera():
     elev = math.radians(30)
     dist = 10.0
     target = Vector((0, 0, 0.92))
-    direction = Vector((math.cos(elev) / math.sqrt(2), math.cos(elev) / math.sqrt(2), math.sin(elev)))
+    direction = Vector((math.cos(elev) / math.sqrt(2), -math.cos(elev) / math.sqrt(2), math.sin(elev)))
     cam.location = target + direction * dist
     aim = bpy.data.objects.new("aim", None)
     bpy.context.collection.objects.link(aim)
@@ -388,14 +412,14 @@ def render_agent(name, colors, tmp):
     scene = reset_scene()
     add_lights()
     cam = add_camera()
-    rig = build_agent(colors)
+    agent = agent_model.Agent(colors)
     frames = []
     for d in range(DIRECTIONS):
-        rig["root"].rotation_euler = Euler((0, 0, math.radians(45 * d)))
+        agent.root.rotation_euler = Euler((0, 0, math.radians(-45 * d)))
         row = []
         for anim, n in ANIMS:
             for i in range(n):
-                pose(rig, anim, i, n)
+                agent.pose(anim, i, n)
                 path = os.path.join(tmp, f"{name}_{d}_{anim}_{i}.png")
                 scene.render.filepath = path
                 bpy.ops.render.render(write_still=True)

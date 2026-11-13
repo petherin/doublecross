@@ -40,6 +40,8 @@ var _t := 0.0
 
 func _ready() -> void:
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	# Smooth down-scaling of the agent sprite sheets (they're rendered large).
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var lights := LightLayer.new()
 	lights.view = self
 	add_child(lights)

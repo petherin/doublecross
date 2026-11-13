@@ -172,10 +172,16 @@ tools/blender/build_agents.py   models, poses and renders the agents in Blender
 
 ### Re-rendering the agents in Blender
 
-The agents are 3D models built, posed and rendered entirely by a script, using
-Blender 4.2 as a Python module. Each agent gets 8 directions × 20 frames
-(idle, walk, search, cosh swing, hurt, knocked down), drawn with ink outlines
-by an orthographic camera at the game's exact isometric angle.
+The agents are 3D models built, posed and rendered entirely by script, using
+Blender 4.2 as a Python module. `tools/blender/agent_model.py` sculpts each
+spy procedurally: an organic body skinned around a jointed skeleton (so knees
+and elbows really bend), a shaped head with a big spy nose, brows, smirk and
+wraparound shades, a snap-brim fedora with pinched crown and ribbon, a
+popped-collar trench coat with belt and double-breasted buttons, gloves and
+polished shoes, all with woven-fabric, felt, leather and skin materials.
+`tools/blender/build_agents.py` poses it (forward kinematics) and renders 8
+directions × 20 frames (idle, walk, search, cosh swing, hurt, knocked down)
+with ink outlines from an orthographic camera at the game's isometric angle.
 
 ```bash
 python3.11 -m venv .blendenv
