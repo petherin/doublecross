@@ -10,6 +10,13 @@ const ROOM := Rect2(100, 110, 1080, 640)
 const WALL := 40.0
 const DOOR_HALF := 75.0
 
+## Isometric projection. Gameplay happens on a flat floor (ROOM, in floor
+## units); these turn floor positions + height into screen positions.
+## Floor "up" (towards the UP door) points to the upper-right of the screen.
+const ISO_K := 0.68
+const WALL_H := 110.0
+const ISO_ORIGIN := Vector2(640.0 - (1080.0 - 640.0) * 0.68 * 0.5, 60.0 + 110.0 + 20.0)
+
 enum Dir { UP, DOWN, LEFT, RIGHT }
 const DIR_VEC := {
 	Dir.UP: Vector2i(0, -1),
@@ -42,6 +49,9 @@ const TYPES := {
 	"sofa": Vector2(170, 70),
 }
 const WALL_TYPES := ["desk", "console", "cabinet", "locker", "shelf", "safe", "plant", "rack", "sofa"]
+## Front walls (bottom/right) sit nearest the camera, so only low furniture
+## goes there; tall pieces would hide the agents behind them.
+const FRONT_TYPES := ["desk", "crate", "safe", "plant", "sofa", "console"]
 const FREE_TYPES := ["crate", "desk", "plant", "crate"]
 
 var seed_value := 0
@@ -85,6 +95,27 @@ static func entry_point(dir: int, radius: float) -> Vector2:
 		_: return Vector2(ROOM.position.x + radius + 6, c.y)
 
 
+## Floor position (room coordinates) + height above the floor -> screen.
+static func iso(p: Vector2, z := 0.0) -> Vector2:
+	var u := p.x - ROOM.position.x
+	var v := p.y - ROOM.position.y
+	return ISO_ORIGIN + Vector2((u - v) * ISO_K, (u + v) * ISO_K * 0.5 - z)
+
+
+## Converts a direction the player pushes on screen into a floor direction,
+## so "up on the joystick" always means "up the screen".
+static func screen_to_floor_dir(s: Vector2) -> Vector2:
+	if s == Vector2.ZERO:
+		return Vector2.ZERO
+	var d := Vector2(s.x + 2.0 * s.y, 2.0 * s.y - s.x) * 0.5
+	return d.normalized() * minf(s.length(), 1.0)
+
+
+## Floor direction -> screen direction (for choosing which way a sprite faces).
+static func floor_to_screen_dir(d: Vector2) -> Vector2:
+	return Vector2(d.x - d.y, (d.x + d.y) * 0.5)
+
+
 func _make_furniture(rng: RandomNumberGenerator) -> Array:
 	var slots := []
 	for x in [230.0, 410.0, 870.0, 1050.0]:
@@ -102,7 +133,11 @@ func _make_furniture(rng: RandomNumberGenerator) -> Array:
 	for s in slots:
 		if out.size() >= want:
 			break
-		var pool: Array = FREE_TYPES if s["wall"] == "free" else WALL_TYPES
+		var pool: Array = WALL_TYPES
+		if s["wall"] == "free":
+			pool = FREE_TYPES
+		elif s["wall"] == "bottom" or s["wall"] == "right":
+			pool = FRONT_TYPES
 		var t: String = pool[rng.randi_range(0, pool.size() - 1)]
 		var sz: Vector2 = TYPES[t]
 		var r: Rect2

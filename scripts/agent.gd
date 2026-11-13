@@ -6,9 +6,7 @@ signal room_changed(room: Vector2i)
 
 const World = preload("res://scripts/world.gd")
 const SPEED := 340.0
-const RADIUS := 30.0
-## Drawing is authored at radius 22 and scaled up to the collision size.
-const ART_SCALE := RADIUS / 22.0
+const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
 
 var world: World
@@ -34,7 +32,6 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	is_local = p_local
 	position = World.ROOM.get_center()
 	_target = position
-	scale = Vector2.ONE * ART_SCALE
 	display_name = style["name"]
 	coat = style["coat"]
 	hat = style["hat"]
@@ -52,7 +49,6 @@ func _physics_process(delta: float) -> void:
 		position = position.lerp(_target, minf(1.0, delta * 15.0))
 	if moving:
 		_walk += delta * 12.0
-	queue_redraw()
 
 
 func _local_move(delta: float) -> void:
@@ -145,43 +141,62 @@ func net_state(r: Vector2i, pos: Vector2, f: float, m: bool) -> void:
 	moving = m
 
 
-func _draw() -> void:
-	# Ground ring + shadow
-	draw_set_transform(Vector2(3, 7), 0.0, Vector2(1.0, 0.6))
-	draw_circle(Vector2.ZERO, 28.0, Color(0, 0, 0, 0.4))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	draw_arc(Vector2.ZERO, 31.0, 0.0, TAU, 40, Color(accent, 0.55), 3.0, true)
+## Draws this agent onto the room renderer `ci` (so it can be depth-sorted
+## with the furniture). Upright, stylised spy in a trench coat and fedora.
+func paint(ci: CanvasItem) -> void:
+	var foot := World.iso(position)
+	var sdir := World.floor_to_screen_dir(Vector2.from_angle(facing))
+	var flip := -1.0 if sdir.x < 0.0 else 1.0
+	var back_view := sdir.y < -0.15
+	var stride := sin(_walk) * 7.0 if moving else 0.0
+	var bob := absf(sin(_walk)) * 2.0 if moving else 0.0
+	var skin := Color("e0b48f")
+	var dark := coat.darkened(0.4)
+	var trousers := Color("1b1e25")
 
-	draw_set_transform(Vector2.ZERO, facing, Vector2.ONE)
-	var dark := coat.darkened(0.45)
-	# Feet stride while walking
-	var stride := sin(_walk) * 9.0 if moving else 0.0
-	draw_circle(Vector2(stride, -9), 6.5, Color("15171c"))
-	draw_circle(Vector2(-stride, 9), 6.5, Color("15171c"))
-	# Trench coat body (wider across the shoulders)
-	draw_set_transform(Vector2.ZERO, facing, Vector2(0.72, 1.0))
-	draw_circle(Vector2.ZERO, 22.0, dark)
-	draw_circle(Vector2(1, 0), 20.0, coat)
-	draw_set_transform(Vector2.ZERO, facing, Vector2.ONE)
-	# Arms swing opposite the feet
-	draw_circle(Vector2(-stride * 0.6 + 3, -20), 7.0, dark)
-	draw_circle(Vector2(stride * 0.6 + 3, 20), 7.0, dark)
-	draw_circle(Vector2(-stride * 0.6 + 8, -21), 4.0, Color("e0b48f"))
-	draw_circle(Vector2(stride * 0.6 + 8, 21), 4.0, Color("e0b48f"))
-	# Coat collar and tie
-	draw_line(Vector2(9, -7), Vector2(14, 0), coat.lightened(0.25), 3.0, true)
-	draw_line(Vector2(9, 7), Vector2(14, 0), coat.lightened(0.25), 3.0, true)
-	# Fedora: wide brim, crown, coloured band, and a peek of dark glasses
-	draw_circle(Vector2(13, 0), 5.0, Color("e0b48f"))
-	draw_line(Vector2(15, -4), Vector2(15, 4), Color("0c0c10"), 3.0)
-	draw_circle(Vector2(-1, 0), 16.5, hat.lightened(0.08))
-	draw_circle(Vector2(-2, 0), 11.5, hat)
-	draw_arc(Vector2(-2, 0), 11.5, 0.0, TAU, 28, accent, 2.5, true)
-	draw_line(Vector2(-10, 0), Vector2(5, 0), hat.lightened(0.18), 2.0, true)
+	# Shadow and team ring on the floor
+	ci.draw_set_transform(foot, 0.0, Vector2(1.0, 0.5))
+	ci.draw_circle(Vector2.ZERO, 26.0, Color(0, 0, 0, 0.4))
+	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
 
-	# Name tag above the head (not rotated)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	ci.draw_set_transform(foot - Vector2(0, bob), 0.0, Vector2(flip, 1.0))
+	# Legs and shoes
+	ci.draw_line(Vector2(-5, -30), Vector2(-5 + stride, -3), trousers, 7.0, true)
+	ci.draw_line(Vector2(5, -30), Vector2(5 - stride, -3), trousers, 7.0, true)
+	ci.draw_circle(Vector2(-3 + stride, -2), 4.5, Color("0c0d10"))
+	ci.draw_circle(Vector2(7 - stride, -2), 4.5, Color("0c0d10"))
+	# Back arm (behind the coat)
+	ci.draw_line(Vector2(-11, -60), Vector2(-13 - stride * 0.8, -36), dark, 7.0, true)
+	# Trench coat: flared hem, belt, lapels
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(-16, -26), Vector2(16, -26), Vector2(13, -64), Vector2(-13, -64)]), coat)
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(-16, -26), Vector2(-4, -26), Vector2(-3, -64), Vector2(-13, -64)]), dark.lightened(0.1))
+	ci.draw_line(Vector2(-15, -44), Vector2(15, -44), dark, 4.0)
+	ci.draw_rect(Rect2(-3, -46, 6, 5), accent)
+	if not back_view:
+		ci.draw_line(Vector2(0, -64), Vector2(6, -50), coat.lightened(0.25), 2.5, true)
+		ci.draw_line(Vector2(9, -64), Vector2(6, -50), coat.lightened(0.25), 2.5, true)
+	# Head
+	ci.draw_circle(Vector2(1, -72), 9.5, skin)
+	if back_view:
+		ci.draw_circle(Vector2(0, -73), 9.0, Color("2a1d16"))
+	else:
+		ci.draw_rect(Rect2(2, -76, 9, 4), Color("0c0c10"))
+	# Fedora: brim, crown, band
+	ci.draw_set_transform(foot - Vector2(0, bob) + Vector2(0, -80), 0.0, Vector2(flip, 0.28))
+	ci.draw_circle(Vector2.ZERO, 17.0, hat.lightened(0.1))
+	ci.draw_set_transform(foot - Vector2(0, bob), 0.0, Vector2(flip, 1.0))
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(-10, -81), Vector2(10, -81), Vector2(8, -95), Vector2(-8, -95)]), hat)
+	ci.draw_rect(Rect2(-10, -85, 20, 4), accent)
+	# Front arm with hand
+	ci.draw_line(Vector2(8, -60), Vector2(12 + stride * 0.8, -36), dark, 7.0, true)
+	ci.draw_circle(Vector2(12 + stride * 0.8, -35), 4.0, skin)
+
+	# Name tag (unflipped)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var font := ThemeDB.fallback_font
-	var size := 15
+	var size := 16
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	draw_string(font, Vector2(-w / 2, -38), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)

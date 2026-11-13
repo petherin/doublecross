@@ -1,14 +1,24 @@
 extends Node2D
-## Draws the room the local agent is standing in: walls, floor, doors and furniture.
+## Isometric renderer for the room the local agent is standing in.
+## Draw order: floor -> back walls -> furniture & agents (depth sorted) -> front ledges.
 ## Everything is drawn in code for now; real art can replace each piece later.
 
 const World = preload("res://scripts/world.gd")
+
+const DOOR_TOP := 82.0
+const LEDGE_H := 16.0
+const HEIGHTS := {
+	"desk": 40.0, "console": 52.0, "cabinet": 72.0, "locker": 120.0, "crate": 58.0,
+	"shelf": 112.0, "safe": 62.0, "plant": 24.0, "rack": 100.0, "sofa": 24.0,
+}
 
 var world: World
 var room := Vector2i.ZERO:
 	set(v):
 		room = v
 		queue_redraw()
+## Agents to draw; only those in `room` are shown.
+var agents: Array = []
 
 var _t := 0.0
 
@@ -18,221 +28,384 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+static func P(x: float, y: float, z := 0.0) -> Vector2:
+	return World.iso(Vector2(x, y), z)
+
+
 func _draw() -> void:
 	if world == null:
 		return
 	var R := World.ROOM
-	var data: Dictionary = world.rooms[room]
-	var tint: Color = data["tint"]
-	var outer := R.grow(World.WALL)
+	var tint: Color = world.rooms[room]["tint"]
+	_draw_floor(R, tint)
+	_draw_back_walls(R, tint)
 
-	# Wall slab with bevel
-	draw_rect(outer.grow(6), Color("0b0e13"))
-	draw_rect(outer, Color("2a3240"))
-	draw_rect(Rect2(outer.position, Vector2(outer.size.x, 8)), Color("3a4456"))
-	draw_rect(Rect2(outer.position.x, outer.end.y - 8, outer.size.x, 8), Color("1c222c"))
-	# Rivets along the walls
-	for x in range(int(outer.position.x) + 30, int(outer.end.x), 70):
-		draw_circle(Vector2(x, outer.position.y + 20), 2.5, Color("4a5568"))
-		draw_circle(Vector2(x, outer.end.y - 20), 2.5, Color("4a5568"))
+	# Depth-sort furniture and agents. Footprints never overlap, so A is in
+	# front of B when A starts beyond B's far edge on either floor axis.
+	var things := []
+	for f in world.furniture(room):
+		things.append({"rect": f["rect"], "f": f})
+	for a in agents:
+		if a.room == room:
+			things.append({"rect": Rect2(a.position, Vector2.ZERO), "agent": a})
+	things.sort_custom(_behind)
+	for t in things:
+		if t.has("agent"):
+			t["agent"].paint(self)
+		else:
+			_draw_furniture(t["f"], tint)
 
-	# Floor: dark metal plates with a subtle grid
-	draw_rect(R, Color("161b22"))
-	var step := 80
-	for x in range(int(R.position.x), int(R.end.x), step):
-		for y in range(int(R.position.y), int(R.end.y), step):
-			var checker := (int((x - R.position.x) / step) + int((y - R.position.y) / step)) % 2
-			if checker == 0:
-				draw_rect(Rect2(x, y, step, step), Color(1, 1, 1, 0.018))
-	for x in range(int(R.position.x), int(R.end.x) + 1, step):
-		draw_line(Vector2(x, R.position.y), Vector2(x, R.end.y), Color(1, 1, 1, 0.045), 1.0)
-	for y in range(int(R.position.y), int(R.end.y) + 1, step):
-		draw_line(Vector2(R.position.x, y), Vector2(R.end.x, y), Color(1, 1, 1, 0.045), 1.0)
-	# Coloured light spill from the ceiling strips
-	for i in 6:
-		var a := 0.05 - i * 0.008
-		draw_rect(Rect2(R.position.x, R.position.y, R.size.x, 18 + i * 14), Color(tint, a))
-	# Inner wall edge glow
-	draw_rect(R, Color(tint, 0.55), false, 2.0)
-	# Ceiling light strips on the top wall
-	var pulse := 0.75 + 0.25 * sin(_t * 2.0)
-	for sx in [R.position.x + 60, R.end.x - 360]:
-		draw_rect(Rect2(sx, outer.position.y + 14, 300, 6), Color(tint, 0.9 * pulse))
-		draw_rect(Rect2(sx - 4, outer.position.y + 10, 308, 14), Color(tint, 0.15 * pulse))
+	_draw_front_ledges(R, tint)
 
-	# Doors
+
+## Sort comparator: true when `a` should be drawn before (behind) `b`.
+static func _behind(a: Dictionary, b: Dictionary) -> bool:
+	var ra: Rect2 = a["rect"]
+	var rb: Rect2 = b["rect"]
+	if rb.position.x >= ra.end.x or rb.position.y >= ra.end.y:
+		return true
+	if ra.position.x >= rb.end.x or ra.position.y >= rb.end.y:
+		return false
+	return ra.get_center().x + ra.get_center().y < rb.get_center().x + rb.get_center().y
+
+
+# ---------------------------------------------------------------- floor
+
+func _draw_floor(R: Rect2, tint: Color) -> void:
+	var x0 := R.position.x
+	var y0 := R.position.y
+	var x1 := R.end.x
+	var y1 := R.end.y
+	_quad(P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1), Color("161b22"))
+	var step := 80.0
+	var ix := 0
+	var x := x0
+	while x < x1:
+		var iy := 0
+		var y := y0
+		while y < y1:
+			if (ix + iy) % 2 == 0:
+				var xe := minf(x + step, x1)
+				var ye := minf(y + step, y1)
+				_quad(P(x, y), P(xe, y), P(xe, ye), P(x, ye), Color(1, 1, 1, 0.022))
+			y += step
+			iy += 1
+		x += step
+		ix += 1
+	x = x0
+	while x <= x1 + 0.1:
+		draw_line(P(x, y0), P(x, y1), Color(1, 1, 1, 0.05), 1.0)
+		x += step
+	var y := y0
+	while y <= y1 + 0.1:
+		draw_line(P(x0, y), P(x1, y), Color(1, 1, 1, 0.05), 1.0)
+		y += step
+	# Coloured light pooling along the base of the back walls
+	for i in 5:
+		var d := 20.0 + i * 22.0
+		var c := Color(tint, 0.05)
+		_quad(P(x0, y0), P(x1, y0), P(x1, y0 + d), P(x0 + d, y0 + d), c)
+		_quad(P(x0, y0), P(x0 + d, y0 + d), P(x0 + d, y1), P(x0, y1), c)
+	# Floor arrows towards each door
 	for dir in [World.Dir.UP, World.Dir.DOWN, World.Dir.LEFT, World.Dir.RIGHT]:
 		if world.has_door(room, dir):
-			_draw_door(dir, tint)
-
-	# Furniture (shadows first so they sit under everything)
-	var items: Array = world.furniture(room)
-	for f in items:
-		draw_rect(Rect2((f["rect"] as Rect2).position + Vector2(6, 8), (f["rect"] as Rect2).size), Color(0, 0, 0, 0.35))
-	for f in items:
-		_draw_furniture(f, tint)
+			_floor_arrow(dir, tint)
 
 
-func _draw_door(dir: int, tint: Color) -> void:
+func _floor_arrow(dir: int, tint: Color) -> void:
 	var R := World.ROOM
 	var c := R.get_center()
-	var h := World.DOOR_HALF
-	var w := World.WALL
-	var gap: Rect2
-	var post_a: Rect2
-	var post_b: Rect2
-	var horizontal := dir == World.Dir.UP or dir == World.Dir.DOWN
-	match dir:
-		World.Dir.UP: gap = Rect2(c.x - h, R.position.y - w, h * 2, w)
-		World.Dir.DOWN: gap = Rect2(c.x - h, R.end.y, h * 2, w)
-		World.Dir.LEFT: gap = Rect2(R.position.x - w, c.y - h, w, h * 2)
-		_: gap = Rect2(R.end.x, c.y - h, w, h * 2)
-	draw_rect(gap, Color("0e1217"))
-	# Open blast door panels slid into the wall
-	if horizontal:
-		post_a = Rect2(gap.position.x - 14, gap.position.y, 14, gap.size.y)
-		post_b = Rect2(gap.end.x, gap.position.y, 14, gap.size.y)
-	else:
-		post_a = Rect2(gap.position.x, gap.position.y - 14, gap.size.x, 14)
-		post_b = Rect2(gap.position.x, gap.end.y, gap.size.x, 14)
-	for post in [post_a, post_b]:
-		_hazard(post)
-	# Threshold light
-	var lamp := Color("5dff8a") if int(_t * 2.0) % 2 == 0 else Color("3bbf62")
-	var lamp_pos := post_a.get_center()
-	draw_circle(lamp_pos, 5.0, lamp)
-	draw_circle(lamp_pos, 9.0, Color(lamp, 0.25))
-	# Floor arrow pointing out of the room
-	var arrow_dir := Vector2(World.DIR_VEC[dir])
-	var base := gap.get_center() - arrow_dir * (w * 0.5 + 26)
-	var side := Vector2(-arrow_dir.y, arrow_dir.x)
-	draw_colored_polygon(PackedVector2Array([
-		base + arrow_dir * 14, base - arrow_dir * 6 + side * 12, base - arrow_dir * 6 - side * 12,
-	]), Color(tint, 0.35))
+	var v := Vector2(World.DIR_VEC[dir])
+	var base := c + v * Vector2(R.size.x * 0.5 - 50, R.size.y * 0.5 - 50)
+	var side := Vector2(-v.y, v.x)
+	var tip := base + v * 22
+	var l := base - v * 10 + side * 20
+	var r := base - v * 10 - side * 20
+	draw_colored_polygon(PackedVector2Array([World.iso(tip), World.iso(l), World.iso(r)]), Color(tint, 0.4))
 
 
-func _hazard(r: Rect2) -> void:
-	draw_rect(r, Color("e0b10b"))
-	var n := 6
-	var horizontal := r.size.x > r.size.y
+# ---------------------------------------------------------------- walls
+
+func _draw_back_walls(R: Rect2, tint: Color) -> void:
+	var x0 := R.position.x
+	var y0 := R.position.y
+	var x1 := R.end.x
+	var y1 := R.end.y
+	var c := R.get_center()
+	var h := World.WALL_H
+	var dh := World.DOOR_HALF
+	var col_up := Color("2c3443")   # faces down-left, catches the light
+	var col_left := Color("222935")
+	# UP wall runs along x at y = y0 (upper-right on screen)
+	var up_door := world.has_door(room, World.Dir.UP)
+	var up_spans := [[x0, c.x - dh], [c.x + dh, x1]] if up_door else [[x0, x1]]
+	for s in up_spans:
+		_quad(P(s[0], y0, 0), P(s[1], y0, 0), P(s[1], y0, h), P(s[0], y0, h), col_up)
+	# LEFT wall runs along y at x = x0 (upper-left on screen)
+	var left_door := world.has_door(room, World.Dir.LEFT)
+	var left_spans := [[y0, c.y - dh], [c.y + dh, y1]] if left_door else [[y0, y1]]
+	for s in left_spans:
+		_quad(P(x0, s[0], 0), P(x0, s[1], 0), P(x0, s[1], h), P(x0, s[0], h), col_left)
+	# Lintels and doorways
+	if up_door:
+		_quad(P(c.x - dh, y0, DOOR_TOP), P(c.x + dh, y0, DOOR_TOP), P(c.x + dh, y0, h), P(c.x - dh, y0, h), col_up.darkened(0.1))
+		_quad(P(c.x - dh, y0, 0), P(c.x + dh, y0, 0), P(c.x + dh, y0, DOOR_TOP), P(c.x - dh, y0, DOOR_TOP), Color("07090c"))
+		_door_frame(P(c.x - dh, y0), P(c.x + dh, y0))
+	if left_door:
+		_quad(P(x0, c.y - dh, DOOR_TOP), P(x0, c.y + dh, DOOR_TOP), P(x0, c.y + dh, h), P(x0, c.y - dh, h), col_left.darkened(0.1))
+		_quad(P(x0, c.y - dh, 0), P(x0, c.y + dh, 0), P(x0, c.y + dh, DOOR_TOP), P(x0, c.y - dh, DOOR_TOP), Color("07090c"))
+		_door_frame(P(x0, c.y - dh), P(x0, c.y + dh))
+	# Wall panels, light strips and skirting
+	var pulse := 0.75 + 0.25 * sin(_t * 2.0)
+	for s in up_spans:
+		_wall_details(Vector2(s[0], y0), Vector2(s[1], y0), tint, pulse)
+	for s in left_spans:
+		_wall_details(Vector2(x0, s[0]), Vector2(x0, s[1]), tint, pulse)
+	# Top caps (wall thickness) and the corner post
+	var cap := Color("3d4759")
+	var t := 14.0
+	_quad(P(x0, y0, h), P(x1, y0, h), P(x1, y0 - t, h), P(x0 - t, y0 - t, h), cap)
+	_quad(P(x0, y0, h), P(x0 - t, y0 - t, h), P(x0 - t, y1, h), P(x0, y1, h), cap.darkened(0.1))
+	draw_line(P(x0, y0, 0), P(x0, y0, h), Color(0, 0, 0, 0.4), 2.0)
+
+
+func _wall_details(a: Vector2, b: Vector2, tint: Color, pulse: float) -> void:
+	var len := a.distance_to(b)
+	if len < 40:
+		return
+	var dir := (b - a) / len
+	# Skirting stripe
+	_quad(World.iso(a, 0), World.iso(b, 0), World.iso(b, 8), World.iso(a, 8), Color(0, 0, 0, 0.3))
+	# Recessed panels
+	var n := int(len / 120.0)
 	for i in n:
-		if i % 2 == 0:
-			continue
-		if horizontal:
-			var seg := r.size.x / n
-			draw_rect(Rect2(r.position.x + i * seg, r.position.y, seg, r.size.y), Color("1a1a1a"))
-		else:
-			var seg := r.size.y / n
-			draw_rect(Rect2(r.position.x, r.position.y + i * seg, r.size.x, seg), Color("1a1a1a"))
+		var pa := a + dir * (i * len / n + 12)
+		var pb := a + dir * ((i + 1) * len / n - 12)
+		_quad_outline(World.iso(pa, 18), World.iso(pb, 18), World.iso(pb, 70), World.iso(pa, 70), Color(1, 1, 1, 0.06))
+	# Glowing light strip
+	var la := a + dir * 16
+	var lb := b - dir * 16
+	_quad(World.iso(la, 86), World.iso(lb, 86), World.iso(lb, 92), World.iso(la, 92), Color(tint, 0.85 * pulse))
+	_quad(World.iso(la, 80), World.iso(lb, 80), World.iso(lb, 98), World.iso(la, 98), Color(tint, 0.12 * pulse))
 
+
+func _door_frame(a: Vector2, b: Vector2) -> void:
+	for p: Vector2 in [a, b]:
+		var w := 6.0
+		var top: Vector2 = p - Vector2(0, DOOR_TOP)
+		draw_rect(Rect2(p.x - w / 2, top.y, w, DOOR_TOP), Color("e0b10b"))
+		for i in 6:
+			if i % 2 == 1:
+				draw_rect(Rect2(p.x - w / 2, top.y + i * DOOR_TOP / 6.0, w, DOOR_TOP / 6.0), Color("1a1a1a"))
+	var lamp := Color("5dff8a") if int(_t * 2.0) % 2 == 0 else Color("3bbf62")
+	var mid := (a + b) / 2 - Vector2(0, DOOR_TOP + 10)
+	draw_circle(mid, 4.0, lamp)
+	draw_circle(mid, 8.0, Color(lamp, 0.25))
+
+
+func _draw_front_ledges(R: Rect2, tint: Color) -> void:
+	var x0 := R.position.x
+	var y0 := R.position.y
+	var x1 := R.end.x
+	var y1 := R.end.y
+	var c := R.get_center()
+	var dh := World.DOOR_HALF
+	var h := LEDGE_H
+	var face := Color("39424f")
+	var top := Color("4b5566")
+	# DOWN ledge along x at y = y1
+	var down_spans := [[x0, c.x - dh], [c.x + dh, x1]] if world.has_door(room, World.Dir.DOWN) else [[x0, x1]]
+	for s in down_spans:
+		_quad(P(s[0], y1, 0), P(s[1], y1, 0), P(s[1], y1, h), P(s[0], y1, h), face)
+		_quad(P(s[0], y1, h), P(s[1], y1, h), P(s[1], y1 + 14, h), P(s[0], y1 + 14, h), top)
+		_quad(P(s[0], y1 + 14, 0), P(s[1], y1 + 14, 0), P(s[1], y1 + 14, h), P(s[0], y1 + 14, h), face.darkened(0.25))
+	# RIGHT ledge along y at x = x1
+	var right_spans := [[y0, c.y - dh], [c.y + dh, y1 + 14]] if world.has_door(room, World.Dir.RIGHT) else [[y0, y1 + 14]]
+	for s in right_spans:
+		_quad(P(x1, s[0], 0), P(x1, s[1], 0), P(x1, s[1], h), P(x1, s[0], h), face.darkened(0.15))
+		_quad(P(x1, s[0], h), P(x1, s[1], h), P(x1 + 14, s[1], h), P(x1 + 14, s[0], h), top)
+		_quad(P(x1 + 14, s[0], 0), P(x1 + 14, s[1], 0), P(x1 + 14, s[1], h), P(x1 + 14, s[0], h), face.darkened(0.4))
+	# Hazard markings on front doorways
+	if world.has_door(room, World.Dir.DOWN):
+		for x in [c.x - dh, c.x + dh]:
+			_quad(P(x - 4, y1, h), P(x + 4, y1, h), P(x + 4, y1 + 14, h), P(x - 4, y1 + 14, h), Color("e0b10b"))
+	if world.has_door(room, World.Dir.RIGHT):
+		for y in [c.y - dh, c.y + dh]:
+			_quad(P(x1, y - 4, h), P(x1, y + 4, h), P(x1 + 14, y + 4, h), P(x1 + 14, y - 4, h), Color("e0b10b"))
+
+
+# ---------------------------------------------------------------- furniture
 
 func _draw_furniture(f: Dictionary, tint: Color) -> void:
 	var r: Rect2 = f["rect"]
 	var d: int = f["detail"]
-	var vertical := r.size.y > r.size.x
-	var inner := r.grow(-5)
+	var h: float = HEIGHTS.get(f["type"], 50.0)
+	var along_x := r.size.x >= r.size.y
+	# Contact shadow
+	_quad(P(r.position.x + 6, r.position.y + 6), P(r.end.x + 10, r.position.y + 6), P(r.end.x + 10, r.end.y + 10), P(r.position.x + 6, r.end.y + 10), Color(0, 0, 0, 0.3))
 	match f["type"]:
 		"desk":
-			_box(r, Color("3c4656"), Color("4f5d72"))
-			var mon := Rect2(r.get_center() - Vector2(22, 14), Vector2(44, 28))
-			draw_rect(mon, Color("0b0f14"))
-			draw_rect(mon.grow(-3), Color(tint, 0.55 + 0.2 * sin(_t * 3.0 + d)))
-			draw_rect(Rect2(inner.position, Vector2(18, 10)), Color("d8d2c0"))
+			_box(r, h, Color("4f5d72"))
+			var m := Rect2(r.get_center() - Vector2(22, 6) if along_x else r.get_center() - Vector2(6, 22), Vector2(44, 12) if along_x else Vector2(12, 44))
+			_box(m, 30, Color("1c2129"), h)
+			var glow := Color(tint, 0.6 + 0.2 * sin(_t * 3.0 + d))
+			if along_x:
+				_face_rect_y(m.end.y, m.position.x + 3, m.end.x - 3, h + 4, h + 26, glow)
+			else:
+				_face_rect_x(m.end.x, m.position.y + 3, m.end.y - 3, h + 4, h + 26, glow)
+			_box(Rect2(r.position + Vector2(10, 10), Vector2(24, 16)), 2, Color("d8d2c0"), h)
 		"console":
-			_box(r, Color("22303c"), Color("2f4252"))
-			var screen := Rect2(inner.position, Vector2(inner.size.x * 0.4, inner.size.y)) if not vertical else Rect2(inner.position, Vector2(inner.size.x, inner.size.y * 0.4))
-			draw_rect(screen, Color("05080b"))
-			for i in 5:
-				var yy := screen.position.y + 5 + i * (screen.size.y - 10) / 5.0
-				var ww := screen.size.x * (0.3 + 0.6 * fposmod(sin(d + i * 1.7 + _t), 1.0))
-				draw_line(Vector2(screen.position.x + 4, yy), Vector2(screen.position.x + 4 + ww * 0.85, yy), Color("4dff9a", 0.8), 2.0)
+			_box(r, h, Color("2f4252"))
 			var colors := [Color("ff4d4d"), Color("ffd84d"), Color("4dff9a"), Color("4dc4ff")]
-			for i in 8:
-				var bx := inner.position.x + inner.size.x * (0.48 + 0.065 * i) if not vertical else inner.position.x + 6 + (i % 3) * 12
-				var by := inner.get_center().y + (6 if i % 2 == 0 else -6) if not vertical else inner.position.y + inner.size.y * (0.48 + 0.065 * i)
+			for i in 10:
+				var s := (i + 0.5) / 10.0
+				var p := Vector2(lerpf(r.position.x + 10, r.end.x - 10, s), r.get_center().y + (6 if i % 2 == 0 else -6)) if along_x \
+					else Vector2(r.get_center().x + (6 if i % 2 == 0 else -6), lerpf(r.position.y + 10, r.end.y - 10, s))
 				var on := int(_t * 3.0 + i + d) % 4 != 0
-				draw_circle(Vector2(bx, by), 3.5, colors[(i + d) % 4] if on else Color("333a44"))
+				draw_circle(World.iso(p, h), 3.0, colors[(i + d) % 4] if on else Color("333a44"))
+			# Upright screen at the back edge
+			var sr := Rect2(r.position, Vector2(r.size.x, 8)) if along_x else Rect2(r.position, Vector2(8, r.size.y))
+			_box(sr, 34, Color("10161c"), h)
+			var lines := Color("4dff9a", 0.8)
+			for i in 3:
+				var z := h + 10 + i * 8
+				if along_x:
+					draw_line(P(sr.position.x + 10, sr.end.y, z), P(sr.position.x + 10 + (sr.size.x - 20) * fposmod(sin(d + i + _t), 1.0), sr.end.y, z), lines, 2.0)
+				else:
+					draw_line(P(sr.end.x, sr.position.y + 10, z), P(sr.end.x, sr.position.y + 10 + (sr.size.y - 20) * fposmod(sin(d + i + _t), 1.0), z), lines, 2.0)
 		"cabinet":
-			_box(r, Color("596273"), Color("6d7789"))
-			var n := 3
-			for i in range(1, n):
-				if vertical:
-					var x := r.position.x + r.size.x * i / n
-					draw_line(Vector2(x, inner.position.y), Vector2(x, inner.end.y), Color("2d333d"), 2.0)
-				else:
-					var y := r.position.y + r.size.y * i / n
-					draw_line(Vector2(inner.position.x, y), Vector2(inner.end.x, y), Color("2d333d"), 2.0)
-			draw_rect(Rect2(r.get_center() - Vector2(8, 2), Vector2(16, 4)), Color("c7ccd6"))
+			_box(r, h, Color("6d7789"))
+			for t in [h / 3.0, h * 2.0 / 3.0]:
+				_face_line_y(r.end.y, r.position.x + 3, r.end.x - 3, t, Color("2d333d"))
+				_face_line_x(r.end.x, r.position.y + 3, r.end.y - 3, t, Color("2d333d"))
+			for t in [h / 6.0, h / 2.0, h * 5.0 / 6.0]:
+				draw_line(P(r.get_center().x - 8, r.end.y, t), P(r.get_center().x + 8, r.end.y, t), Color("c7ccd6"), 3.0)
 		"locker":
-			_box(r, Color("2f5e4e"), Color("3b7462"))
+			_box(r, h, Color("3b7462"))
 			var n := 3
 			for i in range(1, n):
-				if vertical:
-					var y := r.position.y + r.size.y * i / n
-					draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color("173028"), 3.0)
+				if along_x:
+					var x := lerpf(r.position.x, r.end.x, float(i) / n)
+					draw_line(P(x, r.end.y, 0), P(x, r.end.y, h), Color("173028"), 2.0)
 				else:
-					var x := r.position.x + r.size.x * i / n
-					draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), Color("173028"), 3.0)
-		"crate":
-			_box(r, Color("5a5233"), Color("6e6540"))
-			draw_line(inner.position, inner.end, Color("3b351f"), 5.0)
-			draw_line(Vector2(inner.end.x, inner.position.y), Vector2(inner.position.x, inner.end.y), Color("3b351f"), 5.0)
-			draw_rect(inner, Color("3b351f"), false, 3.0)
-			_text_center("CLASSIFIED" if d % 2 == 0 else "TOP SECRET", r.get_center(), 9, Color("e8463a", 0.85))
-		"shelf":
-			_box(r, Color("3a2e26"), Color("4a3c32"))
-			var palette := [Color("c0392b"), Color("2980b9"), Color("f1c40f"), Color("27ae60"), Color("ecf0f1"), Color("8e44ad")]
-			var count := int((r.size.y if vertical else r.size.x) / 14)
-			for i in count:
-				var col: Color = palette[(i * 7 + d) % palette.size()]
-				if vertical:
-					draw_rect(Rect2(inner.position.x, inner.position.y + i * 14, inner.size.x, 11), col.darkened(0.2))
-				else:
-					draw_rect(Rect2(inner.position.x + i * 14, inner.position.y, 11, inner.size.y), col.darkened(0.2))
-		"safe":
-			_box(r, Color("2b2f36"), Color("3a3f48"))
-			var c := r.get_center()
-			draw_circle(c, 15.0, Color("9aa3b0"))
-			draw_circle(c, 11.0, Color("50575f"))
-			draw_line(c, c + Vector2.from_angle(d * 0.37) * 10.0, Color("e6e9ee"), 2.0)
-		"plant":
-			draw_circle(r.get_center(), r.size.x * 0.32, Color("6b4a33"))
-			for i in 6:
-				var a := i * TAU / 6.0 + d * 0.1
-				draw_circle(r.get_center() + Vector2.from_angle(a) * 12.0, 12.0, Color("2f8f46"))
-			draw_circle(r.get_center(), 10.0, Color("3fae58"))
-		"rack":
-			_box(r, Color("1f2329"), Color("2a2f37"))
-			var n := 4
+					var y := lerpf(r.position.y, r.end.y, float(i) / n)
+					draw_line(P(r.end.x, y, 0), P(r.end.x, y, h), Color("173028"), 2.0)
 			for i in n:
-				var t := (i + 0.5) / n
-				if vertical:
-					var y := r.position.y + r.size.y * t
-					draw_line(Vector2(inner.position.x + 2, y), Vector2(inner.end.x - 2, y), Color("8e98a6"), 4.0)
+				for k in 3:
+					var z := h - 18 - k * 6
+					if along_x:
+						var xa := lerpf(r.position.x, r.end.x, (i + 0.25) / n)
+						var xb := lerpf(r.position.x, r.end.x, (i + 0.75) / n)
+						draw_line(P(xa, r.end.y, z), P(xb, r.end.y, z), Color("173028"), 1.5)
+					else:
+						var ya := lerpf(r.position.y, r.end.y, (i + 0.25) / n)
+						var yb := lerpf(r.position.y, r.end.y, (i + 0.75) / n)
+						draw_line(P(r.end.x, ya, z), P(r.end.x, yb, z), Color("173028"), 1.5)
+		"crate":
+			_box(r, h, Color("6e6540"))
+			var dark := Color("3b351f")
+			draw_line(P(r.position.x, r.end.y, 0), P(r.end.x, r.end.y, h), dark, 4.0)
+			draw_line(P(r.position.x, r.end.y, h), P(r.end.x, r.end.y, 0), dark, 4.0)
+			draw_line(P(r.end.x, r.position.y, 0), P(r.end.x, r.end.y, h), dark, 4.0)
+			draw_line(P(r.end.x, r.position.y, h), P(r.end.x, r.end.y, 0), dark, 4.0)
+			draw_line(P(r.position.x + 10, r.get_center().y, h), P(r.end.x - 10, r.get_center().y, h), Color("e8463a", 0.7), 3.0)
+		"shelf":
+			_box(r, h, Color("4a3c32"))
+			var palette := [Color("c0392b"), Color("2980b9"), Color("f1c40f"), Color("27ae60"), Color("ecf0f1"), Color("8e44ad")]
+			for row in 3:
+				var z0 := 8.0 + row * (h - 12) / 3.0
+				var z1 := z0 + (h - 12) / 3.0 - 6
+				var count := int((r.size.x if along_x else r.size.y) / 13)
+				for i in count:
+					var col: Color = palette[(i * 7 + row * 3 + d) % palette.size()]
+					var a := (r.position.x if along_x else r.position.y) + 4 + i * 13
+					if along_x:
+						_face_rect_y(r.end.y, a, a + 10, z0, z1 - (i % 3) * 3, col.darkened(0.15))
+					else:
+						_face_rect_x(r.end.x, a, a + 10, z0, z1 - (i % 3) * 3, col.darkened(0.15))
+		"safe":
+			_box(r, h, Color("3a3f48"))
+			var center := P(r.get_center().x, r.end.y, h * 0.5) if along_x else P(r.end.x, r.get_center().y, h * 0.5)
+			draw_circle(center, 12.0, Color("9aa3b0"))
+			draw_circle(center, 8.0, Color("50575f"))
+			draw_line(center, center + Vector2.from_angle(d * 0.37) * 8.0, Color("e6e9ee"), 2.0)
+		"plant":
+			var pot := r.grow(-12)
+			_box(pot, h, Color("7a5238"))
+			var top := World.iso(r.get_center(), h + 14)
+			for i in 7:
+				var a := i * TAU / 7.0 + d * 0.1
+				draw_circle(top + Vector2(cos(a) * 14, sin(a) * 7 - 4), 11.0, Color("2f8f46"))
+			draw_circle(top - Vector2(0, 14), 12.0, Color("3fae58"))
+			draw_circle(top - Vector2(4, 22), 8.0, Color("52c46b"))
+		"rack":
+			_box(r, h, Color("2a2f37"))
+			for i in 4:
+				var s := (i + 0.5) / 4.0
+				if along_x:
+					var x := lerpf(r.position.x, r.end.x, s)
+					draw_line(P(x, r.end.y + 1, 14), P(x, r.end.y + 1, h - 14), Color("8e98a6"), 4.0)
+					draw_line(P(x, r.end.y + 1, h - 30), P(x + 10, r.end.y + 1, h - 30), Color("8e98a6"), 3.0)
 				else:
-					var x := r.position.x + r.size.x * t
-					draw_line(Vector2(x, inner.position.y + 2), Vector2(x, inner.end.y - 2), Color("8e98a6"), 4.0)
+					var y := lerpf(r.position.y, r.end.y, s)
+					draw_line(P(r.end.x + 1, y, 14), P(r.end.x + 1, y, h - 14), Color("8e98a6"), 4.0)
+					draw_line(P(r.end.x + 1, y, h - 30), P(r.end.x + 1, y + 10, h - 30), Color("8e98a6"), 3.0)
 		"sofa":
-			_box(r, Color("5c1f2a"), Color("7a2b39"))
-			var cushions := 3
-			for i in cushions:
-				var cr: Rect2
-				if vertical:
-					cr = Rect2(inner.position.x + 8, inner.position.y + i * inner.size.y / cushions + 3, inner.size.x - 10, inner.size.y / cushions - 6)
-				else:
-					cr = Rect2(inner.position.x + i * inner.size.x / cushions + 3, inner.position.y + 8, inner.size.x / cushions - 6, inner.size.y - 10)
-				draw_rect(cr, Color("8f3545"))
+			var seat := Color("8f3545")
+			var back: Rect2
+			var wall: String = f["wall"]
+			match wall:
+				"top": back = Rect2(r.position, Vector2(r.size.x, 18))
+				"bottom": back = Rect2(Vector2(r.position.x, r.end.y - 18), Vector2(r.size.x, 18))
+				"left": back = Rect2(r.position, Vector2(18, r.size.y))
+				_: back = Rect2(Vector2(r.end.x - 18, r.position.y), Vector2(18, r.size.y))
+			if wall == "bottom" or wall == "right":
+				_box(r, h, seat)
+				_box(back, 50, Color("7a2b39"))
+			else:
+				_box(back, 50, Color("7a2b39"))
+				_box(r, h, seat)
 		_:
-			_box(r, Color("444"), Color("555"))
+			_box(r, h, Color("555555"))
 
 
-func _box(r: Rect2, body: Color, top: Color) -> void:
-	draw_rect(r, body.darkened(0.35))
-	draw_rect(r.grow(-3), body)
-	draw_rect(Rect2(r.position + Vector2(3, 3), Vector2(r.size.x - 6, 4)), top)
+## An isometric box: footprint `r` on the floor, from height `z0` to `z0 + h`.
+func _box(r: Rect2, h: float, col: Color, z0 := 0.0) -> void:
+	var x0 := r.position.x
+	var y0 := r.position.y
+	var x1 := r.end.x
+	var y1 := r.end.y
+	var z1 := z0 + h
+	_quad(P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1), col.darkened(0.25))   # front-left face
+	_quad(P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1), col.darkened(0.45))   # front-right face
+	_quad(P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1), col.lightened(0.08))  # top
+	var edge := col.lightened(0.3)
+	draw_line(P(x0, y1, z1), P(x1, y1, z1), edge, 1.5)
+	draw_line(P(x1, y0, z1), P(x1, y1, z1), edge, 1.5)
+	draw_line(P(x1, y1, z0), P(x1, y1, z1), col.darkened(0.6), 1.0)
 
 
-func _text_center(text: String, at: Vector2, size: int, col: Color) -> void:
-	var font := ThemeDB.fallback_font
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	draw_string(font, at + Vector2(-w / 2, size * 0.35), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+## A rectangle painted on a face that runs along x at floor y = `y`.
+func _face_rect_y(y: float, xa: float, xb: float, za: float, zb: float, col: Color) -> void:
+	_quad(P(xa, y, za), P(xb, y, za), P(xb, y, zb), P(xa, y, zb), col)
+
+
+## A rectangle painted on a face that runs along y at floor x = `x`.
+func _face_rect_x(x: float, ya: float, yb: float, za: float, zb: float, col: Color) -> void:
+	_quad(P(x, ya, za), P(x, yb, za), P(x, yb, zb), P(x, ya, zb), col)
+
+
+func _face_line_y(y: float, xa: float, xb: float, z: float, col: Color) -> void:
+	draw_line(P(xa, y, z), P(xb, y, z), col, 2.0)
+
+
+func _face_line_x(x: float, ya: float, yb: float, z: float, col: Color) -> void:
+	draw_line(P(x, ya, z), P(x, yb, z), col, 2.0)
+
+
+func _quad(a: Vector2, b: Vector2, c: Vector2, d: Vector2, col: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([a, b, c, d]), col)
+
+
+func _quad_outline(a: Vector2, b: Vector2, c: Vector2, d: Vector2, col: Color) -> void:
+	draw_polyline(PackedVector2Array([a, b, c, d, a]), col, 1.5)

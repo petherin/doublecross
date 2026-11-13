@@ -51,7 +51,7 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	add_child(leave)
 
 	_minimap = Control.new()
-	_minimap.position = Vector2(1095, 4)
+	_minimap.position = Vector2(1090, 12)
 	_minimap.size = Vector2(56, 56)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.draw.connect(_draw_minimap)
@@ -75,14 +75,16 @@ func show_room(room: Vector2i, animate: bool) -> void:
 
 
 func _draw_minimap() -> void:
-	var cell := 16.0
-	var pad := 2.0
+	# Isometric mini-map matching the room view's orientation.
+	var a := 9.0
+	var origin := Vector2(28, 8)
 	for y in World.ROWS:
 		for x in World.COLS:
-			var r := Rect2(x * (cell + pad), y * (cell + pad), cell, cell)
+			var c := origin + Vector2((x - y) * a, (x + y) * a * 0.5 + a * 0.5)
+			var pts := PackedVector2Array([
+				c + Vector2(0, -a * 0.5 + 1), c + Vector2(a - 1.5, 0), c + Vector2(0, a * 0.5 - 1), c + Vector2(-a + 1.5, 0)])
 			var here := Vector2i(x, y) == _room
-			_minimap.draw_rect(r, Color(_accent, 0.85) if here else Color(1, 1, 1, 0.12))
-			_minimap.draw_rect(r, Color(1, 1, 1, 0.35), false, 1.0)
+			_minimap.draw_colored_polygon(pts, Color(_accent, 0.9) if here else Color(1, 1, 1, 0.15))
 
 
 func _label(text: String, size: int, col: Color) -> Label:

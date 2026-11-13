@@ -41,6 +41,7 @@ func setup(seed_value: int, my_id: int, ids: Array) -> void:
 		agents.append(a)
 		if id == my_id:
 			local_agent = a
+	_view.agents = agents
 
 	_hud = Hud.new()
 	add_child(_hud)
@@ -60,9 +61,8 @@ func _process(_delta: float) -> void:
 	var move := kb + wasd
 	if _hud.joystick.output != Vector2.ZERO:
 		move = _hud.joystick.output
-	local_agent.move_input = move
-	for a in agents:
-		a.visible = a.room == local_agent.room
+	# Controls are screen-relative: up on the stick = up the screen.
+	local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
 
 
 func _on_room_changed(room: Vector2i, animate := true) -> void:
