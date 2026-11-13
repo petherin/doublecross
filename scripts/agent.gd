@@ -6,7 +6,9 @@ signal room_changed(room: Vector2i)
 
 const World = preload("res://scripts/world.gd")
 const SPEED := 340.0
-const RADIUS := 22.0
+const RADIUS := 30.0
+## Drawing is authored at radius 22 and scaled up to the collision size.
+const ART_SCALE := RADIUS / 22.0
 const SEND_RATE := 1.0 / 20.0
 
 var world: World
@@ -32,6 +34,7 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	is_local = p_local
 	position = World.ROOM.get_center()
 	_target = position
+	scale = Vector2.ONE * ART_SCALE
 	display_name = style["name"]
 	coat = style["coat"]
 	hat = style["hat"]
@@ -179,6 +182,6 @@ func _draw() -> void:
 	# Name tag above the head (not rotated)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var font := ThemeDB.fallback_font
-	var size := 18
+	var size := 15
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	draw_string(font, Vector2(-w / 2, -40), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	draw_string(font, Vector2(-w / 2, -38), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)

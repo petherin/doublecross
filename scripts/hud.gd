@@ -51,8 +51,8 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	add_child(leave)
 
 	_minimap = Control.new()
-	_minimap.position = Vector2(1180, 80)
-	_minimap.size = Vector2(86, 86)
+	_minimap.position = Vector2(1095, 4)
+	_minimap.size = Vector2(56, 56)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.draw.connect(_draw_minimap)
 	add_child(_minimap)
@@ -75,8 +75,8 @@ func show_room(room: Vector2i, animate: bool) -> void:
 
 
 func _draw_minimap() -> void:
-	var cell := 26.0
-	var pad := 4.0
+	var cell := 16.0
+	var pad := 2.0
 	for y in World.ROWS:
 		for x in World.COLS:
 			var r := Rect2(x * (cell + pad), y * (cell + pad), cell, cell)

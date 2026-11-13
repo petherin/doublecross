@@ -14,7 +14,6 @@ var _t := 0.0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	size = Vector2(1280, 800)
 	theme = _make_theme()
 
 	var title := Label.new()
