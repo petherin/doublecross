@@ -5,6 +5,10 @@ extends Node2D
 
 const World = preload("res://scripts/world.gd")
 const Icons = preload("res://scripts/icons.gd")
+const Art = preload("res://scripts/art.gd")
+const LightLayer = preload("res://scripts/light_layer.gd")
+const POSTERS := ["TRUST NO ONE", "WALLS HAVE EARS", "SHRED AFTER READING", "LOOK BUSY"]
+const SIGNS := ["RESTRICTED", "AUTHORISED ONLY", "NO ENTRY", "DANGER: HIGH VOLTAGE"]
 
 const DOOR_TOP := 82.0
 const LEDGE_H := 16.0
@@ -32,6 +36,30 @@ var darts: Array = []
 var _effects: Array = []
 
 var _t := 0.0
+
+
+func _ready() -> void:
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	var lights := LightLayer.new()
+	lights.view = self
+	add_child(lights)
+
+
+## Affine transforms for drawing "flat" in the isometric world:
+## floor space uses floor coordinates; wall space uses (along the wall, -height).
+func _floor_xf() -> Transform2D:
+	var k := World.ISO_K
+	return Transform2D(Vector2(k, k * 0.5), Vector2(-k, k * 0.5), World.iso(Vector2.ZERO))
+
+
+func _up_wall_xf() -> Transform2D:
+	var k := World.ISO_K
+	return Transform2D(Vector2(k, k * 0.5), Vector2(0, 1), World.iso(Vector2(0, World.ROOM.position.y)))
+
+
+func _left_wall_xf() -> Transform2D:
+	var k := World.ISO_K
+	return Transform2D(Vector2(-k, k * 0.5), Vector2(0, 1), World.iso(Vector2(World.ROOM.position.x, 0)))
 
 
 func _process(delta: float) -> void:
@@ -128,36 +156,39 @@ func _draw_floor(R: Rect2, tint: Color) -> void:
 	var y0 := R.position.y
 	var x1 := R.end.x
 	var y1 := R.end.y
-	_quad(P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1), Color("161b22"))
-	var step := 80.0
-	var ix := 0
-	var x := x0
-	while x < x1:
-		var iy := 0
-		var y := y0
-		while y < y1:
-			if (ix + iy) % 2 == 0:
-				var xe := minf(x + step, x1)
-				var ye := minf(y + step, y1)
-				_quad(P(x, y), P(xe, y), P(xe, ye), P(x, ye), Color(1, 1, 1, 0.022))
-			y += step
-			iy += 1
-		x += step
-		ix += 1
-	x = x0
-	while x <= x1 + 0.1:
-		draw_line(P(x, y0), P(x, y1), Color(1, 1, 1, 0.05), 1.0)
-		x += step
-	var y := y0
-	while y <= y1 + 0.1:
-		draw_line(P(x0, y), P(x1, y), Color(1, 1, 1, 0.05), 1.0)
-		y += step
-	# Coloured light pooling along the base of the back walls
-	for i in 5:
-		var d := 20.0 + i * 22.0
-		var c := Color(tint, 0.05)
-		_quad(P(x0, y0), P(x1, y0), P(x1, y0 + d), P(x0 + d, y0 + d), c)
-		_quad(P(x0, y0), P(x0 + d, y0 + d), P(x0 + d, y1), P(x0, y1), c)
+	var font := ThemeDB.fallback_font
+	draw_set_transform_matrix(_floor_xf())
+	# Steel tread plate, tinted a touch by the room's lighting.
+	draw_texture_rect(Art.floor_tex(), R, true, Color(0.95, 0.97, 1.0).lerp(tint, 0.08))
+	# Room name stencilled on the floor.
+	var name_text: String = world.rooms[room]["name"].to_upper()
+	draw_string(font, Vector2(x0 + 70, y1 - 70), name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 58, Color(1, 1, 1, 0.045))
+	# Hazard stripes on the threshold of each doorway.
+	var rc := R.get_center()
+	var door_half := World.DOOR_HALF
+	for dir in World.DIR_VEC:
+		if world.opening(room, dir) == 0:
+			continue
+		var v := Vector2(World.DIR_VEC[dir])
+		var side := Vector2(-v.y, v.x)
+		var mid := rc + v * (R.size / 2.0 - Vector2(18, 18))
+		for i in 8:
+			var a := mid + side * (-door_half + 6 + i * (door_half * 2 - 12) / 8.0)
+			var stripe := PackedVector2Array([a - v * 14, a - v * 14 + side * 9, a + v * 14 + side * 15, a + v * 14 + side * 6])
+			draw_colored_polygon(stripe, Color(0.88, 0.69, 0.04, 0.35) if i % 2 == 0 else Color(0, 0, 0, 0.25))
+	# Darkening where the floor meets the back walls.
+	var ao := Color(0, 0, 0, 0.5)
+	var clear := Color(0, 0, 0, 0)
+	draw_polygon(PackedVector2Array([Vector2(x0, y0), Vector2(x1, y0), Vector2(x1, y0 + 80), Vector2(x0, y0 + 80)]),
+		PackedColorArray([ao, ao, clear, clear]))
+	draw_polygon(PackedVector2Array([Vector2(x0, y0), Vector2(x0 + 80, y0), Vector2(x0 + 80, y1), Vector2(x0, y1)]),
+		PackedColorArray([ao, clear, clear, ao]))
+	# Soft shadows under the furniture.
+	var soft := Art.soft()
+	for f in world.furniture(room):
+		var r: Rect2 = f["rect"]
+		draw_texture_rect(soft, Rect2(r.position + Vector2(-10, -10), r.size + Vector2(44, 44)), false, Color(0, 0, 0, 0.65))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 	# Daylight spilling in from the exit
 	for dir in [World.Dir.UP, World.Dir.LEFT]:
 		if world.is_exit(room, dir):
@@ -206,14 +237,12 @@ func _draw_back_walls(R: Rect2, tint: Color) -> void:
 	var up_kind := world.opening(room, World.Dir.UP)
 	var up_door := up_kind != 0
 	var up_spans := [[x0, c.x - dh], [c.x + dh, x1]] if up_door else [[x0, x1]]
-	for s in up_spans:
-		_quad(P(s[0], y0, 0), P(s[1], y0, 0), P(s[1], y0, h), P(s[0], y0, h), col_up)
+	_textured_wall(_up_wall_xf(), up_spans, Color(1.0, 1.0, 1.05).lerp(tint, 0.06))
 	# LEFT wall runs along y at x = x0 (upper-left on screen)
 	var left_kind := world.opening(room, World.Dir.LEFT)
 	var left_door := left_kind != 0
 	var left_spans := [[y0, c.y - dh], [c.y + dh, y1]] if left_door else [[y0, y1]]
-	for s in left_spans:
-		_quad(P(x0, s[0], 0), P(x0, s[1], 0), P(x0, s[1], h), P(x0, s[0], h), col_left)
+	_textured_wall(_left_wall_xf(), left_spans, Color(0.72, 0.74, 0.8).lerp(tint, 0.05))
 	# Lintels and doorways
 	if up_door:
 		_quad(P(c.x - dh, y0, DOOR_TOP), P(c.x + dh, y0, DOOR_TOP), P(c.x + dh, y0, h), P(c.x - dh, y0, h), col_up.darkened(0.1))
@@ -227,12 +256,147 @@ func _draw_back_walls(R: Rect2, tint: Color) -> void:
 		_wall_details(Vector2(s[0], y0), Vector2(s[1], y0), tint, pulse)
 	for s in left_spans:
 		_wall_details(Vector2(x0, s[0]), Vector2(x0, s[1]), tint, pulse)
+	_draw_decor(_up_wall_xf(), up_spans, tint, 0)
+	_draw_decor(_left_wall_xf(), left_spans, tint, 1)
 	# Top caps (wall thickness) and the corner post
 	var cap := Color("3d4759")
 	var t := 14.0
 	_quad(P(x0, y0, h), P(x1, y0, h), P(x1, y0 - t, h), P(x0 - t, y0 - t, h), cap)
 	_quad(P(x0, y0, h), P(x0 - t, y0 - t, h), P(x0 - t, y1, h), P(x0, y1, h), cap.darkened(0.1))
 	draw_line(P(x0, y0, 0), P(x0, y0, h), Color(0, 0, 0, 0.4), 2.0)
+
+
+func _textured_wall(xf: Transform2D, spans: Array, modulate_col: Color) -> void:
+	var h := World.WALL_H
+	draw_set_transform_matrix(xf)
+	for sp in spans:
+		var r := Rect2(sp[0], -h, sp[1] - sp[0], h)
+		draw_texture_rect(Art.wall_tex(), r, true, modulate_col)
+		# Grime and shadow at the base, a little light at the top.
+		draw_polygon(PackedVector2Array([Vector2(r.position.x, -34), Vector2(r.end.x, -34), Vector2(r.end.x, 0), Vector2(r.position.x, 0)]),
+			PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0.45)]))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## Things hung on the back walls: screens, maps, clocks, vents, signs, posters.
+## Chosen per room from the world seed, so both tablets see the same decor.
+func _draw_decor(xf: Transform2D, spans: Array, tint: Color, wall: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([world.seed_value, room, wall])
+	var font := ThemeDB.fallback_font
+	draw_set_transform_matrix(xf)
+	for sp in spans:
+		var a: float = sp[0] + 95.0
+		while a < sp[1] - 70.0:
+			if rng.randf() < 0.6:
+				var kind: String = ["monitor", "monitor", "map", "clock", "vent", "sign", "poster", "fusebox"][rng.randi_range(0, 7)]
+				var w := _decor(kind, a, tint, rng.randi(), font)
+				a += w + 50.0
+			else:
+				a += 120.0
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## Draws one decoration centred at `a` along the wall; returns its width.
+func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> float:
+	match kind:
+		"monitor":
+			var r := Rect2(a - 38, -76, 76, 48)
+			draw_rect(r, Color("0a0d12"))
+			draw_rect(r, Color("3a4456"), false, 2.0)
+			var sc := r.grow(-5)
+			draw_rect(sc, tint.darkened(0.82))
+			if seed_v % 2 == 0:
+				# Scrolling signal trace.
+				var pts := PackedVector2Array()
+				for i in 25:
+					var x := sc.position.x + i * sc.size.x / 24.0
+					pts.append(Vector2(x, sc.get_center().y + sin(i * 0.7 + _t * 4.0 + seed_v) * 8.0 * sin(i * 0.23 + _t)))
+				draw_polyline(pts, tint.lightened(0.4), 1.5, true)
+			else:
+				# Radar sweep with blips.
+				var cc := sc.get_center()
+				draw_arc(cc, 15, 0, TAU, 24, Color(tint.lightened(0.3), 0.6), 1.0)
+				draw_arc(cc, 8, 0, TAU, 16, Color(tint.lightened(0.3), 0.4), 1.0)
+				var ang := _t * 2.0 + seed_v
+				draw_line(cc, cc + Vector2.from_angle(ang) * 15, tint.lightened(0.5), 1.5)
+				for b in 3:
+					var bp := cc + Vector2.from_angle(seed_v * 0.7 + b * 2.1) * (5 + b * 4)
+					var fade := fposmod(ang - (seed_v * 0.7 + b * 2.1), TAU) / TAU
+					draw_circle(bp, 1.6, Color(1, 0.4, 0.4, 1.0 - fade))
+			return 76.0
+		"map":
+			var r := Rect2(a - 62, -78, 124, 58)
+			draw_rect(r, Color("0d2236"))
+			draw_rect(r, Color("8a6a3a"), false, 3.0)
+			for i in 5:
+				draw_line(Vector2(r.position.x + i * r.size.x / 4.0, r.position.y), Vector2(r.position.x + i * r.size.x / 4.0, r.end.y), Color(1, 1, 1, 0.06), 1.0)
+			var land := Color("2e6b57")
+			for blob in [[-38, -58, 10], [-30, -50, 8], [-20, -40, 6], [-2, -60, 9], [4, -50, 8], [10, -40, 7], [30, -58, 11], [40, -50, 9], [44, -34, 6]]:
+				draw_circle(Vector2(a + blob[0], blob[1]), blob[2], land)
+			for i in 3:
+				var dot := Vector2(a - 40 + ((seed_v >> (i * 4)) % 80), -64 + ((seed_v >> (i * 3)) % 30))
+				if int(_t * 2.0 + i) % 2 == 0:
+					draw_circle(dot, 2.2, Color("ff4d4d"))
+			return 124.0
+		"clock":
+			var cc := Vector2(a, -58)
+			draw_circle(cc, 18, Color("2b2f36"))
+			draw_circle(cc, 15, Color("e6e2d3"))
+			for i in 12:
+				draw_line(cc + Vector2.from_angle(i * TAU / 12.0) * 12, cc + Vector2.from_angle(i * TAU / 12.0) * 14, Color("2b2f36"), 1.0)
+			var tm := Time.get_time_dict_from_system()
+			var mins: float = tm["minute"] + tm["second"] / 60.0
+			var hrs: float = (tm["hour"] % 12) + mins / 60.0
+			draw_line(cc, cc + Vector2.from_angle(hrs / 12.0 * TAU - PI / 2) * 8, Color("15151a"), 2.0)
+			draw_line(cc, cc + Vector2.from_angle(mins / 60.0 * TAU - PI / 2) * 12, Color("15151a"), 1.5)
+			draw_line(cc, cc + Vector2.from_angle(tm["second"] / 60.0 * TAU - PI / 2) * 13, Color("d32f2f"), 1.0)
+			return 40.0
+		"vent":
+			var r := Rect2(a - 26, -44, 52, 32)
+			draw_rect(r, Color("0d1015"))
+			draw_rect(r, Color("4a5568"), false, 2.0)
+			for i in 6:
+				var y := r.position.y + 4 + i * 4.6
+				draw_line(Vector2(r.position.x + 3, y), Vector2(r.end.x - 3, y), Color("3a4456"), 2.0)
+			return 52.0
+		"sign":
+			var txt: String = SIGNS[seed_v % SIGNS.size()]
+			var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 18
+			var r := Rect2(a - w / 2, -70, w, 24)
+			draw_rect(r, Color("e0b10b"))
+			draw_rect(r.grow(-2), Color("15151a"), false, 1.5)
+			draw_string(font, Vector2(r.position.x + 9, r.end.y - 8), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("15151a"))
+			return w
+		"poster":
+			var txt: String = POSTERS[seed_v % POSTERS.size()]
+			var r := Rect2(a - 28, -84, 56, 70)
+			draw_rect(r, Color("e8dfc8"))
+			draw_rect(Rect2(r.position, Vector2(r.size.x, 14)), Color("b3262e"))
+			# Spy silhouette: fedora and coat collar.
+			var cc := Vector2(a, -50)
+			draw_circle(cc, 8, Color("15151a"))
+			draw_rect(Rect2(cc.x - 13, cc.y - 9, 26, 3), Color("15151a"))
+			draw_rect(Rect2(cc.x - 7, cc.y - 17, 14, 9), Color("15151a"))
+			draw_colored_polygon(PackedVector2Array([cc + Vector2(-14, 22), cc + Vector2(14, 22), cc + Vector2(8, 6), cc + Vector2(-8, 6)]), Color("15151a"))
+			var words := txt.split(" ")
+			for i in mini(words.size(), 3):
+				var ww := font.get_string_size(words[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+				draw_string(font, Vector2(a - ww / 2, r.position.y + 10 + (i * 0)), "" if i > 0 else words[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+			var rest := " ".join(words.slice(1))
+			var rw := font.get_string_size(rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+			draw_string(font, Vector2(a - rw / 2, r.end.y - 4), rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("b3262e"))
+			return 56.0
+		"fusebox":
+			var r := Rect2(a - 22, -70, 44, 54)
+			draw_rect(r, Color("4a5260"))
+			draw_rect(r, Color("2b3038"), false, 2.0)
+			for i in 6:
+				var on := int(_t * 2.5 + i * 1.3 + seed_v) % 3 != 0
+				draw_circle(Vector2(r.position.x + 9 + (i % 3) * 13, r.position.y + 12 + (i / 3) * 10), 2.5, (Color("4dff9a") if i % 2 == 0 else Color("ff4d4d")) if on else Color("1c2026"))
+			draw_rect(Rect2(r.position.x + 8, r.end.y - 18, 28, 8), Color("e0b10b"))
+			return 44.0
+	return 60.0
 
 
 func _wall_details(a: Vector2, b: Vector2, tint: Color, pulse: float) -> void:
@@ -503,8 +667,6 @@ func _draw_furniture(f: Dictionary, tint: Color) -> void:
 	var d: int = f["detail"]
 	var h: float = HEIGHTS.get(f["type"], 50.0)
 	var along_x := r.size.x >= r.size.y
-	# Contact shadow
-	_quad(P(r.position.x + 6, r.position.y + 6), P(r.end.x + 10, r.position.y + 6), P(r.end.x + 10, r.end.y + 10), P(r.position.x + 6, r.end.y + 10), Color(0, 0, 0, 0.3))
 	match f["type"]:
 		"desk":
 			_box(r, h, Color("4f5d72"))
@@ -638,9 +800,17 @@ func _box(r: Rect2, h: float, col: Color, z0 := 0.0) -> void:
 	var x1 := r.end.x
 	var y1 := r.end.y
 	var z1 := z0 + h
-	_quad(P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1), col.darkened(0.25))   # front-left face
-	_quad(P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1), col.darkened(0.45))   # front-right face
-	_quad(P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1), col.lightened(0.08))  # top
+	# Shaded faces: darker towards the floor, lit from the top-left.
+	var fl_top := col.darkened(0.15)
+	var fl_bot := col.darkened(0.45)
+	var fr_top := col.darkened(0.38)
+	var fr_bot := col.darkened(0.62)
+	draw_polygon(PackedVector2Array([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)]),
+		PackedColorArray([fl_bot, fl_bot, fl_top, fl_top]))   # front-left face
+	draw_polygon(PackedVector2Array([P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1)]),
+		PackedColorArray([fr_bot, fr_bot, fr_top, fr_top]))   # front-right face
+	draw_polygon(PackedVector2Array([P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)]),
+		PackedColorArray([col.lightened(0.02), col.lightened(0.1), col.lightened(0.18), col.lightened(0.1)]))  # top
 	var edge := col.lightened(0.3)
 	draw_line(P(x0, y1, z1), P(x1, y1, z1), edge, 1.5)
 	draw_line(P(x1, y0, z1), P(x1, y1, z1), edge, 1.5)

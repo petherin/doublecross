@@ -46,7 +46,7 @@ rebuilt with an original setting, original characters and a lot more polish.
 | 3 | Traps and counter-gadgets (bomb ⇄ extinguisher, spring trap ⇄ toolkit, tripwire ⇄ wire cutters) | ✅ Done |
 | 4 | Combat (cosh and dart pistol), per-player countdown and respawn penalty | ✅ Done |
 | 5 | Sound, music, menus, settings | ✅ Done |
-| 6 | Richer, more detailed graphics | ⏳ Next |
+| 6 | Richer, more detailed graphics: textures, lighting, shading, wall decor | ✅ Done |
 | 7 | Bot difficulty levels: easy (walks into its own traps), medium, hard | ✅ Done |
 | ★ | One-player mode against a bot | ✅ Done |
 | ★ | Phones as well as tablets, and a Mac app | ✅ Done |

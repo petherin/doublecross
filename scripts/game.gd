@@ -137,7 +137,19 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		ba.door_passed.connect(func(r, d): _handle_door(BOT_ID, r, d))
 		ba.exit_touched.connect(func(): _handle_escape(BOT_ID))
 
+	var vig_layer := CanvasLayer.new()
+	vig_layer.layer = 1
+	add_child(vig_layer)
+	var vig := TextureRect.new()
+	vig.texture = preload("res://scripts/art.gd").vignette()
+	vig.stretch_mode = TextureRect.STRETCH_SCALE
+	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vig_layer.add_child(vig)
+	vig.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vig.size = Ui.view_size(self)
+
 	_hud = Hud.new()
+	_hud.layer = 2
 	add_child(_hud)
 	_hud.setup(world, local_agent.display_name, local_agent.accent)
 	_hud.leave_requested.connect(func(): leave_requested.emit())

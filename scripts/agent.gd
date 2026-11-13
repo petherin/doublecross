@@ -12,6 +12,7 @@ signal recovered(kind: String)
 
 const World = preload("res://scripts/world.gd")
 const Ui = preload("res://scripts/ui.gd")
+const Art = preload("res://scripts/art.gd")
 const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
@@ -289,7 +290,7 @@ func paint(ci: CanvasItem) -> void:
 
 	# Shadow and team ring on the floor
 	ci.draw_set_transform(foot, 0.0, Vector2(1.0, 0.5))
-	ci.draw_circle(Vector2.ZERO, 26.0, Color(0, 0, 0, 0.4))
+	ci.draw_texture_rect(Art.soft(), Rect2(-40, -40, 80, 80), false, Color(0, 0, 0, 0.7))
 	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
 
 	var tilt := sin(_walk * 1.3) * 0.25 if ko else 0.0
@@ -303,9 +304,13 @@ func paint(ci: CanvasItem) -> void:
 	ci.draw_circle(Vector2(7 - stride, -2), 4.5, Color("0c0d10"))
 	# Back arm (behind the coat)
 	ci.draw_line(Vector2(-11, -60), Vector2(-13 - stride * 0.8, -36), dark, 7.0, true)
-	# Trench coat: flared hem, belt, lapels
+	# Trench coat: dark outline, flared hem, belt, lapels, rim light
 	ci.draw_colored_polygon(PackedVector2Array([
-		Vector2(-16, -26), Vector2(16, -26), Vector2(13, -64), Vector2(-13, -64)]), coat)
+		Vector2(-18, -24), Vector2(18, -24), Vector2(15, -66), Vector2(-15, -66)]), Color(0, 0, 0, 0.55))
+	ci.draw_polygon(PackedVector2Array([
+		Vector2(-16, -26), Vector2(16, -26), Vector2(13, -64), Vector2(-13, -64)]),
+		PackedColorArray([coat.darkened(0.25), coat.darkened(0.25), coat.lightened(0.08), coat.lightened(0.08)]))
+	ci.draw_line(Vector2(13, -63), Vector2(16, -27), Color(coat.lightened(0.45), 0.8), 1.5, true)
 	ci.draw_colored_polygon(PackedVector2Array([
 		Vector2(-16, -26), Vector2(-4, -26), Vector2(-3, -64), Vector2(-13, -64)]), dark.lightened(0.1))
 	ci.draw_line(Vector2(-15, -44), Vector2(15, -44), dark, 4.0)
