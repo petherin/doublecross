@@ -83,7 +83,7 @@ var _last_tick := -1
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
-func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6) -> void:
+func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6, names := {}) -> void:
 	my_id = p_my_id
 	time_limit = minutes * 60.0
 	_rng.randomize()
@@ -106,6 +106,9 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		a.set_multiplayer_authority(id)
 		var start := Vector2i(0, 0) if i == 0 else Vector2i(World.COLS - 1, World.ROWS - 1)
 		var style: Dictionary = STYLES[i % STYLES.size()].duplicate()
+		var chosen: String = str(names.get(id, "")).strip_edges().to_upper()
+		if chosen != "":
+			style["name"] = chosen
 		var is_bot := vs_bot and id == BOT_ID
 		if is_bot:
 			style["name"] += " (BOT)"

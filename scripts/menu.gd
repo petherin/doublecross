@@ -14,6 +14,7 @@ var _t := 0.0
 var _content: Control
 var _bot_level := "medium"
 var _overlay: Control
+var _name_edit: LineEdit
 var _lift := 0.0
 
 const Ui = preload("res://scripts/ui.gd")
@@ -51,11 +52,35 @@ func _ready() -> void:
 	sub.size = Vector2(1280, 40)
 	_content.add_child(sub)
 
+	# Codename
+	var name_row := HBoxContainer.new()
+	name_row.position = Vector2(140, 228)
+	name_row.add_theme_constant_override("separation", 12)
+	_content.add_child(name_row)
+	var nl := Label.new()
+	nl.text = "YOUR CODENAME"
+	nl.add_theme_color_override("font_color", Color("ff5a5f"))
+	nl.add_theme_font_size_override("font_size", 20)
+	nl.custom_minimum_size = Vector2(0, 46)
+	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_row.add_child(nl)
+	var name_edit := LineEdit.new()
+	name_edit.placeholder_text = "e.g. NIGHTJAR"
+	name_edit.text = Settings.player_name
+	name_edit.max_length = 14
+	name_edit.custom_minimum_size = Vector2(260, 46)
+	name_edit.add_theme_font_size_override("font_size", 22)
+	name_edit.text_changed.connect(func(t):
+		Settings.player_name = t.strip_edges()
+		Settings.save())
+	name_row.add_child(name_edit)
+	_name_edit = name_edit
+
 	# Left column: host / practice
 	var left := VBoxContainer.new()
-	left.position = Vector2(140, 250)
+	left.position = Vector2(140, 292)
 	left.size = Vector2(440, 300)
-	left.add_theme_constant_override("separation", 18)
+	left.add_theme_constant_override("separation", 14)
 	_content.add_child(left)
 	_main_buttons = left
 	left.add_child(_big_button("HOST GAME", _on_host))
@@ -81,7 +106,7 @@ func _ready() -> void:
 
 	# Right column: join
 	var right := VBoxContainer.new()
-	right.position = Vector2(700, 280)
+	right.position = Vector2(700, 300)
 	right.size = Vector2(440, 400)
 	right.add_theme_constant_override("separation", 14)
 	_content.add_child(right)
@@ -121,7 +146,7 @@ func _ready() -> void:
 	row.add_child(jb)
 
 	_status = Label.new()
-	_status.position = Vector2(0, 645)
+	_status.position = Vector2(0, 652)
 	_status.size = Vector2(1280, 80)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -392,7 +417,7 @@ func _refresh_hosts() -> void:
 func _big_button(text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(440, 88)
+	b.custom_minimum_size = Vector2(440, 80)
 	b.add_theme_font_size_override("font_size", 34)
 	b.pressed.connect(cb)
 	return b

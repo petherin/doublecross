@@ -11,6 +11,8 @@ var vibration := true
 var clock_minutes := 6
 var bot_level := "medium"
 var last_ip := ""
+## Codename shown on your agent (blank = AGENT CRIMSON / COBALT).
+var player_name := ""
 
 
 func _ready() -> void:
@@ -22,6 +24,7 @@ func _ready() -> void:
 		clock_minutes = cfg.get_value("game", "clock_minutes", clock_minutes)
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
 		last_ip = cfg.get_value("net", "last_ip", last_ip)
+		player_name = cfg.get_value("game", "player_name", player_name)
 	changed.emit()
 
 
@@ -33,6 +36,7 @@ func save() -> void:
 	cfg.set_value("game", "clock_minutes", clock_minutes)
 	cfg.set_value("game", "bot_level", bot_level)
 	cfg.set_value("net", "last_ip", last_ip)
+	cfg.set_value("game", "player_name", player_name)
 	cfg.save(PATH)
 	changed.emit()
 
