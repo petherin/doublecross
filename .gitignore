@@ -3,3 +3,5 @@ build/
 *.keystore
 # Shared debug-only key (password "android") so CI builds can update each other.
 !android/debug.keystore
+.blendenv/
+__pycache__/

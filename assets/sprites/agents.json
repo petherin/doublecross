@@ -1,0 +1,39 @@
+{
+  "frame": 192,
+  "directions": 8,
+  "anims": {
+    "idle": {
+      "start": 0,
+      "count": 2
+    },
+    "walk": {
+      "start": 2,
+      "count": 8
+    },
+    "search": {
+      "start": 10,
+      "count": 4
+    },
+    "swing": {
+      "start": 14,
+      "count": 4
+    },
+    "hurt": {
+      "start": 18,
+      "count": 1
+    },
+    "down": {
+      "start": 19,
+      "count": 1
+    }
+  },
+  "sheets": {
+    "crimson": "res://assets/sprites/agent_crimson.png",
+    "cobalt": "res://assets/sprites/agent_cobalt.png"
+  },
+  "anchor": [
+    96.0,
+    154.84
+  ],
+  "pixels_per_metre": 63.953
+}

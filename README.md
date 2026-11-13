@@ -163,10 +163,28 @@ scripts/
   sound.gd      sound effects, music and audio buses (autoload "Sound")
   settings.gd   saved player settings (autoload "Settings")
 tools/make_audio.py   synthesises every sound and the music into assets/audio/
+tools/blender/build_agents.py   models, poses and renders the agents in Blender
+                                into isometric sprite sheets (assets/sprites/)
   action_button.gd  multi-touch round button (SEARCH, and later TRAP/ATTACK)
   icons.gd      drawn item icons
 .github/workflows/android.yml   builds the Android APK and the Mac app on every push
 ```
+
+### Re-rendering the agents in Blender
+
+The agents are 3D models built, posed and rendered entirely by a script, using
+Blender 4.2 as a Python module. Each agent gets 8 directions × 20 frames
+(idle, walk, search, cosh swing, hurt, knocked down), drawn with ink outlines
+by an orthographic camera at the game's exact isometric angle.
+
+```bash
+python3.11 -m venv .blendenv
+.blendenv/bin/pip install bpy==4.2.0 pillow
+.blendenv/bin/python tools/blender/build_agents.py
+```
+
+`--preview` renders small, fast sheets for trying out changes. If the sheets
+are missing, the game falls back to the original drawn-in-code agents.
 
 ### Building the APK yourself
 

@@ -44,8 +44,8 @@ const DART_SPEED := 950.0
 const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians)
 
 const STYLES := [
-	{"name": "AGENT CRIMSON", "coat": Color("b3262e"), "hat": Color("2a0d10"), "accent": Color("ff5a5f")},
-	{"name": "AGENT COBALT", "coat": Color("1f5fae"), "hat": Color("0b1a33"), "accent": Color("5ab0ff")},
+	{"name": "AGENT CRIMSON", "coat": Color("b3262e"), "hat": Color("2a0d10"), "accent": Color("ff5a5f"), "sheet": "crimson"},
+	{"name": "AGENT COBALT", "coat": Color("1f5fae"), "hat": Color("0b1a33"), "accent": Color("5ab0ff"), "sheet": "cobalt"},
 ]
 
 var world: World

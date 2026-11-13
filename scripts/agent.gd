@@ -25,6 +25,8 @@ var is_local := false
 var move_input := Vector2.ZERO
 
 var display_name := "Agent"
+## Which sprite sheet to draw ("crimson" / "cobalt"); empty = drawn fallback.
+var sheet_name := ""
 var coat := Color("b3262e")
 var hat := Color("2a0d10")
 var accent := Color("ff5a5f")
@@ -70,6 +72,7 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	coat = style["coat"]
 	hat = style["hat"]
 	accent = style["accent"]
+	sheet_name = style.get("sheet", "")
 
 
 func _physics_process(delta: float) -> void:
@@ -260,8 +263,108 @@ func net_state(r: Vector2i, pos: Vector2, f: float, m: bool, s: bool) -> void:
 
 
 ## Draws this agent onto the room renderer `ci` (so it can be depth-sorted
-## with the furniture). Upright, stylised spy in a trench coat and fedora.
+## with the furniture), using the Blender-rendered sprite sheet if there is one.
 func paint(ci: CanvasItem) -> void:
+	if _sheet() != null:
+		_paint_sprite(ci)
+	else:
+		_paint_vector(ci)
+
+
+# ---------------------------------------------------------------- sprites
+
+static var _meta := {}
+static var _sheets := {}
+## Agent height on screen, in pixels, at normal size.
+const SPRITE_HEIGHT := 120.0
+const SPRITE_METRES := 1.95
+
+
+static func _load_meta() -> Dictionary:
+	if _meta.is_empty() and FileAccess.file_exists("res://assets/sprites/agents.json"):
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://assets/sprites/agents.json"))
+		if parsed is Dictionary:
+			_meta = parsed
+	return _meta
+
+
+func _sheet() -> Texture2D:
+	if sheet_name == "":
+		return null
+	if not _sheets.has(sheet_name):
+		var m := _load_meta()
+		var tex: Texture2D = null
+		if m.has("sheets") and m["sheets"].has(sheet_name) and ResourceLoader.exists(m["sheets"][sheet_name]):
+			tex = load(m["sheets"][sheet_name])
+		_sheets[sheet_name] = tex
+	return _sheets[sheet_name]
+
+
+## Which animation and frame to show right now.
+func _sprite_frame() -> Array:
+	var ko := ko_time > 0.0
+	if ko and ko_kind == "DOWN":
+		return ["down", 0]
+	if hurt_time > 0.0 or ko:
+		return ["hurt", 0]
+	if attack_anim > 0.0:
+		return ["swing", int(clampf(1.0 - attack_anim / 0.3, 0.0, 0.999) * 4.0)]
+	if searching:
+		return ["search", int(_walk * 0.6) % 4]
+	if moving:
+		return ["walk", int(fposmod(_walk, TAU) / TAU * 8.0) % 8]
+	return ["idle", int(Time.get_ticks_msec() / 700) % 2]
+
+
+func _paint_sprite(ci: CanvasItem) -> void:
+	var m := _load_meta()
+	var tex := _sheet()
+	var fsize: float = m["frame"]
+	var dirs: int = m["directions"]
+	var anchor := Vector2(m["anchor"][0], m["anchor"][1])
+	var scale_f := SPRITE_HEIGHT / (SPRITE_METRES * float(m["pixels_per_metre"]))
+	var foot := World.iso(position)
+	var ko := ko_time > 0.0
+	var ko_age := _ko_total - ko_time
+	if ko and ko_kind == "SPRING" and ko_age < 0.9:
+		foot.y -= sin(ko_age / 0.9 * PI) * 160.0
+
+	# Shadow and team ring on the floor.
+	ci.draw_set_transform(World.iso(position), 0.0, Vector2(1.0, 0.5))
+	ci.draw_texture_rect(Art.soft(), Rect2(-40, -40, 80, 80), false, Color(0, 0, 0, 0.7))
+	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
+
+	var fr := _sprite_frame()
+	var anim: Dictionary = m["anims"][fr[0]]
+	var col: int = int(anim["start"]) + int(fr[1])
+	var d := posmod(int(round(facing / (TAU / dirs))), dirs)
+	var region := Rect2(col * fsize, d * fsize, fsize, fsize)
+	# Dizzy wobble while knocked out by a trap.
+	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" else 0.0
+	var tint := Color.WHITE
+	if soot > 0.0:
+		tint = tint.lerp(Color(0.28, 0.25, 0.23), minf(1.0, soot * 1.4))
+	if hurt_time > 0.0:
+		tint = tint.lerp(Color(1.0, 0.45, 0.45), hurt_time / 0.3)
+	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f))
+	ci.draw_texture_rect_region(tex, Rect2(-anchor, Vector2(fsize, fsize)), region, tint)
+	if has_case and not searching and attack_anim <= 0.0 and not ko:
+		# The briefcase, carried at the side.
+		var side := Vector2.from_angle(facing + PI / 2)
+		var hand := World.floor_to_screen_dir(side) * 26.0 / scale_f + Vector2(0, -52.0 / scale_f)
+		ci.draw_set_transform(foot + hand * scale_f, 0.0, Vector2.ONE)
+		ci.draw_rect(Rect2(-10, -2, 20, 14), Color("7a5238"))
+		ci.draw_rect(Rect2(-10, -2, 20, 3), Color("946645"))
+		ci.draw_rect(Rect2(-2, 0, 4, 3), Color("e8c25a"))
+		ci.draw_rect(Rect2(-10, -2, 20, 14), Color(0, 0, 0, 0.6), false, 1.5)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 14.0 if not (ko and ko_kind == "DOWN") else 50.0)
+
+
+# ---------------------------------------------------------------- drawn fallback
+
+## The original drawn-in-code spy (used if the sprite sheets are missing).
+func _paint_vector(ci: CanvasItem) -> void:
 	var foot := World.iso(position)
 	var ko := ko_time > 0.0
 	var ko_age := _ko_total - ko_time
@@ -378,14 +481,19 @@ func paint(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(hand + Vector2(-1, 4), Vector2(4, 3)), Color("e8c25a"))
 	ci.draw_circle(hand, 4.0, skin)
 
-	# Name tag (unflipped)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_paint_overlays(ci, foot, ko)
+
+
+## Name tag, health pips, smoke, dizzy stars and the search bubble.
+func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> void:
+	# Name tag (unflipped)
 	var font := ThemeDB.fallback_font
 	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	ci.draw_string(font, foot + Vector2(-w / 2, -104), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	ci.draw_string(font, foot + Vector2(-w / 2, -top), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
 	for i in max_hp:
-		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -98)
+		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -top + 6.0)
 		ci.draw_circle(pip, 4.0, Color(0, 0, 0, 0.6))
 		ci.draw_circle(pip, 3.0, accent if i < hp else Color(1, 1, 1, 0.15))
 
@@ -404,13 +512,13 @@ func paint(ci: CanvasItem) -> void:
 	if ko:
 		for i in 4:
 			var a := _walk * 1.5 + i * TAU / 4.0
-			var sp := foot + Vector2(cos(a) * 26.0, -102.0 + sin(a) * 8.0)
+			var sp := foot + Vector2(cos(a) * 26.0, -top + 2.0 + sin(a) * 8.0)
 			_star(ci, sp, 7.0, Color("ffd23f"))
 
 	# Thought bubble while searching (with a progress ring for your own agent)
 	if searching:
-		var b := foot + Vector2(30, -128)
-		ci.draw_circle(foot + Vector2(18, -104), 3.0, Color.WHITE)
+		var b := foot + Vector2(30, -top - 24.0)
+		ci.draw_circle(foot + Vector2(18, -top), 3.0, Color.WHITE)
 		ci.draw_circle(b, 17.0, Color.WHITE)
 		if is_local:
 			ci.draw_arc(b, 21.0, -PI / 2, -PI / 2 + TAU * search_progress, 32, accent, 4.0, true)
