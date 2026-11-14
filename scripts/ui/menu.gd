@@ -582,6 +582,12 @@ func _join(ip: String) -> void:
 
 
 func _set_waiting(on: bool) -> void:
+	# Discovery is only useful while choosing a host. Stop subnet probes while
+	# hosting or connecting, and resume them if the attempt is cancelled/fails.
+	if on:
+		Net.stop_listening()
+	else:
+		Net.start_listening()
 	_main_buttons.modulate.a = 0.35 if on else 1.0
 	for b in _main_buttons.get_children():
 		if b is Button:
