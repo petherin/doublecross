@@ -113,7 +113,8 @@ func on_event(e: Dictionary) -> void:
 			_think_pause()
 			# Only rig furniture it has just emptied. Nothing can be hidden in
 			# trapped furniture, so a careful bot never needs to come back to it.
-			_maybe_trap(key, _p["trap"])
+			# Several bots share the trap budget, or a big game becomes a minefield.
+			_maybe_trap(key, _p["trap"] / maxf(1.0, game.bots.size()))
 		"ko", "down":
 			if e.get("type") == "down" and e.get("by", 0) == id:
 				_engaged = false
@@ -141,7 +142,8 @@ func _maybe_trap(key: String, chance: float) -> void:
 	if door != -1 and _p["avoid_own"] < 1.0 and _rng.randf() < 0.35:
 		info = {"kind": "WIRE", "key": World.door_key(agent.room, door)}
 	elif not game.traps.has(key) and not game.contents.has(key):
-		info = {"kind": "BOMB" if _rng.randf() < 0.5 else "SPRING", "key": key}
+		var kinds: Array = World.FURNITURE_TRAPS
+		info = {"kind": kinds[_rng.randi_range(0, kinds.size() - 1)], "key": key}
 	if info.is_empty() or game.traps.has(info["key"]):
 		return
 	_path = PackedVector2Array()

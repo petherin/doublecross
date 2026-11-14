@@ -17,16 +17,17 @@ const HELP := [
 		+ "then walk out of the [b]EXIT[/b] before your clock runs out. First one out wins."],
 	["SEARCHING", "Stand next to furniture and press [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can "
 		+ "carry only one item, so you'll swap and leave the other behind."],
-	["TRAPS", "Press [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a "
+	["TRAPS", "Press [b]TRAP[/b] to hide a [b]BOMB[/b], [b]SPRING[/b] or [b]SHOCK TRAP[/b] in furniture, or string a "
 		+ "[b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs "
 		+ "20 seconds. Only you can see your own traps, but they still work on you."],
-	["GADGETS", "The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the "
-		+ "[b]WIRE CUTTERS[/b] beat tripwires. Each is used up when it saves you."],
+	["GADGETS", "The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs, the "
+		+ "[b]WIRE CUTTERS[/b] beat tripwires and [b]RUBBER GLOVES[/b] beat shock traps. Each is used up "
+		+ "when it saves you."],
 	["AIR VENTS", "Some walls hide a vent. Stand by it and press [b]CRAWL[/b] to shuffle through the ducts "
 		+ "to a room further away. The same vents link up every time, so remember the shortcuts."],
 	["FIGHTING", "[b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: "
 		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
-	["KEYBOARD", "WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart · V crawl. "
+	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · V crawl. "
 		+ "Gamepads work too."],
 ]
 const TAGLINE := "Two agents. One way out."

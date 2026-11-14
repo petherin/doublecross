@@ -113,7 +113,7 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	trap_button.radius = 50.0
 	trap_button.pressed.connect(_toggle_trap_menu)
 	add_child(trap_button)
-	for kind in ["BOMB", "SPRING", "WIRE"]:
+	for kind in ["BOMB", "SPRING", "WIRE", "SHOCK"]:
 		var b := ActionButton.new()
 		b.label = kind
 		b.icon = kind
@@ -298,8 +298,11 @@ func _layout() -> void:
 	_place(trap_button, Vector2(L.x - 250, L.y - 78))
 	_place(crawl_button, Vector2(L.x - 238, L.y - 352))
 	# Trap options fan out to the left of the TRAP button.
-	var spots := [Vector2(L.x - 380, L.y - 72), Vector2(L.x - 392, L.y - 178), Vector2(L.x - 345, L.y - 280)]
-	var kinds := ["BOMB", "SPRING", "WIRE"]
+	var spots := [
+		Vector2(L.x - 380, L.y - 72), Vector2(L.x - 392, L.y - 178), Vector2(L.x - 345, L.y - 280),
+		Vector2(L.x - 500, L.y - 120),
+	]
+	var kinds := ["BOMB", "SPRING", "WIRE", "SHOCK"]
 	for i in kinds.size():
 		_place(_trap_options[kinds[i]], spots[i])
 	_status.position = Vector2(0, 60)
@@ -337,6 +340,7 @@ func set_trap_options(furniture: bool, door: bool) -> void:
 	_trap_options["BOMB"].enabled = furniture
 	_trap_options["SPRING"].enabled = furniture
 	_trap_options["WIRE"].enabled = door
+	_trap_options["SHOCK"].enabled = furniture
 	if _trap_menu_open:
 		_trap_menu_timer -= get_process_delta_time()
 		if _trap_menu_timer <= 0.0 or not trap_button.enabled:

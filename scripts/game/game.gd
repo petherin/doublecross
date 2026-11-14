@@ -64,7 +64,7 @@ var my_id := 1
 var contents := {}
 ## peer id -> { "items": [intel...], "case": bool, "gadgets": [gadget...] }
 var inventories := {}
-## furniture_key or door_key -> { "kind": "BOMB"|"SPRING"|"WIRE", "owner": peer id }
+## furniture_key or door_key -> { "kind": "BOMB"|"SPRING"|"WIRE"|"SHOCK", "owner": peer id }
 var traps := {}
 var over := false
 ## Once over: { "winner": peer id or 0, "reason": "escape" | "time" | "left" }.
@@ -288,6 +288,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_trap("SPRING")
 	elif event.is_action_pressed("trap_wire"):
 		_try_trap("WIRE")
+	elif event.is_action_pressed("trap_shock"):
+		_try_trap("SHOCK")
 	elif event.is_action_pressed("attack"):
 		_try_melee()
 	elif event.is_action_pressed("crawl"):
