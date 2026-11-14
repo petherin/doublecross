@@ -198,6 +198,25 @@ func start_trap(info: Dictionary, duration: float) -> void:
 	_trap_info = info
 
 
+## The furniture (index in this room) the agent is busy at, or -1. Other
+## devices only know the agent is busy, so it's the nearest piece in reach.
+func busy_furniture() -> int:
+	if not searching:
+		return -1
+	if is_local and _search_idx >= 0:
+		return _search_idx
+	var best := -1
+	var best_d := RADIUS + 70.0
+	var items: Array = world.furniture(room)
+	for i in items.size():
+		var r: Rect2 = items[i]["rect"]
+		var q := Vector2(clampf(position.x, r.position.x, r.end.x), clampf(position.y, r.position.y, r.end.y))
+		if position.distance_to(q) < best_d:
+			best_d = position.distance_to(q)
+			best = i
+	return best
+
+
 func start_search(idx: int, duration: float) -> void:
 	_busy_kind = "search"
 	searching = true
