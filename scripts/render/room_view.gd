@@ -47,6 +47,8 @@ var base_position := Vector2.ZERO
 var effects := RoomEffects.new()
 
 var _t := 0.0
+var _paper_t := 0.0
+var _rng := RandomNumberGenerator.new()
 var _shake_amp := 0.0
 var _shake_t := 0.0
 var _shake_len := 1.0
@@ -83,6 +85,16 @@ func _left_wall_xf() -> Transform2D:
 func _process(delta: float) -> void:
 	_t += delta
 	effects.tick(delta)
+	_paper_t -= delta
+	if _paper_t <= 0.0 and world:
+		_paper_t = 0.16
+		# Paperwork flies out of whatever's being searched.
+		for a in agents:
+			var idx: int = a.busy_furniture() if a.room == room else -1
+			if idx >= 0 and _rng.randf() < 0.75:
+				var f: Dictionary = world.furniture(room)[idx]
+				effects.add("PAPER", room, (f["rect"] as Rect2).get_center(),
+						{"z": HEIGHTS.get(f["type"], 50.0), "seed": _rng.randi()})
 	if _shake_t > 0.0:
 		_shake_t = maxf(0.0, _shake_t - delta)
 		var k := _shake_t / _shake_len
@@ -102,8 +114,14 @@ func shake(amplitude: float, seconds: float) -> void:
 	_shake_len = seconds
 
 
-func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
-	effects.add(kind, effect_room, pos)
+## Pops `item` up out of furniture `idx` in this room (what you just found).
+func show_found(idx: int, item: String) -> void:
+	var f: Dictionary = world.furniture(room)[idx]
+	effects.add("FOUND", room, (f["rect"] as Rect2).get_center(), {"z": HEIGHTS.get(f["type"], 50.0), "item": item})
+
+
+func add_effect(kind: String, effect_room: Vector2i, pos: Vector2, extra := {}) -> void:
+	effects.add(kind, effect_room, pos, extra)
 	if effect_room == room and lights:
 		if kind == "BOMB":
 			lights.flash(pos, Color(1.0, 0.55, 0.2), 2.2)
@@ -143,11 +161,18 @@ func _draw() -> void:
 			if things[j].has("f") and _agent_in_front(a.position, things[j]["rect"]):
 				slot = j + 1
 		things.insert(slot, {"agent": a})
+	var busy := {}
+	for a in here:
+		busy[a.busy_furniture()] = true
 	for t in things:
 		if t.has("agent"):
 			t["agent"].paint(self)
 		else:
-			_draw_furniture(t["f"])
+			# Furniture being searched rattles.
+			var shake := Vector2.ZERO
+			if busy.has(t["i"]):
+				shake = Vector2(sin(_t * 47.0 + t["i"]) * 1.6, sin(_t * 61.0 + t["i"] * 2.0) * 1.0)
+			_draw_furniture(t["f"], shake)
 			if t["i"] == highlight:
 				_draw_highlight(t["f"])
 			var tk := World.furniture_key(room, t["i"])
@@ -532,10 +557,10 @@ static func _furniture_sprite(kind: String, wall: String) -> Array:
 	return [_furn_tex[key], Vector2(anchor[0], anchor[1]), float(_furn_meta.get("scale", 1.0))]
 
 
-func _draw_furniture(f: Dictionary) -> void:
+func _draw_furniture(f: Dictionary, offset := Vector2.ZERO) -> void:
 	var sprite := _furniture_sprite(f["type"], f["wall"])
 	if not sprite.is_empty():
-		var at := World.iso((f["rect"] as Rect2).get_center())
+		var at := World.iso((f["rect"] as Rect2).get_center()) + offset
 		var sc: float = sprite[2]
 		draw_set_transform(at, 0.0, Vector2(sc, sc))
 		draw_texture(sprite[0], -sprite[1])

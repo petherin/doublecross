@@ -25,6 +25,9 @@ func present(e: Dictionary) -> void:
 			if not me:
 				return
 			var found: String = e["found"]
+			var idx := int(str(e["key"]).get_slice(",", 2))
+			if found != "" and not e.get("spare", false):
+				game.view.show_found(idx, found)
 			var msg := ""
 			if e["disarmed"] != "":
 				msg = "Defused a %s with your %s!  " % [World.TRAP_NAMES[e["disarmed"]], World.TRAPS[e["disarmed"]]]
