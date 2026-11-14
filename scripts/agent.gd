@@ -64,6 +64,7 @@ var _search_left := 0.0
 var _search_room := Vector2i.ZERO
 var _search_idx := -1
 var _target := Vector2.ZERO
+var _frame_offset := Vector2.ZERO
 var _walk := 0.0
 var _send_timer := 0.0
 
@@ -359,7 +360,13 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var anim: Dictionary = m["anims"][fr[0]]
 	var d := posmod(int(round(facing / (TAU / dirs))), dirs)
 	var region: Rect2
-	if m.has("cols"):
+	if m.get("packed", false):
+		# Tightly packed atlas: each frame is trimmed, so draw it at its offset.
+		var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
+		var r: Array = m["rects"][sheet_name][fid]
+		region = Rect2(r[0], r[1], r[2], r[3])
+		_frame_offset = Vector2(r[4], r[5])
+	elif m.has("cols"):
 		var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
 		var cols: int = m["cols"]
 		region = Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
@@ -376,7 +383,10 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	if protect_time > 0.0 and ko_time <= 0.0:
 		tint.a = 0.35 if int(Time.get_ticks_msec() / 90) % 2 == 0 else 0.85
 	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f))
-	ci.draw_texture_rect_region(tex, Rect2(-anchor, Vector2(fsize, fsize)), region, tint)
+	if m.get("packed", false):
+		ci.draw_texture_rect_region(tex, Rect2(-anchor + _frame_offset, region.size), region, tint)
+	else:
+		ci.draw_texture_rect_region(tex, Rect2(-anchor, Vector2(fsize, fsize)), region, tint)
 	if has_case and not searching and attack_anim <= 0.0 and not ko:
 		# The briefcase, carried at the side.
 		var side := Vector2.from_angle(facing + PI / 2)

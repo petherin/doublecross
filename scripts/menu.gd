@@ -224,16 +224,24 @@ func _load_photos() -> void:
 	if not FileAccess.file_exists(path):
 		return
 	var m = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not m is Dictionary or not m.has("cols"):
+	if not m is Dictionary or not m.has("frames_per_direction"):
 		return
 	var fsize: float = m["frame"]
-	var cols: int = m["cols"]
 	# Facing the camera: direction 1, first idle frame.
 	var fid: int = 1 * int(m["frames_per_direction"]) + int(m["anims"]["idle"]["start"])
-	var region := Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
+	var regions := {}
+	for name in m["sheets"]:
+		if m.get("packed", false):
+			# Packed frames are trimmed: rebuild the full frame box around the trim.
+			var r: Array = m["rects"][name][fid]
+			regions[name] = [Rect2(r[0] - r[4], r[1] - r[5], fsize, fsize), Rect2(r[0], r[1], r[2], r[3])]
+		else:
+			var cols: int = m["cols"]
+			var box := Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
+			regions[name] = [box, box]
 	for name in m["sheets"]:
 		if ResourceLoader.exists(m["sheets"][name]):
-			_photos[name] = [load(m["sheets"][name]), region]
+			_photos[name] = [load(m["sheets"][name]), regions[name][0], regions[name][1]]
 
 
 func _photo(ci: CanvasItem, r: Rect2, who: String) -> void:
@@ -245,8 +253,14 @@ func _photo(ci: CanvasItem, r: Rect2, who: String) -> void:
 	if _photos.has(who):
 		var tex: Texture2D = _photos[who][0]
 		var reg: Rect2 = _photos[who][1]
+		var drawn: Rect2 = _photos[who][2]
 		var crop := Rect2(reg.position + Vector2(reg.size.x * 0.22, reg.size.y * 0.02), reg.size * Vector2(0.56, 0.56))
-		ci.draw_texture_rect_region(tex, r, crop)
+		# Only the frame's own pixels: map the visible part of the crop onto the photo.
+		var vis := crop.intersection(drawn)
+		if vis.has_area():
+			var k := r.size / crop.size
+			var dest := Rect2(r.position + (vis.position - crop.position) * k, vis.size * k)
+			ci.draw_texture_rect_region(tex, dest, vis)
 	ci.draw_rect(r, Color(1.0, 0.9, 0.7, 0.08))
 
 

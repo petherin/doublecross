@@ -15,10 +15,11 @@ Output (in assets/sprites/):
     agent_*_n.png                         matching normal maps
     agents.json                           frame size, foot anchor, animations
 
-Sheet layout: frames are numbered direction by direction (direction d faces
-the game's floor angle d * 45 degrees), animations in the order listed in
-ANIMS, and laid out SHEET_COLS to a row. Each colour sheet has a matching
-normal-map sheet (camera-space normals, OpenGL convention) so the game can
+Frames are numbered direction by direction (direction d faces the game's
+floor angle d * 45 degrees), animations in the order listed in ANIMS. They
+are trimmed and packed into an atlas by pack_sprites.py (agents.json gives
+each frame's rect and offset). Each colour atlas has a matching half-size
+normal-map atlas (camera-space normals, OpenGL convention) so the game can
 light the agents dynamically. The camera matches the game's isometric view.
 """
 import json
@@ -33,6 +34,7 @@ from mathutils import Euler, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agent_model  # noqa: E402  (the detailed, skeleton-posed model)
+import pack_sprites  # noqa: E402  (trims and packs frames into small atlases)
 from bpy_extras.object_utils import world_to_camera_view
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -40,7 +42,6 @@ OUT_DIR = os.path.join(ROOT, "assets", "sprites")
 PREVIEW = "--preview" in sys.argv
 
 FRAME = 96 if PREVIEW else 224          # pixels per frame (square)
-SHEET_COLS = 18                          # frames per sheet row (keeps sheets <= 4096 wide)
 SAMPLES = 8 if PREVIEW else 32
 DIRECTIONS = 8
 
@@ -478,25 +479,10 @@ def render_agent(name, colors, tmp):
     return frames, foot_anchor(scene, cam)
 
 
-def build_sheet(frames, out_path, which):
-    """Packs all frames (direction-major) SHEET_COLS to a row."""
-    from PIL import Image
-    flat = [f[which] for row in frames for f in row]
-    rows = (len(flat) + SHEET_COLS - 1) // SHEET_COLS
-    sheet = Image.new("RGBA", (SHEET_COLS * FRAME, rows * FRAME), (0, 0, 0, 0))
-    for k, path in enumerate(flat):
-        img = Image.open(path).convert("RGBA")
-        if which == 1:
-            # Normal maps: keep the colour opaque only where the agent is.
-            img.putalpha(Image.open(flat_alpha[k]).convert("RGBA").getchannel("A"))
-        sheet.paste(img, ((k % SHEET_COLS) * FRAME, (k // SHEET_COLS) * FRAME))
-    sheet.save(out_path, optimize=True)
-
-
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="agents_")
-    meta = {"frame": FRAME, "directions": DIRECTIONS, "cols": SHEET_COLS, "anims": {}, "sheets": {}, "normals": {}}
+    meta = {"frame": FRAME, "directions": DIRECTIONS, "anims": {}, "sheets": {}, "normals": {}}
     col = 0
     for anim, n in ANIMS:
         meta["anims"][anim] = {"start": col, "count": n}
@@ -506,20 +492,21 @@ def main():
         for name, colors in AGENTS.items():
             print("Rendering", name, flush=True)
             frames, (ax, ay, ppm) = render_agent(name, colors, tmp)
-            global flat_alpha
-            flat_alpha = [f[0] for row in frames for f in row]
-            out = os.path.join(OUT_DIR, f"agent_{name}.png")
-            build_sheet(frames, out, 0)
-            build_sheet(frames, os.path.join(OUT_DIR, f"agent_{name}_n.png"), 1)
-            meta["sheets"][name] = f"res://assets/sprites/agent_{name}.png"
-            meta["normals"][name] = f"res://assets/sprites/agent_{name}_n.png"
+            from PIL import Image
+            colours = [Image.open(f[0]).convert("RGBA") for row in frames for f in row]
+            normals = []
+            for k, f in enumerate([f for row in frames for f in row]):
+                n = Image.open(f[1]).convert("RGBA")
+                n.putalpha(colours[k].getchannel("A"))
+                normals.append(n)
+            size = pack_sprites.write(name, colours, normals, meta)
+            print("  packed into", size, flush=True)
             meta["anchor"] = [round(ax, 2), round(ay, 2)]
             meta["pixels_per_metre"] = round(ppm, 3)
-            print("  wrote", out, flush=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     with open(os.path.join(OUT_DIR, "agents.json"), "w") as f:
-        json.dump(meta, f, indent=2)
+        json.dump(meta, f, indent=1)
     print("done:", os.path.join(OUT_DIR, "agents.json"))
 
 

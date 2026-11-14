@@ -81,10 +81,16 @@ jobs:
           grep -E "^(version/|application/(short_)?version)" export_presets.cfg
 
       - name: Export APK
+        # A release build (smaller engine), signed with the shared debug key so
+        # each new APK still installs over the previous one.
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: android
         run: |
           mkdir -p build
           ~/godot/godot --headless --import || true
-          ~/godot/godot --headless --export-debug "Android" build/double-cross.apk
+          ~/godot/godot --headless --export-release "Android" build/double-cross.apk
           test -f build/double-cross.apk
           ls -la build
 
