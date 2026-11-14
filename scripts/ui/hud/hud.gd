@@ -17,6 +17,9 @@ const ActionButton = preload("res://scripts/ui/action_button.gd")
 const Icons = preload("res://scripts/ui/icons.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
+const DuctView = preload("res://scripts/ui/hud/duct_view.gd")
+const Briefing = preload("res://scripts/ui/hud/briefing.gd")
+const Debrief = preload("res://scripts/ui/hud/debrief.gd")
 
 var world: World
 var joystick: Joystick
@@ -26,10 +29,6 @@ var attack_button: ActionButton
 var crawl_button: ActionButton
 var fire_button: ActionButton
 var _known_vents: Array = []
-var _duct: Control
-var _duct_t := 0.0
-var _duct_len := 1.0
-var _duct_tex: Texture2D
 var _status: Control
 var _clock_mine := 0.0
 var _clock_rival := -1.0
@@ -49,14 +48,8 @@ var _toast: Label
 var _tape: PanelContainer
 var _toast_full := ""
 var _toast_chars := 0.0
-var _briefing: Control
-var _brief_lines: Array = []
-var _brief_t := 0.0
-var _brief_done := false
-var _stamp: Control
-var _stamp_t := -1.0
 var _toast_tween: Tween
-var _end: Control
+var _end: Debrief
 var _room := Vector2i.ZERO
 var _accent := Color.WHITE
 var _held: Array = []
@@ -364,79 +357,7 @@ func set_known_vents(pairs: Array) -> void:
 
 ## The cut-away of the agent crawling through a duct, shown for `seconds`.
 func show_duct(crawl_sheet: Texture2D, seconds: float) -> void:
-	if _duct:
-		_duct.queue_free()
-	var L := _area()
-	_duct = Control.new()
-	_duct.size = L
-	_duct.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_duct.modulate.a = 0.0
-	add_child(_duct)
-	_duct_t = 0.0
-	_duct_len = seconds
-	_duct_tex = crawl_sheet
-	_duct.draw.connect(_draw_duct)
-	var tw := create_tween()
-	tw.tween_property(_duct, "modulate:a", 1.0, 0.2)
-	tw.tween_interval(seconds - 0.4)
-	tw.tween_property(_duct, "modulate:a", 0.0, 0.2)
-	tw.tween_callback(func():
-		if _duct:
-			_duct.queue_free()
-			_duct = null)
-
-
-func _draw_duct() -> void:
-	var L := _area()
-	var d := _duct
-	d.draw_rect(Rect2(Vector2.ZERO, L), Color(0.02, 0.02, 0.03, 0.96))
-	var mid := L.y / 2.0
-	var h := 230.0
-	var top := mid - h / 2.0
-	var scroll := _duct_t * 240.0
-	# The duct: sheet-metal walls, the inside lit by passing grilles.
-	d.draw_rect(Rect2(0, top, L.x, h), Color("15181d"))
-	for band in [[top - 26.0, 26.0], [top + h, 26.0]]:
-		d.draw_rect(Rect2(0, band[0], L.x, band[1]), Color("4a5260"))
-		d.draw_rect(Rect2(0, band[0], L.x, 4), Color("6b7585"))
-	var x := -fmod(scroll, 180.0)
-	while x < L.x:
-		d.draw_line(Vector2(x, top - 26), Vector2(x, top), Color("2b3038"), 2.0)
-		d.draw_line(Vector2(x, top + h), Vector2(x, top + h + 26), Color("2b3038"), 2.0)
-		d.draw_circle(Vector2(x + 10, top - 13), 2.5, Color("9aa3b0"))
-		d.draw_circle(Vector2(x + 10, top + h + 13), 2.5, Color("9aa3b0"))
-		x += 180.0
-	# Slatted light from grilles in the duct roof drifting past.
-	x = -fmod(scroll * 1.0, 520.0) + 120.0
-	while x < L.x + 200.0:
-		var pts := PackedVector2Array([
-			Vector2(x - 40, top), Vector2(x + 40, top), Vector2(x + 110, top + h), Vector2(x - 110, top + h),
-		])
-		d.draw_colored_polygon(pts, Color(1.0, 0.92, 0.7, 0.07))
-		for k in 4:
-			d.draw_line(Vector2(x - 34 + k * 22, top + 2), Vector2(x - 26 + k * 22, top + 2), Color(1.0, 0.95, 0.75, 0.6), 3.0)
-		x += 520.0
-	# The agent crawling along.
-	if _duct_tex:
-		var frames := 8
-		var fw := _duct_tex.get_width() / frames
-		var fh := _duct_tex.get_height()
-		var f := int(_duct_t * 11.0) % frames
-		var sc := 1.25
-		var at := Vector2(L.x / 2.0 - fw * sc / 2.0 + sin(_duct_t * 2.0) * 20.0, top + h - fh * sc + 6)
-		d.draw_texture_rect_region(_duct_tex, Rect2(at, Vector2(fw, fh) * sc), Rect2(f * fw, 0, fw, fh))
-	# Dust drifting by.
-	for i in 24:
-		var px := fmod(i * 97.0 - scroll * (0.5 + (i % 3) * 0.3), L.x + 40.0)
-		if px < 0:
-			px += L.x + 40.0
-		var py := top + fmod(i * 53.0, h)
-		d.draw_circle(Vector2(px, py), 1.5, Color(1, 0.95, 0.8, 0.25))
-	var caption := "…crawling through the air ducts…"
-	var f2 := Style.typewriter()
-	var w := f2.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-	d.draw_string(
-			f2, Vector2((L.x - w) / 2.0, top + h + 80), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.92, 0.88, 0.78))
+	add_child(DuctView.new(_area(), crawl_sheet, seconds))
 
 
 ## Sizes the room-name plate to the name, centred in the space in the top bar.
@@ -487,205 +408,28 @@ func _process(delta: float) -> void:
 	_toast.custom_minimum_size = Vector2(minf(widest + 4.0, L.x - 90.0), 0)
 	_tape.size = Vector2.ZERO
 	_tape.position = Vector2((L.x - _tape.size.x) / 2.0, L.y - 150.0 - _tape.size.y / 2.0)
-	if _briefing:
-		_update_briefing(delta)
-	if _duct:
-		_duct_t += delta
-		_duct.queue_redraw()
-	if _stamp_t >= 0.0:
-		_stamp_t += delta
-		_stamp.queue_redraw()
 
 
+## The case-file debrief at the end of the match.
 func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool) -> void:
-	var won := winner == my_id
-	search_button.visible = false
-	trap_button.visible = false
-	attack_button.visible = false
-	fire_button.visible = false
-	crawl_button.visible = false
+	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
+		b.visible = false
 	_close_trap_menu()
-	joystick.visible = false
 	if _toast_tween:
 		_toast_tween.kill()
 	_tape.modulate.a = 0.0
-	var L := _area()
-	_end = Control.new()
-	_end.size = L
+	_end = Debrief.new(_area(), winner == my_id, winner, winner_name, reason, can_rematch)
+	_end.rematch_requested.connect(rematch_requested.emit)
+	_end.leave_requested.connect(leave_requested.emit)
 	add_child(_end)
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.0)
-	dim.size = L
-	_end.add_child(dim)
-	create_tween().tween_property(dim, "color:a", 0.65, 0.4)
-
-	var stamp_text := "MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED"
-	var sub_text := "Escaped with the intel. Drinks are on you."
-	if not won:
-		sub_text = "%s got out with the intel. Awkward." % winner_name
-	if reason == "time":
-		if winner == 0:
-			stamp_text = "TIME EXPIRED"
-			sub_text = "Nobody got out. The base goes into lockdown."
-		elif won:
-			stamp_text = "LAST AGENT STANDING"
-			sub_text = "Your rival's clock ran out. A win's a win."
-		else:
-			stamp_text = "OUT OF TIME"
-			sub_text = "Your clock ran out. %s wins by default." % winner_name
-	var stamp_col := Style.GREEN_INK if won else Style.RED_INK
-
-	# The case file card.
-	var card := Control.new()
-	card.size = Vector2(760, 440)
-	card.position = (L - card.size) / 2.0 + Vector2(0, -20)
-	card.theme = Style.paper_theme()
-	_end.add_child(card)
-	card.draw.connect(func():
-		Style.draw_paper(card, Rect2(Vector2.ZERO, card.size), Style.PAPER, -0.01)
-		card.draw_string(Style.stencil(), Vector2(40, 70), "CASE FILE", HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Style.INK)
-		card.draw_string(Style.mono_bold(), Vector2(44, 104), "OPERATION DOUBLE CROSS  //  DEBRIEF",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Style.RED_INK)
-		card.draw_line(Vector2(40, 120), Vector2(720, 120), Style.INK, 2.0)
-		card.draw_string(Style.mono_bold(), Vector2(44, 168), "OUTCOME:", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Style.INK)
-		card.draw_string(Style.typewriter(), Vector2(44, 204), sub_text, HORIZONTAL_ALIGNMENT_LEFT, 680, 23, Style.INK)
-		Style.draw_redacted(card, Vector2(44, 248), "REMARKS:", [160, 90, 130])
-		Style.draw_paperclip(card, Vector2(700, 6), 1.6, 70.0))
-
-	# The rubber stamp slams down a moment later.
-	_stamp = Control.new()
-	_stamp.size = card.size
-	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(_stamp)
-	_stamp_t = 0.0
-	var stamp_landed := [false]
-	_stamp.draw.connect(func():
-		var k := clampf((_stamp_t - 0.55) / 0.16, 0.0, 1.0)
-		if k <= 0.0:
-			return
-		if not stamp_landed[0] and k >= 1.0:
-			stamp_landed[0] = true
-			Sound.play("stamp", 2.0, false, 0.02)
-			Settings.buzz(60)
-			var shake := create_tween()
-			for i in 4:
-				shake.tween_property(card, "position", card.position + Vector2(randf_range(-7, 7), randf_range(-5, 5)), 0.03)
-			shake.tween_property(card, "position", card.position, 0.04)
-		Style.draw_stamp(_stamp, stamp_text, Vector2(380, 300), -0.08, stamp_col, 40,
-				0.9 * k, Style.PAPER, lerpf(2.6, 1.0, k)))
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 30)
-	row.position = Vector2(40, 372)
-	row.size = Vector2(680, 56)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	card.add_child(row)
-	if can_rematch:
-		row.add_child(_end_button("[ REMATCH ]", func(): rematch_requested.emit()))
-	else:
-		var wait := Label.new()
-		wait.text = "Awaiting orders from the host…"
-		wait.add_theme_font_override("font", Style.typewriter())
-		wait.add_theme_font_size_override("font_size", 21)
-		row.add_child(wait)
-	row.add_child(_end_button("[ BACK TO HQ ]", func(): leave_requested.emit()))
 
 
 ## The mission briefing typed out at the start of a match, then it
 ## self-destructs. Any tap or key skips it.
 func show_briefing(agent_name: String, rival_name: String, minutes: int) -> void:
-	var L := _area()
-	_briefing = Control.new()
-	_briefing.size = L
-	add_child(_briefing)
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.82)
-	dim.size = L
-	_briefing.add_child(dim)
-	var sheet := Control.new()
-	sheet.size = Vector2(minf(860.0, L.x - 60.0), 400)
-	sheet.position = (L - sheet.size) / 2.0
-	sheet.name = "sheet"
-	_briefing.add_child(sheet)
-	_brief_lines = [
-		["OPERATION DOUBLE CROSS", Style.stencil(), 40, Style.INK],
-		["TO: " + agent_name, Style.mono_bold(), 22, Style.INK],
-		["Recover the PASSPORT, CASH, MICROFILM and KEYCARD,", Style.mono(), 22, Style.INK],
-		["then get to the EXIT. You have %d minutes." % minutes, Style.mono(), 22, Style.INK],
-		["Beware: %s is already inside. Trust no one." % rival_name, Style.mono_bold(), 22, Style.RED_INK],
-		["This message will self-destruct in 3… 2… 1…", Style.typewriter(), 22, Style.INK],
-	]
-	_brief_t = 0.0
-	_brief_done = false
-	sheet.draw.connect(_draw_briefing.bind(sheet))
-	Sound.play("paper", -2.0)
-
-
-func _brief_chars() -> int:
-	return int(_brief_t * 55.0)
-
-
-func _update_briefing(delta: float) -> void:
-	var total := 0
-	for l in _brief_lines:
-		total += (l[0] as String).length()
-	var before := _brief_chars()
-	_brief_t += delta
-	if _brief_chars() < total and _brief_chars() / 3 != before / 3:
-		Sound.play("type%d" % randi_range(1, 3), -9.0, false, 0.08)
-	var typed_for := float(total) / 55.0
-	if not _brief_done and _brief_t > typed_for + 1.4:
-		_end_briefing()
-	_briefing.get_node("sheet").queue_redraw()
-
-
-func _draw_briefing(sheet: Control) -> void:
-	var smoke := clampf((_brief_t - (_brief_total_time() + 1.4)) / 0.6, 0.0, 1.0)
-	Style.draw_paper(sheet, Rect2(Vector2.ZERO, sheet.size), Style.PAPER, 0.008)
-	var left := _brief_chars()
-	var y := 70.0
-	for l in _brief_lines:
-		var text: String = l[0]
-		var shown := text.left(maxi(0, left))
-		left -= text.length()
-		sheet.draw_string(l[1], Vector2(40, y), shown, HORIZONTAL_ALIGNMENT_LEFT, sheet.size.x - 80, l[2], l[3])
-		y += 46.0 if l[2] > 30 else 52.0
-	Style.draw_stamp(sheet, "TOP SECRET", Vector2(sheet.size.x - 150, 52), 0.12, Style.RED_INK, 26)
-	if smoke > 0.0:
-		for i in 18:
-			var a := i * 2.4
-			var p := sheet.size / 2.0 + Vector2(cos(a), sin(a)) * (40.0 + 220.0 * smoke) * Vector2(1.6, 0.8)
-			sheet.draw_circle(p, 40.0 + 60.0 * smoke, Color(0.3, 0.3, 0.3, 0.6 * (1.0 - smoke)))
-
-
-func _brief_total_time() -> float:
-	var total := 0
-	for l in _brief_lines:
-		total += (l[0] as String).length()
-	return float(total) / 55.0
-
-
-func _end_briefing() -> void:
-	if _brief_done:
-		return
-	_brief_done = true
-	Sound.play("poof", -2.0)
-	var b := _briefing
-	var tw := create_tween()
-	tw.tween_property(b, "modulate:a", 0.0, 0.6)
-	tw.tween_callback(func():
-		b.queue_free()
-		if _briefing == b:
-			_briefing = null)
-	briefing_done.emit()
-
-
-func _input(event: InputEvent) -> void:
-	if _briefing and not _brief_done:
-		if (event is InputEventScreenTouch and event.pressed) or (event is InputEventKey and event.pressed):
-			_brief_t = maxf(_brief_t, _brief_total_time() + 1.4)
-			_end_briefing()
-			get_viewport().set_input_as_handled()
+	var b := Briefing.new(_area(), agent_name, rival_name, minutes)
+	b.finished.connect(briefing_done.emit)
+	add_child(b)
 
 
 func _draw_inventory() -> void:
@@ -736,15 +480,6 @@ func _draw_minimap() -> void:
 		_minimap.draw_dashed_line(ca, cb, Color(1.0, 0.86, 0.15, 0.9), 1.5, 3.0)
 		_minimap.draw_circle(ca, 2.0, Color(1.0, 0.86, 0.15))
 		_minimap.draw_circle(cb, 2.0, Color(1.0, 0.86, 0.15))
-
-
-func _end_button(text: String, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(220, 56)
-	b.add_theme_font_size_override("font_size", 26)
-	b.pressed.connect(cb)
-	return b
 
 
 func _label(text: String, size: int, col: Color) -> Label:

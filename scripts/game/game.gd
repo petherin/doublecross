@@ -16,7 +16,7 @@ signal event_happened(event: Dictionary)
 const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
 const RoomView = preload("res://scripts/render/room_view.gd")
-const Hud = preload("res://scripts/ui/hud.gd")
+const Hud = preload("res://scripts/ui/hud/hud.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Bot = preload("res://scripts/game/bot.gd")
 
