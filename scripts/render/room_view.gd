@@ -189,8 +189,8 @@ func _draw_floor(area: Rect2, tint: Color) -> void:
 	var y1 := area.end.y
 	var font := ThemeDB.fallback_font
 	draw_set_transform_matrix(_floor_xf())
-	# Steel tread plate, tinted a touch by the room's lighting.
-	draw_texture_rect(Art.floor_tex(), area, true, Color(0.95, 0.97, 1.0).lerp(tint, 0.08))
+	# Steel tread plate (Blender-rendered, normal-mapped), tinted a touch by the room's lighting.
+	_tiled(Art.floor_tex(), area, _floor_xf(), Color(0.36, 0.37, 0.4).lerp(tint, 0.03))
 	# Room name stencilled on the floor.
 	var name_text: String = world.rooms[room]["name"].to_upper()
 	draw_string(Style.stencil(), Vector2(x0 + 70, y1 - 70), name_text,
@@ -303,12 +303,22 @@ func _draw_back_walls(area: Rect2, tint: Color) -> void:
 	draw_line(_iso(x0, y0, 0), _iso(x0, y0, h), Color(0, 0, 0, 0.4), 2.0)
 
 
+## Draws `tex` tiled over `rect` (in the space of transform `xf`), at the
+## room textures' resolution of 2 pixels per unit.
+func _tiled(tex: Texture2D, rect: Rect2, xf: Transform2D, modulate_col: Color) -> void:
+	var k := Art.ROOM_TEX_SCALE
+	draw_set_transform_matrix(xf * Transform2D.IDENTITY.scaled(Vector2(k, k)))
+	draw_texture_rect(tex, Rect2(rect.position / k, rect.size / k), true, modulate_col)
+	draw_set_transform_matrix(xf)
+
+
 func _textured_wall(xf: Transform2D, spans: Array, modulate_col: Color) -> void:
 	var h := World.WALL_H
 	draw_set_transform_matrix(xf)
 	for sp in spans:
 		var r := Rect2(sp[0], -h, sp[1] - sp[0], h)
-		draw_texture_rect(Art.wall_tex(), r, true, modulate_col)
+		_tiled(Art.wall_tex(), r, xf, Color(modulate_col * 0.62, 1.0))
+		draw_set_transform_matrix(xf)
 		# Grime and shadow at the base, a little light at the top.
 		draw_polygon(PackedVector2Array([
 					Vector2(r.position.x, -34), Vector2(r.end.x, -34), Vector2(r.end.x, 0), Vector2(r.position.x, 0)]),
