@@ -42,6 +42,7 @@ func _notification(what: int) -> void:
 
 
 func _show_menu(msg: String) -> void:
+	Sound.ambience("")
 	if _game:
 		remove_child(_game)
 		_game.queue_free()

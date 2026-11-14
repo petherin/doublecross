@@ -19,11 +19,27 @@ var _music: AudioStreamPlayer
 var _layers := {}          # name -> AudioStreamPlayer
 var _layer_target := {}    # name -> 0..1
 var _layer_level := {}     # name -> current 0..1
+## Room tone: two players so one room's sound can crossfade into the next.
+var _amb: Array[AudioStreamPlayer] = []
+var _amb_streams := {}
+var _amb_current := ""
 
 
 func _ready() -> void:
 	_make_bus("Music")
 	_make_bus("SFX")
+	_make_bus("Ambience")
+	for amb_name in ["amb_hvac", "amb_machines", "amb_pipes"]:
+		var st: AudioStream = load("res://assets/audio/%s.ogg" % amb_name)
+		if st is AudioStreamOggVorbis:
+			st.loop = true
+			_amb_streams[amb_name] = st
+	for i in 2:
+		var p := AudioStreamPlayer.new()
+		p.bus = "Ambience"
+		p.volume_db = -60.0
+		add_child(p)
+		_amb.append(p)
 	# A compressor for punch and a touch of room on the effects.
 	var sfx_bus := AudioServer.get_bus_index("SFX")
 	var comp := AudioEffectCompressor.new()
@@ -82,6 +98,9 @@ func _make_bus(bus_name: String) -> int:
 func _apply_volumes() -> void:
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(Settings.music_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(Settings.sfx_volume, 0.0001)))
+	# Room tone sits well under the effects and follows their volume.
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Ambience"),
+			linear_to_db(maxf(Settings.sfx_volume, 0.0001)) - 15.0)
 
 
 ## Plays an effect. `distant` = it happened in another room (muffled).
@@ -131,6 +150,26 @@ func music(on: bool) -> void:
 		_music.stop()
 		for layer in _layers.values():
 			layer.stop()
+
+
+## Crossfades the room tone to `amb_name` ("" for silence) over `seconds`.
+func ambience(amb_name: String, seconds := 0.8) -> void:
+	if amb_name == _amb_current:
+		return
+	_amb_current = amb_name
+	var old: AudioStreamPlayer = _amb[0]
+	var nxt: AudioStreamPlayer = _amb[1]
+	_amb.reverse()
+	var tw := create_tween().set_parallel()
+	tw.tween_property(old, "volume_db", -60.0, seconds)
+	if _amb_streams.has(amb_name):
+		nxt.stream = _amb_streams[amb_name]
+		nxt.volume_db = -60.0
+		nxt.play(randf() * 12.0)
+		tw.tween_property(nxt, "volume_db", 0.0, seconds)
+	tw.chain().tween_callback(func():
+		if old.volume_db <= -59.0:
+			old.stop())
 
 
 ## How much of each extra layer to bring in (0..1); they fade over a second.

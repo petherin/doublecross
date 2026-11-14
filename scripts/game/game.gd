@@ -310,8 +310,21 @@ func _on_room_changed(room: Vector2i, animate := true) -> void:
 	view.room = room
 	view.lights.rebuild(world, room)
 	hud.show_room(room, animate, view.base_position + World.iso(local_agent.position, 60.0))
+	Sound.ambience(room_tone(world.rooms[room]["name"]))
 	if animate:
 		Sound.play("door", -6.0)
+
+
+## Which room-tone loop suits a room: humming machines, dripping pipes, or
+## the air-conditioning everywhere else.
+static func room_tone(room_name: String) -> String:
+	for word in ["Server", "Comms", "Command", "Reactor", "Cipher", "Situation", "Laboratory"]:
+		if room_name.contains(word):
+			return "amb_machines"
+	for word in ["Detention", "Hangar", "Motor", "Cryo", "Mess", "Infirmary"]:
+		if room_name.contains(word):
+			return "amb_pipes"
+	return "amb_hvac"
 
 
 ## Footsteps, rummaging, the low-time tick and music tempo.
@@ -741,6 +754,7 @@ func game_over(winner: int, reason := "escape") -> void:
 	if _agent_by_id.has(winner):
 		name = _agent_by_id[winner].display_name
 	Sound.music(false)
+	Sound.ambience("", 1.5)
 	Sound.music_tempo(1.0)
 	Sound.play("win" if winner == my_id else "lose")
 	hud.show_end(winner, my_id, name, reason, multiplayer.is_server())
