@@ -16,6 +16,7 @@ signal event_happened(event: Dictionary)
 const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
 const RoomView = preload("res://scripts/render/room_view.gd")
+const FpView = preload("res://scripts/render/fp_view.gd")
 const Hud = preload("res://scripts/ui/hud/hud.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Bot = preload("res://scripts/game/bot.gd")
@@ -25,6 +26,8 @@ const Referee = preload("res://scripts/game/referee.gd")
 const Tips = preload("res://scripts/game/tips.gd")
 const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 
+## How fast left/right turns you in first person (radians a second).
+const FP_TURN_SPEED := 2.6
 ## Seconds left on your clock when the room's alarm light starts.
 const ALARM_TIME := 30.0
 ## Peer ids of computer-controlled rivals in one-player games: 2, 3, 4.
@@ -92,6 +95,9 @@ var referee := Referee.new(self)
 var presenter := EventPresenter.new(self)
 var view: RoomView
 var hud: Hud
+## First-person view, built when first switched on.
+var fp: FpView
+var first_person := false
 var _agent_by_id := {}
 var _exit_cooldown := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -191,6 +197,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	hud.attack_pressed.connect(_try_melee)
 	hud.crawl_pressed.connect(_try_vent)
 	hud.fire_pressed.connect(_try_fire)
+	hud.view_pressed.connect(toggle_view)
 	local_agent.room_changed.connect(_on_room_changed)
 	local_agent.search_finished.connect(_on_local_search_finished)
 	local_agent.trap_finished.connect(_on_local_trap_finished)
@@ -261,8 +268,16 @@ func _process(delta: float) -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if hud.joystick.output != Vector2.ZERO:
 		move = hud.joystick.output
-	# Controls are screen-relative: up on the stick = up the screen.
-	local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
+	if first_person:
+		# Tank controls: forward/back walks, left/right turns.
+		var turn := move.x
+		if not (local_agent.frozen or local_agent.searching or local_agent.ko_time > 0.0):
+			local_agent.facing = wrapf(local_agent.facing + turn * FP_TURN_SPEED * delta, -PI, PI)
+		local_agent.move_input = Vector2.from_angle(local_agent.facing) * -move.y
+		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
+	else:
+		# Controls are screen-relative: up on the stick = up the screen.
+		local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
 
 	_melee_cd -= delta
 	_dart_cd -= delta
@@ -304,9 +319,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_vent()
 	elif event.is_action_pressed("fire"):
 		_try_fire()
+	elif event.is_action_pressed("toggle_view"):
+		toggle_view()
+
+
+## Switches between the isometric view and first person.
+func toggle_view() -> void:
+	first_person = not first_person
+	if first_person and fp == null:
+		fp = FpView.new()
+		add_child(fp)
+	view.visible = not first_person
+	local_agent.face_lock = first_person
+	fp.set_active(first_person)
+	if first_person:
+		fp.rebuild(world, local_agent.room)
+	hud.set_first_person(first_person)
 
 
 func _on_room_changed(room: Vector2i, animate := true) -> void:
+	if first_person:
+		fp.rebuild(world, room)
 	view.room = room
 	view.lights.rebuild(world, room)
 	hud.show_room(room, animate, view.base_position + World.iso(local_agent.position, 60.0))

@@ -121,6 +121,11 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   hats, brass stabs and a rising riff come in when your clock is nearly out.
 - **Spy-file screens:** the title screen is a case-file dossier, each match
   opens with a briefing that self-destructs, and ends with a stamped debrief.
+- **First person (experimental):** the **1ST PERSON** button (or <kbd>Tab</kbd>)
+  switches to seeing the room through your agent's eyes: real 3D walls,
+  floor and Blender-modelled furniture, with the other agents as *Doom*-style
+  cut-outs from their sprite sheets. Forward and back walk, left and right
+  turn. Effects and trap markers only show in the overhead view for now.
 - **Readable for everyone:** each agent has a shape as well as a colour
   (● Crimson, ▲ Cobalt, ■ Amber, ◆ Jade) on their name tag and clock, and new
   players get a few one-off tips on the ticker tape.
@@ -203,6 +208,7 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 | Cosh | **ATTACK** | <kbd>F</kbd> | X |
 | Fire a dart | **FIRE** | <kbd>G</kbd> | Y |
 | Crawl through a vent | **CRAWL** (appears at a vent) | <kbd>V</kbd> | B |
+| Switch overhead / first person | **1ST PERSON** / **OVERHEAD** (top bar) | <kbd>Tab</kbd> | Start |
 | Skip the briefing | Tap | Any key | |
 | Leave the match | **LEAVE** / Android back | Close the window | |
 
@@ -253,10 +259,9 @@ rendered in Blender.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
-- **First-person view:** a button to switch between the usual isometric view
-  and seeing the room through your agent's eyes, peering round doorframes and
-  over desks. It would need the rooms and furniture as real 3D scenes in
-  Godot, using the Blender models the sprites are already rendered from.
+- **First person, finished:** the first version is in (see below). Still to
+  come: the furniture's full materials in 3D, trap markers and vents, the
+  explosions and other effects, and a look-around swipe on touch screens.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.

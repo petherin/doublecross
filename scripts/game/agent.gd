@@ -49,6 +49,8 @@ var voice := 1.0
 
 ## Set by the game: no movement at all (e.g. after the match ends).
 var frozen := false
+## In first person the player turns the agent, so walking doesn't turn it.
+var face_lock := false
 ## Out of the match (clock ran out or left): no longer drawn or fought.
 var out := false
 var has_case := false
@@ -247,7 +249,7 @@ func _local_move(delta: float) -> void:
 		v = Vector2.ZERO
 	moving = v.length() > 25.0
 	running = v.length() > SPEED * 0.8
-	if moving:
+	if moving and not face_lock:
 		facing = v.angle()
 	var p := position + (v + _knock) * delta
 	_knock = _knock.move_toward(Vector2.ZERO, 3500.0 * delta)
@@ -406,6 +408,35 @@ func _sprite_frame() -> Array:
 		var n: int = m["anims"][anim]["count"]
 		return [anim, int(fposmod(_walk, TAU) / TAU * n) % n]
 	return ["idle", int(Time.get_ticks_msec() / 700) % 2]
+
+
+## This agent's sprite atlas (with its normal map), for other views.
+func sprite_sheet() -> Texture2D:
+	return _sheet()
+
+
+## The current animation frame as seen from a camera at floor point (cx, cy),
+## for the first-person view: { region (atlas rect), scale (game units per
+## atlas pixel), centre (frame centre relative to the feet, in atlas pixels) }.
+func frame_for_view(cx: float, cy: float) -> Dictionary:
+	var m := _load_meta()
+	var dirs: int = m["directions"]
+	var fr := _sprite_frame()
+	var anim: Dictionary = m["anims"][fr[0]]
+	# The sheets were rendered for the isometric camera, which looks along
+	# floor angle 225 degrees; pick the frame showing the same side of the
+	# agent as this camera would see.
+	var view := atan2(position.y - cy, position.x - cx)
+	var d := posmod(int(round((facing - view + deg_to_rad(225.0)) / (TAU / dirs))), dirs)
+	var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
+	var r: Array = m["rects"][sheet_name][fid]
+	var size := Vector2(r[2], r[3])
+	var anchor := Vector2(m["anchor"][0], m["anchor"][1])
+	return {
+		"region": Rect2(r[0], r[1], r[2], r[3]),
+		"scale": SPRITE_HEIGHT / (SPRITE_METRES * float(m["pixels_per_metre"])),
+		"centre": -anchor + Vector2(r[4], r[5]) + size / 2.0,
+	}
 
 
 func _paint_sprite(ci: CanvasItem) -> void:
