@@ -213,6 +213,74 @@ they're easy to change.
 clock length, and a button to see the new-player tips again. **HOW TO PLAY**
 is the field manual.
 
+## Ideas for what's next
+
+Suggestions, roughly in the order they'd pay off. Nothing here is promised.
+
+**In progress:** new agent animations (crouching to set a trap, a dizzy sway
+after a trap, a two-way flinch when hit, falling before lying flat), being
+rendered in Blender.
+
+### Top five
+
+1. **Spectate when you're out.** Once your clock runs out you're left
+   staring at a frozen agent. Let eliminated players follow the others room
+   by room until the match ends.
+2. **Bots in hosted games.** Let the host fill empty seats with bots, so two
+   friends can play a full four-agent match.
+3. **Reduced-motion setting.** One switch to turn off screen shake, flashes,
+   slow motion and film grain, for players who find them uncomfortable.
+4. **Survive a host dropping out.** Today the match ends for everyone if the
+   host's device leaves or sleeps. Hand refereeing to another device, or at
+   least let players rejoin a match after a brief disconnect.
+5. **A match recap.** Add a timeline to the debrief card: who found what, who
+   trapped whom, who took out whom, and each agent's escape time.
+
+### Gameplay
+
+- **More gadgets and traps:** a smoke bomb that hides you from everyone in the
+  room, a glue trap that slows you down, a bug you plant to see into another
+  room, and decoy intel that looks real until you reach the exit.
+- **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
+- **Team mode:** two against two, sharing a briefcase and escaping together.
+- **Match options for the host:** how many traps each, fewer briefcases,
+  hidden exit, faster clocks.
+- **Bot personalities:** a trapper who rigs everything, a brawler who hunts
+  you, a sneak who uses every vent.
+- **Pause** in one-player games.
+
+### Look and feel
+
+- **Doors and drawers that open:** animated doorways, and furniture doors that
+  swing open when searched (a second Blender render of each piece).
+- **First-person view:** a button to switch between the usual isometric view
+  and seeing the room through your agent's eyes, peering round doorframes and
+  over desks. It would need the rooms and furniture as real 3D scenes in
+  Godot, using the Blender models the sprites are already rendered from.
+- **Taunts:** a button to make your agent gloat, wave or shake a fist.
+- **Stats and achievements** kept on the device: wins, fastest escape, traps
+  sprung, rivals taken out.
+- **A guided first mission** with the bot, instead of tips alone.
+
+### Reaching more players
+
+- **Play over the internet**, not just the same Wi-Fi, through a small relay
+  server or a join code.
+- **Store releases:** Google Play (needs a release signing key and a developer
+  account), and a signed, notarised Mac app so macOS stops warning about it
+  (needs an Apple developer account).
+- **More platforms:** Godot can also build for Windows, Linux, iPhone and iPad.
+- **Remappable controls** in SETTINGS, full gamepad navigation of the menus,
+  and **translations** of the on-screen text.
+
+### Under the hood
+
+- **Profiling on low-end Android** phones for frame rate and battery use.
+- **Screenshot tests** in CI, comparing key screens against approved images so
+  visual changes are caught in review.
+- **Network tests:** a host and joiners as separate processes in CI, playing a
+  short scripted match.
+
 ## How it's built
 
 - **[Godot 4.3](https://godotengine.org/)** using GDScript and the *Compatibility*
