@@ -13,6 +13,8 @@ var bot_level := "medium"
 ## Computer rivals in a one-player game (1-3).
 var bot_count := 1
 var last_ip := ""
+## Field tips already shown (tip id -> true), so each appears once ever.
+var tips_seen := {}
 ## Codename shown on your agent (blank = AGENT CRIMSON / COBALT).
 var player_name := ""
 
@@ -27,6 +29,7 @@ func _ready() -> void:
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
 		bot_count = cfg.get_value("game", "bot_count", bot_count)
 		last_ip = cfg.get_value("net", "last_ip", last_ip)
+		tips_seen = cfg.get_value("game", "tips_seen", tips_seen)
 		player_name = cfg.get_value("game", "player_name", player_name)
 	changed.emit()
 
@@ -40,6 +43,7 @@ func save() -> void:
 	cfg.set_value("game", "bot_level", bot_level)
 	cfg.set_value("game", "bot_count", bot_count)
 	cfg.set_value("net", "last_ip", last_ip)
+	cfg.set_value("game", "tips_seen", tips_seen)
 	cfg.set_value("game", "player_name", player_name)
 	cfg.save(PATH)
 	changed.emit()

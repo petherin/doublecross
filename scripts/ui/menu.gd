@@ -27,6 +27,8 @@ const HELP := [
 		+ "to a room further away. The same vents link up every time, so remember the shortcuts."],
 	["FIGHTING", "[b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: "
 		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
+	["TIPS", "New agents get a few tips on the ticker tape during their first missions. "
+		+ "Clear them under SETTINGS to see them again."],
 	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · V crawl. "
 		+ "Gamepads work too."],
 ]
@@ -501,9 +503,18 @@ func _show_settings() -> void:
 		b.pressed.connect(func(): Settings.clock_minutes = m)
 		row.add_child(b)
 	box.add_child(row)
-	var note := _label("In a two-player game the host's clock setting is used.", Style.typewriter(), 18)
+	var note := _label("In multiplayer the host's clock setting is used.", Style.typewriter(), 18)
 	note.add_theme_color_override("font_color", Color(Style.INK, 0.6))
 	box.add_child(note)
+	var tips := Button.new()
+	tips.text = "Show field tips again"
+	tips.add_theme_font_size_override("font_size", 20)
+	tips.disabled = Settings.tips_seen.is_empty()
+	tips.pressed.connect(func():
+		Settings.tips_seen = {}
+		Settings.save()
+		tips.disabled = true)
+	box.add_child(tips)
 	_done_button(box)
 
 
