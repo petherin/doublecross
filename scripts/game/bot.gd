@@ -20,7 +20,7 @@ const CELL := 40.0
 ##  vents:   "none" ignores air-vent shortcuts, "learn" finds them by trying
 ##           vents it comes across, "all" knows every duct from the start
 ## Fighting, per difficulty:
-##  aggro:  chance it picks a fight when it meets you
+##  aggro:  chance it picks a fight when it meets a rival carrying intel
 ##  react:  delay before each attack (seconds)
 ##  aim:    dart aim error (radians)
 ##  chase:  how far it will chase you across a room
@@ -82,7 +82,8 @@ func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard") -> void:
 	if _p["vents"] == "all":
 		for i in game.world.vents.size():
 			_vents_known[i] = true
-	_rng.randomize()
+	# Seeded from the match, so a match (and the headless tests) replay the same.
+	_rng.seed = hash([game.world.seed_value, id])
 	agent.room_changed.connect(func(_r):
 		_path = PackedVector2Array()
 		_action = {}
@@ -177,10 +178,14 @@ func _fight(delta: float) -> bool:
 		_met_in = Vector2i(-1, -1)
 		_engaged = false
 		return false
-	# Decide once per meeting whether to pick a fight.
+	# Decide once per meeting whether to pick a fight. Only worth it if the
+	# rival is carrying intel to knock loose, and never with the clock nearly out.
 	if _met_in != agent.room:
 		_met_in = agent.room
-		_engaged = _rng.randf() < _f["aggro"]
+		var rid: int = game.id_of(rival)
+		var worth: bool = rid != -1 and not game.inventories[rid]["items"].is_empty()
+		var hurry: bool = game.clocks.get(id, 0.0) < 60.0
+		_engaged = worth and not hurry and _rng.randf() < _f["aggro"]
 		_fight_time = 0.0
 		_attack_cd = _rng.randf_range(_f["react"][0], _f["react"][1])
 	# Carrying everything? Ignore the rival and run for it. Also leave a rival

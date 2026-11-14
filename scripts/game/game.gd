@@ -67,6 +67,8 @@ var inventories := {}
 ## furniture_key or door_key -> { "kind": "BOMB"|"SPRING"|"WIRE", "owner": peer id }
 var traps := {}
 var over := false
+## Once over: { "winner": peer id or 0, "reason": "escape" | "time" | "left" }.
+var result := {}
 ## peer id -> seconds left on that agent's clock (host counts down, syncs).
 var clocks := {}
 
@@ -101,8 +103,9 @@ var _last_tick := -1
 func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6, names := {},
 		bot_count := 1) -> void:
 	my_id = p_my_id
-	time_limit = minutes * 60.0
-	_rng.randomize()
+	# Match and referee dice come from the seed, so every match replays the same.
+	_rng.seed = hash(["game", seed_value])
+	referee.seed_rng(seed_value)
 	var bot_ids := []
 	if bot_level != "":
 		for b in clampi(bot_count, 1, World.MAX_PLAYERS - ids.size()):
@@ -110,6 +113,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	ids = ids + bot_ids
 	ids.sort()
 	world = World.new(seed_value, ids.size())
+	# The clock grows with the base: the setting is for a 3x3 base.
+	time_limit = minutes * 60.0 * world.rooms.size() / 9.0
 	contents = world.hidden.duplicate()
 	# Darken the world a touch so the room's lights have something to do.
 	var ambient := CanvasModulate.new()
@@ -501,7 +506,8 @@ func rival_near(a: Agent, reach: float) -> Agent:
 	return best
 
 
-func _id_of(a: Agent) -> int:
+## The peer id of agent `a`, or -1.
+func id_of(a: Agent) -> int:
 	for id in _agent_by_id:
 		if _agent_by_id[id] == a:
 			return id
@@ -535,7 +541,7 @@ func do_melee(id: int) -> void:
 	_attack_sound("swing", a.room)
 	show_attack.rpc("melee", id, a.position, Vector2.from_angle(a.facing))
 	if target:
-		_send_hit(id, _id_of(target), "melee")
+		_send_hit(id, id_of(target), "melee")
 
 
 ## Fire a dart. Auto-aims at a rival roughly in front; `aim_error` (radians)
@@ -593,7 +599,7 @@ func _physics_process(delta: float) -> void:
 				break
 		if d["live"] and not stop:
 			for o in agents:
-				var oid := _id_of(o)
+				var oid := id_of(o)
 				if oid == d["owner"] or o.room != d["room"] or o.ko_time > 0.0 or o.vent >= 0:
 					continue
 				if Geometry2D.get_closest_point_to_segment(o.position, old, p).distance_to(o.position) < 30.0:
@@ -704,6 +710,7 @@ func game_over(winner: int, reason := "escape") -> void:
 	if over:
 		return
 	over = true
+	result = {"winner": winner, "reason": reason}
 	for a in agents:
 		a.frozen = true
 	if _agent_by_id.has(winner):

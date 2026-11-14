@@ -3,7 +3,7 @@ extends SceneTree
 ## find the intel and briefcase and escape before the clock runs out.
 ##   godot --headless --fixed-fps 60 -s res://tests/bot_match.gd [-- --bots=3]
 
-const LIMIT := 60 * 60 * 7   # seven minutes of game time at 60 fps
+const LIMIT := 60 * 60 * 12   # twelve minutes of game time at 60 fps
 
 var _game: Node
 var _frames := 0
@@ -26,7 +26,7 @@ func _process(_delta: float) -> bool:
 		var won := false
 		for b in _game.bots.values():
 			won = won or b.agent.celebrating
-		print("match over after %.0f s, a bot escaped: %s" % [_frames / 60.0, won])
+		print("match over after %.0f s: %s; a bot escaped: %s" % [_frames / 60.0, _game.result, won])
 		return _finish(0 if won else 1)
 	if _frames > LIMIT:
 		print("FAIL: match did not finish in time")
