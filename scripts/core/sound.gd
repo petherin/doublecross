@@ -15,6 +15,10 @@ var _streams := {}
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _music: AudioStreamPlayer
+## Extra layers mixed over the bed: a rival nearby, and the clock running out.
+var _layers := {}          # name -> AudioStreamPlayer
+var _layer_target := {}    # name -> 0..1
+var _layer_level := {}     # name -> current 0..1
 
 
 func _ready() -> void:
@@ -54,13 +58,12 @@ func _ready() -> void:
 		add_child(p)
 		_players.append(p)
 
-	_music = AudioStreamPlayer.new()
-	_music.bus = "Music"
-	var m: AudioStream = load("res://assets/audio/music.ogg")
-	if m is AudioStreamOggVorbis:
-		m.loop = true
-	_music.stream = m
-	add_child(_music)
+	_music = _loop_player("music")
+	for layer in ["tension", "hurry"]:
+		_layers[layer] = _loop_player("music_" + layer)
+		_layers[layer].volume_db = -60.0
+		_layer_target[layer] = 0.0
+		_layer_level[layer] = 0.0
 
 	Settings.changed.connect(_apply_volumes)
 	_apply_volumes()
@@ -102,13 +105,51 @@ func play(sound_name: String, volume_db := 0.0, distant := false, pitch_jitter :
 	p.play()
 
 
+func _loop_player(stream_name: String) -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
+	p.bus = "Music"
+	var m: AudioStream = load("res://assets/audio/%s.ogg" % stream_name)
+	if m is AudioStreamOggVorbis:
+		m.loop = true
+	p.stream = m
+	add_child(p)
+	return p
+
+
+## Starts (or stops) the music. The layers start in step with the bed and
+## stay there, since all three loops are exactly the same length.
 func music(on: bool) -> void:
 	if on and not _music.playing:
+		music_layers(0.0, 0.0)
+		for layer in _layers:
+			_layer_level[layer] = 0.0
+			_layers[layer].volume_db = -60.0
 		_music.play()
+		for layer in _layers.values():
+			layer.play()
 	elif not on:
 		_music.stop()
+		for layer in _layers.values():
+			layer.stop()
+
+
+## How much of each extra layer to bring in (0..1); they fade over a second.
+func music_layers(tension: float, hurry: float) -> void:
+	_layer_target["tension"] = clampf(tension, 0.0, 1.0)
+	_layer_target["hurry"] = clampf(hurry, 0.0, 1.0)
 
 
 ## Speeds the music up a touch when time is running out.
 func music_tempo(scale: float) -> void:
 	_music.pitch_scale = scale
+	for layer in _layers.values():
+		layer.pitch_scale = scale
+
+
+func _process(delta: float) -> void:
+	for layer in _layers:
+		var level: float = _layer_level[layer]
+		var target: float = _layer_target[layer]
+		level = move_toward(level, target, delta * (1.6 if target > level else 0.8))
+		_layer_level[layer] = level
+		_layers[layer].volume_db = linear_to_db(maxf(level, 0.001)) if level > 0.001 else -60.0

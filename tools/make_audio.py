@@ -460,17 +460,27 @@ def sfx():
 # ------------------------------------------------------------------ music
 
 def music():
-    """Original 16-bar spy-jazz loop: walking bass, brushes, vibraphone."""
+    """Original 16-bar spy-jazz loop: walking bass, brushes, vibraphone.
+
+    Written as three loops of exactly the same length that the game plays
+    together and mixes on the fly:
+      music.ogg          the bed: bass, brushes, vibes and organ pad
+      music_tension.ogg  shaker, low toms and a tremolo swell (a rival is near)
+      music_hurry.ogg    driving hats, brass stabs and a rising riff (clock low)
+    """
     bpm = 126
     beat = 60.0 / bpm
     bars = 16
     total = bars * 4 * beat
     out = np.zeros(int(SR * total) + SR)
+    tension = np.zeros_like(out)
+    hurry = np.zeros_like(out)
 
-    def place(x, at, gain=1.0):
+    def place(x, at, gain=1.0, into=None):
+        buf = out if into is None else into
         s = int(at * SR)
-        e = min(len(out), s + len(x))
-        out[s:e] += x[: e - s] * gain
+        e = min(len(buf), s + len(x))
+        buf[s:e] += x[: e - s] * gain
 
     swing = beat * 2 / 3  # swung eighth offset
 
@@ -531,25 +541,66 @@ def music():
         pad_x = sum(np.sin(2 * np.pi * note(t + "3") * n) for t in tones[ch][1:])
         place(lowpass(pad_x, 1200) * env(len(n), 0.08, None, 0.4) * 0.12, bar * 4 * beat)
 
-    # Make the loop seamless: fold the tail back into the start.
-    loop_len = int(SR * total)
-    tail = out[loop_len:]
-    out = out[:loop_len]
-    out[: len(tail)] += tail
-    data = np.clip(normalise(out, 0.8), -1, 1)
-    tmp = os.path.join(OUT, "_music.wav")
+    # ---- Tension layer: a rival is in the room.
+    shaker = bandpass(noise(0.05), 3000, 9000) * env(int(SR * 0.05), 0.002, 0.02, 0.02)
+    tom_t = t_axis(0.35)
+    tom = np.sin(2 * np.pi * (120 * np.exp(-tom_t * 6) + 70) * tom_t) * env(len(tom_t), 0.002, 0.2, 0.1)
+    for b in range(bars * 4):
+        t = b * beat
+        place(shaker, t, 0.5, tension)
+        place(shaker, t + swing, 0.3, tension)
+        if b % 8 == 7:
+            place(tom, t + swing, 0.6, tension)
+            place(tom, t + beat * 0.5 + swing, 0.4, tension)
+    for bar, ch in enumerate(prog):
+        # Low tremolo swell on the chord's root and fifth, rising through the bar.
+        n = t_axis(beat * 4)
+        r, _, t5, _ = tones[ch]
+        swell = sum(np.sin(2 * np.pi * note(x + "2") * n) for x in (r, t5))
+        swell = lowpass(swell, 500) * (0.7 + 0.3 * np.sign(np.sin(2 * np.pi * 7.0 * n)))
+        place(swell * env(len(n), 1.2, None, 0.5) * 0.16, bar * 4 * beat, 1.0, tension)
+
+    # ---- Hurry layer: the clock is nearly out.
+    tick = highpass(noise(0.03), 7000) * env(int(SR * 0.03), 0.001, 0.012, 0.01)
+    for b in range(bars * 16):
+        place(tick, b * beat / 4, 0.28 if b % 4 == 0 else 0.16, hurry)
+    for bar, ch in enumerate(prog):
+        # Brass stabs: a saw-wave chord, short and punchy, on 1 and the and-of-2.
+        for off in (0.0, 1.5):
+            n = t_axis(beat * 0.45)
+            stab = sum(2 * ((note(x + "3") * n) % 1.0) - 1 for x in tones[ch][:3])
+            stab = lowpass(stab, 1800 - 1200 * n / n[-1]) * env(len(n), 0.01, beat * 0.3, 0.05)
+            place(saturate(stab, 1.6) * 0.22, (bar * 4 + off) * beat, 1.0, hurry)
+        # Rising eighth-note riff over the chord tones.
+        for k in range(8):
+            x = tones[ch][k % 4] + ("5" if k < 4 else "6")
+            pl = pluck(note(x), beat * 0.6, 0.992) * env(int(SR * beat * 0.6), 0.002, beat * 0.4, 0.05)
+            place(pl, (bar * 4 + k * 0.5) * beat, 0.3, hurry)
+
+    for name, buf in (("music", out), ("music_tension", tension), ("music_hurry", hurry)):
+        _write_loop(name, buf, int(SR * total))
+
+
+def _write_loop(name, buf, loop_len):
+    """Folds the tail back into the start so the loop is seamless, then
+    writes an Ogg Vorbis file of exactly loop_len samples."""
+    tail = buf[loop_len:]
+    buf = buf[:loop_len].copy()
+    buf[: len(tail)] += tail
+    data = np.clip(normalise(buf, 0.8), -1, 1)
+    tmp = os.path.join(OUT, "_%s.wav" % name)
     with wave.open(tmp, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(SR)
         w.writeframes((data * 32767).astype(np.int16).tobytes())
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-c:a", "libvorbis", "-q:a", "4",
-                    os.path.join(OUT, "music.ogg")], check=True)
+                    os.path.join(OUT, name + ".ogg")], check=True)
     os.remove(tmp)
 
 
 if __name__ == "__main__":
     sfx()
-    if not ONLY:
+    if not ONLY or "music" in ONLY:
         music()
     print("audio written to", os.path.abspath(OUT))
