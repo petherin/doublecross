@@ -14,7 +14,11 @@ var _clock_sync := 0.0
 
 func _init(p_game: Node) -> void:
 	game = p_game
-	_rng.randomize()
+
+
+## Seeded from the match so a match (and the headless tests) replay the same.
+func seed_rng(seed_value: int) -> void:
+	_rng.seed = hash(["referee", seed_value])
 
 
 func handle_search(pid: int, room: Vector2i, idx: int) -> void:
