@@ -20,8 +20,8 @@ const Hud = preload("res://scripts/ui/hud/hud.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Bot = preload("res://scripts/game/bot.gd")
 
-## Peer id used for the computer-controlled rival in one-player games.
-const BOT_ID := 2
+## Peer ids of computer-controlled rivals in one-player games: 2, 3, 4.
+const FIRST_BOT_ID := 2
 
 const SEARCH_TIME := 0.8
 const TRAP_TIME := 1.2
@@ -48,6 +48,8 @@ const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 const STYLES := [
 	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson"},
 	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt"},
+	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber"},
+	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade"},
 ]
 
 var world: World
@@ -66,7 +68,10 @@ var over := false
 ## peer id -> seconds left on that agent's clock (host counts down, syncs).
 var clocks := {}
 
-var bot: Bot
+## Bot id -> its brain (one-player games only).
+var bots := {}
+## Agents knocked out of the match (clock ran out, or left): peer id -> true.
+var eliminated := {}
 ## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
 var darts: Array = []
 var time_limit := TIME_LIMIT
@@ -86,12 +91,20 @@ var _was_searching := {}
 var _last_tick := -1
 
 
-## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
-func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6, names := {}) -> void:
+## `ids` holds every human peer id in the match; the host (lowest id, 1)
+## is Crimson. With a `bot_level`, `bot_count` computer rivals join in.
+func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes := 6, names := {},
+		bot_count := 1) -> void:
 	my_id = p_my_id
 	time_limit = minutes * 60.0
 	_rng.randomize()
-	world = World.new(seed_value)
+	var bot_ids := []
+	if bot_level != "":
+		for b in clampi(bot_count, 1, World.MAX_PLAYERS - ids.size()):
+			bot_ids.append(FIRST_BOT_ID + b)
+	ids = ids + bot_ids
+	ids.sort()
+	world = World.new(seed_value, ids.size())
 	contents = world.hidden.duplicate()
 	# Darken the world a touch so the room's lights have something to do.
 	var ambient := CanvasModulate.new()
@@ -103,21 +116,18 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	_view.position = Ui.center_offset(self)
 	get_viewport().size_changed.connect(func(): _view.position = Ui.center_offset(self))
 
-	var vs_bot := bot_level != ""
-	if vs_bot:
-		ids.append(BOT_ID)
-	ids.sort()
+	var starts := world.start_rooms()
 	for i in ids.size():
 		var id: int = ids[i]
 		var a := Agent.new()
 		a.name = "Agent_%d" % id
 		a.set_multiplayer_authority(id)
-		var start := Vector2i(0, 0) if i == 0 else Vector2i(World.COLS - 1, World.ROWS - 1)
+		var start: Vector2i = starts[i]
 		var style: Dictionary = STYLES[i % STYLES.size()].duplicate()
 		var chosen: String = str(names.get(id, "")).strip_edges().to_upper()
 		if chosen != "":
 			style["name"] = chosen
-		var is_bot := vs_bot and id == BOT_ID
+		var is_bot := id in bot_ids
 		if is_bot:
 			style["name"] += " (BOT)"
 		# The bot's agent is simulated on this device, like the player's own.
@@ -139,15 +149,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	_view.my_id = my_id
 	_view.darts = darts
 
-	if vs_bot:
-		var ba: Agent = _agent_by_id[BOT_ID]
-		bot = Bot.new()
-		add_child(bot)
-		bot.setup(self, ba, BOT_ID, bot_level)
-		ba.search_finished.connect(func(r, i): _handle_search(BOT_ID, r, i))
-		ba.trap_finished.connect(func(info): _handle_trap(BOT_ID, info))
-		ba.door_passed.connect(func(r, d): _handle_door(BOT_ID, r, d))
-		ba.exit_touched.connect(func(): _handle_escape(BOT_ID))
+	for bid in bot_ids:
+		_add_bot(bid, bot_level)
 
 	var vig_layer := CanvasLayer.new()
 	vig_layer.layer = 1
@@ -178,20 +181,43 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	local_agent.exit_touched.connect(_on_exit_touched)
 	_on_room_changed(local_agent.room, false)
 	# The briefing: everyone waits until it self-destructs (or is skipped).
-	var rival_name := "AGENT UNKNOWN"
-	for a in agents:
-		if a != local_agent:
-			rival_name = a.display_name
-	local_agent.frozen = true
-	if bot:
-		_agent_by_id[BOT_ID].frozen = true
+	var rivals := "AGENT UNKNOWN is"
+	if agents.size() > 2:
+		rivals = "%d rival agents are" % (agents.size() - 1)
+	else:
+		for a in agents:
+			if a != local_agent:
+				rivals = a.display_name + " is"
+	for a in _simulated_agents():
+		a.frozen = true
 	_hud.briefing_done.connect(func():
 		if not over:
-			local_agent.frozen = false
-			if bot:
-				_agent_by_id[BOT_ID].frozen = false)
-	_hud.show_briefing(local_agent.display_name, rival_name, int(time_limit / 60.0))
+			for a in _simulated_agents():
+				a.frozen = false)
+	_hud.show_briefing(local_agent.display_name, rivals, int(time_limit / 60.0))
 	_update_hud_status()
+	if multiplayer.has_multiplayer_peer() and not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+		multiplayer.peer_disconnected.connect(_on_peer_left)
+
+
+func _add_bot(bid: int, level: String) -> void:
+	var ba: Agent = _agent_by_id[bid]
+	var b := Bot.new()
+	add_child(b)
+	b.setup(self, ba, bid, level)
+	bots[bid] = b
+	ba.search_finished.connect(func(r, i): _handle_search(bid, r, i))
+	ba.trap_finished.connect(func(info): _handle_trap(bid, info))
+	ba.door_passed.connect(func(r, d): _handle_door(bid, r, d))
+	ba.exit_touched.connect(func(): _handle_escape(bid))
+
+
+## The agents this device moves itself: the player's own, plus any bots.
+func _simulated_agents() -> Array:
+	var out := [local_agent]
+	for bid in bots:
+		out.append(_agent_by_id[bid])
+	return out
 
 
 # The local player's agent finished an action: ask the referee to apply it.
@@ -327,7 +353,8 @@ func near_door(a: Agent) -> int:
 	return best
 
 
-func _missing(pid: int) -> Array:
+## The intel `pid` still needs before the exit will open.
+func missing_intel(pid: int) -> Array:
 	var out := []
 	for item in World.INTEL:
 		if not inventories[pid]["items"].has(item):
@@ -385,7 +412,7 @@ func _on_exit_touched() -> void:
 	if over or _exit_cooldown > 0.0:
 		return
 	_exit_cooldown = 2.0
-	var missing := _missing(my_id)
+	var missing := missing_intel(my_id)
 	if missing.is_empty():
 		request_escape.rpc_id(1)
 	else:
@@ -436,11 +463,13 @@ func _on_vent_moved(a: Agent, entering: bool) -> void:
 # ------------------------------------------------------------------ combat (local side)
 
 func _update_hud_status() -> void:
-	var rival := -1
-	for id in clocks:
+	var rivals := []
+	for id in _agent_by_id:
 		if id != my_id:
-			rival = id
-	_hud.set_status(clocks.get(my_id, 0.0), clocks.get(rival, -1.0),
+			var out: bool = eliminated.has(id)
+			var left := ceilf(clocks.get(id, 0.0))
+			rivals.append({"clock": left, "accent": _agent_by_id[id].accent, "out": out})
+	_hud.set_status(clocks.get(my_id, 0.0), rivals,
 		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"])
 
 
@@ -449,7 +478,7 @@ func rival_near(a: Agent, reach: float) -> Agent:
 	var best: Agent = null
 	var best_d := reach
 	for o in agents:
-		if o == a or o.room != a.room or o.ko_time > 0.0 or o.vent >= 0:
+		if o == a or o.out or o.room != a.room or o.ko_time > 0.0 or o.vent >= 0:
 			continue
 		var d := a.position.distance_to(o.position)
 		if d < best_d:
@@ -512,7 +541,7 @@ func do_fire(id: int, aim_error: float) -> void:
 	darts.append({"owner": id, "room": a.room, "pos": start, "vel": dir * DART_SPEED, "live": true})
 	_attack_sound("dart", a.room)
 	show_attack.rpc("dart", id, start, dir)
-	if id == BOT_ID or multiplayer.is_server():
+	if bots.has(id) or multiplayer.is_server():
 		_handle_fire(id)
 	else:
 		request_fire.rpc_id(1)
@@ -564,7 +593,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _send_hit(by: int, target: int, kind: String) -> void:
-	if by == BOT_ID or multiplayer.is_server():
+	if bots.has(by) or multiplayer.is_server():
 		_handle_hit(by, target, kind)
 	else:
 		request_hit.rpc_id(1, target, kind)
@@ -572,7 +601,7 @@ func _send_hit(by: int, target: int, kind: String) -> void:
 
 func _on_recovered(id: int, kind: String) -> void:
 	# After being taken out you wake up back where you started.
-	if kind == "DOWN" and (id == my_id or (bot and id == BOT_ID)):
+	if kind == "DOWN" and (id == my_id or bots.has(id)):
 		_agent_by_id[id].respawn(_start_room[id])
 
 
@@ -687,7 +716,7 @@ func _handle_door(pid: int, from_room: Vector2i, dir: int) -> void:
 func _handle_escape(pid: int) -> void:
 	if over:
 		return
-	if inventories.has(pid) and _missing(pid).is_empty():
+	if inventories.has(pid) and missing_intel(pid).is_empty():
 		game_over.rpc(pid, "escape")
 
 
@@ -730,25 +759,41 @@ func _penalise(pid: int, seconds: float) -> void:
 
 func _tick_clocks(delta: float) -> void:
 	for id in clocks:
-		clocks[id] -= delta
+		if not eliminated.has(id):
+			clocks[id] -= delta
 	_clock_sync -= delta
 	if _clock_sync <= 0.0:
 		_clock_sync = 0.5
 		sync_clocks.rpc(clocks)
-	var out := []
-	for id in clocks:
-		if clocks[id] <= 0.0:
-			out.append(id)
-	if out.is_empty():
+	for id in clocks.keys():
+		if clocks[id] <= 0.0 and not eliminated.has(id) and not over:
+			_eliminate(id, "time")
+
+
+## Host: takes an agent out of the match (clock ran out, or they left).
+## Their intel scatters so the others can still finish. When only one agent
+## is left they win; if nobody is, nobody does.
+func _eliminate(pid: int, reason: String) -> void:
+	if eliminated.has(pid) or not _agent_by_id.has(pid):
 		return
-	# Someone's clock ran out: the other agent (if they still have time) wins.
-	var winner := 0
-	for id in clocks:
-		if clocks[id] > 0.0:
-			winner = id
-	if clocks.size() == 1:
-		winner = 0
-	game_over.rpc(winner, "time")
+	eliminated[pid] = true
+	var room: Vector2i = _agent_by_id[pid].room
+	var lost: Array = inventories[pid]["items"].duplicate()
+	inventories[pid]["items"].clear()
+	for item in lost:
+		_hide_somewhere(item, room)
+	_broadcast({"type": "out", "pid": pid, "reason": reason, "room": room, "lost": lost})
+	var active := []
+	for id in _agent_by_id:
+		if not eliminated.has(id):
+			active.append(id)
+	if active.size() <= 1 and not over:
+		game_over.rpc(active[0] if active.size() == 1 else 0, reason)
+
+
+func _on_peer_left(id: int) -> void:
+	if multiplayer.is_server() and not over:
+		_eliminate(id, "left")
 
 
 @rpc("authority", "call_local", "unreliable_ordered")
@@ -816,8 +861,8 @@ func sync_state(p_contents: Dictionary, p_inventories: Dictionary, p_traps: Dict
 	var inv: Dictionary = inventories[my_id]
 	_hud.set_inventory(inv["items"], inv["case"], inv["gadgets"])
 	_on_event(event)
-	if bot:
-		bot.on_event(event)
+	for b in bots.values():
+		b.on_event(event)
 	event_happened.emit(event)
 
 
@@ -879,6 +924,16 @@ func _on_event(e: Dictionary) -> void:
 				_hud.toast("You've been taken out! -%ds.%s" % [int(DOWN_PENALTY), dropped], warn, 3.5)
 			elif e["by"] == my_id:
 				_hud.toast("You took out %s! They lose %ds." % [victim.display_name, int(DOWN_PENALTY)], col, 3.0)
+		"out":
+			var who: Agent = _agent_by_id[pid]
+			who.frozen = true
+			who.out = true
+			if me:
+				_hud.toast("Your clock ran out. You're out of the mission." if e["reason"] == "time"
+						else "You've left the mission.", warn, 4.0)
+			else:
+				var why := "ran out of time" if e["reason"] == "time" else "left the base"
+				_hud.toast("%s %s and is out!" % [who.display_name, why], col, 3.5)
 		"ko":
 			var victim: Agent = _agent_by_id[pid]
 			victim.knock_out(e["kind"], KO_TIME)

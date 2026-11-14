@@ -1,7 +1,7 @@
 extends SceneTree
 ## Headless regression: an idle player against the hard bot. The bot must
 ## find the intel and briefcase and escape before the clock runs out.
-##   godot --headless --fixed-fps 60 -s res://tests/bot_match.gd
+##   godot --headless --fixed-fps 60 -s res://tests/bot_match.gd [-- --bots=3]
 
 const LIMIT := 60 * 60 * 7   # seven minutes of game time at 60 fps
 
@@ -15,12 +15,18 @@ func _process(_delta: float) -> bool:
 		# exist once the tree is running.
 		_game = load("res://scripts/game/game.gd").new()
 		root.add_child(_game)
-		_game.setup(12345, 1, [1], "hard", 6, {1: "TEST"})
+		var bots := 1
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--bots="):
+				bots = a.get_slice("=", 1).to_int()
+		_game.setup(12345, 1, [1], "hard", 6, {1: "TEST"}, bots)
 		return false
 	_frames += 1
 	if _game.over:
-		var won: bool = _game.bot.agent.celebrating
-		print("match over after %.0f s, bot escaped: %s" % [_frames / 60.0, won])
+		var won := false
+		for b in _game.bots.values():
+			won = won or b.agent.celebrating
+		print("match over after %.0f s, a bot escaped: %s" % [_frames / 60.0, won])
 		return _finish(0 if won else 1)
 	if _frames > LIMIT:
 		print("FAIL: match did not finish in time")

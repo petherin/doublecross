@@ -42,6 +42,8 @@ var accent := Color("ff5a5f")
 
 ## Set by the game: no movement at all (e.g. after the match ends).
 var frozen := false
+## Out of the match (clock ran out or left): no longer drawn or fought.
+var out := false
 var has_case := false
 ## True while rummaging through furniture (sent to the other tablet too).
 var searching := false
@@ -322,6 +324,8 @@ func net_state(r: Vector2i, pos: Vector2, f: float, m: int, s: bool, v := -1) ->
 ## Draws this agent onto the room renderer `ci` (so it can be depth-sorted
 ## with the furniture), using the Blender-rendered sprite sheet if there is one.
 func paint(ci: CanvasItem) -> void:
+	if out:
+		return
 	if _sheet() != null:
 		_paint_sprite(ci)
 
