@@ -6,6 +6,7 @@ extends Node2D
 const World = preload("res://scripts/world.gd")
 const Icons = preload("res://scripts/icons.gd")
 const Art = preload("res://scripts/art.gd")
+const Style = preload("res://scripts/style.gd")
 const LightLayer = preload("res://scripts/light_layer.gd")
 const RoomLights = preload("res://scripts/room_lights.gd")
 const POSTERS := ["TRUST NO ONE", "WALLS HAVE EARS", "SHRED AFTER READING", "LOOK BUSY"]
@@ -175,7 +176,7 @@ func _draw_floor(R: Rect2, tint: Color) -> void:
 	draw_texture_rect(Art.floor_tex(), R, true, Color(0.95, 0.97, 1.0).lerp(tint, 0.08))
 	# Room name stencilled on the floor.
 	var name_text: String = world.rooms[room]["name"].to_upper()
-	draw_string(font, Vector2(x0 + 70, y1 - 70), name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 58, Color(1, 1, 1, 0.045))
+	draw_string(Style.stencil(), Vector2(x0 + 70, y1 - 70), name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 64, Color(1, 1, 1, 0.05))
 	# Hazard stripes on the threshold of each doorway.
 	var rc := R.get_center()
 	var door_half := World.DOOR_HALF
@@ -497,7 +498,7 @@ func _draw_dart(d: Dictionary) -> void:
 func _draw_effect(e: Dictionary) -> void:
 	var t: float = e["t"]
 	var p := World.iso(e["pos"], 40.0)
-	var font := ThemeDB.fallback_font
+	var font := Style.stencil()
 	var word := "TWANG!"
 	var col := Color("eef1f5")
 	match e["kind"]:

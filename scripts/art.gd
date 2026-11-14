@@ -18,6 +18,27 @@ static func wall_tex() -> Texture2D:
 	return _cache["wall"]
 
 
+## Dark wood grain for the desk under the case file.
+static func wood_tex() -> Texture2D:
+	if not _cache.has("wood"):
+		var w := 256
+		var h := 256
+		var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+		var n := FastNoiseLite.new()
+		n.seed = 21
+		n.frequency = 0.02
+		var fine := FastNoiseLite.new()
+		fine.seed = 5
+		fine.frequency = 0.35
+		for y in h:
+			for x in w:
+				var grain := sin((x * 0.05 + n.get_noise_2d(x * 0.3, y * 2.0) * 6.0) * 6.0) * 0.5 + 0.5
+				var v := 0.16 + grain * 0.06 + fine.get_noise_2d(x * 0.2, y * 3.0) * 0.025
+				img.set_pixel(x, y, Color(v * 1.25, v * 0.82, v * 0.55))
+		_cache["wood"] = ImageTexture.create_from_image(img)
+	return _cache["wood"]
+
+
 ## White radial blob fading to transparent: used for lights and soft shadows.
 static func soft() -> Texture2D:
 	if not _cache.has("soft"):

@@ -17,6 +17,10 @@ var _names := {}
 
 func _ready() -> void:
 	randomize()
+	# Typewriter type everywhere text is drawn with the default font.
+	var tw := load("res://assets/fonts/CourierPrime-Bold.ttf")
+	if tw:
+		ThemeDB.fallback_font = tw
 	get_tree().set_auto_accept_quit(false)
 	get_tree().set_quit_on_go_back(false)
 	Net.opponent_joined.connect(_on_opponent_joined)

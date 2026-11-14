@@ -1,92 +1,82 @@
 extends Control
-## Title screen: host a game, join one found on the network (or by IP), or practise solo.
+## Title screen, styled as a classified case file open on a desk: host a game,
+## join one found on the network (or by IP), play the bot or practise solo.
 
 signal practice_requested
 signal bot_requested(level: String)
+
+const Ui = preload("res://scripts/ui.gd")
+const Style = preload("res://scripts/style.gd")
+const Art = preload("res://scripts/art.gd")
 
 var _status: Label
 var _hosts_box: VBoxContainer
 var _searching: Label
 var _ip_edit: LineEdit
+var _name_edit: LineEdit
 var _main_buttons: Control
 var _cancel: Button
-var _t := 0.0
 var _content: Control
-var _bot_level := "medium"
+var _art: Control
 var _overlay: Control
-var _name_edit: LineEdit
+var _bot_level := "medium"
+var _t := 0.0
 var _lift := 0.0
-
-const Ui = preload("res://scripts/ui.gd")
+# Typewriter effect for the status line and the tagline.
+var _status_full := ""
+var _status_chars := 0.0
+var _tag_chars := 0.0
+const TAGLINE := "Two agents. One secret base. Only one gets out."
+# Polaroid photos of the agents, cut from the Blender sprite sheets.
+var _photos := {}
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	theme = _make_theme()
+	theme = Style.paper_theme()
 	_bot_level = Settings.bot_level
-	# All menu widgets live in a 1280x800 panel that is centred (and lifted
-	# above the on-screen keyboard) in _process.
+	# Everything lives in a 1280x800 panel, centred (and lifted above the
+	# on-screen keyboard) in _process.
 	_content = Control.new()
 	_content.size = Ui.BASE
 	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_content)
+	_art = Control.new()
+	_art.size = Ui.BASE
+	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_art.draw.connect(_draw_dossier)
+	_content.add_child(_art)
+	_load_photos()
 
-	var title := Label.new()
-	title.text = "DOUBLE CROSS"
-	title.add_theme_font_size_override("font_size", 92)
-	title.add_theme_color_override("font_color", Color("ff5a5f"))
-	title.add_theme_color_override("font_shadow_color", Color("5ab0ff"))
-	title.add_theme_constant_override("shadow_offset_x", 5)
-	title.add_theme_constant_override("shadow_offset_y", 5)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 60)
-	title.size = Vector2(1280, 110)
-	_content.add_child(title)
-
-	var sub := Label.new()
-	sub.text = "Two agents. One secret base. Only one gets out."
-	sub.add_theme_font_size_override("font_size", 26)
-	sub.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.position = Vector2(0, 175)
-	sub.size = Vector2(1280, 40)
-	_content.add_child(sub)
-
-	# Codename
+	# ---- Right page: mission orders.
 	var name_row := HBoxContainer.new()
-	name_row.position = Vector2(140, 228)
-	name_row.add_theme_constant_override("separation", 12)
+	name_row.position = Vector2(700, 168)
+	name_row.add_theme_constant_override("separation", 10)
 	_content.add_child(name_row)
-	var nl := Label.new()
-	nl.text = "YOUR CODENAME"
-	nl.add_theme_color_override("font_color", Color("ff5a5f"))
-	nl.add_theme_font_size_override("font_size", 20)
-	nl.custom_minimum_size = Vector2(0, 46)
-	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	name_row.add_child(nl)
-	var name_edit := LineEdit.new()
-	name_edit.placeholder_text = "e.g. NIGHTJAR"
-	name_edit.text = Settings.player_name
-	name_edit.max_length = 14
-	name_edit.custom_minimum_size = Vector2(260, 46)
-	name_edit.add_theme_font_size_override("font_size", 22)
-	name_edit.text_changed.connect(func(t):
+	name_row.add_child(_label("AGENT CODENAME:", Style.mono_bold(), 20))
+	_name_edit = LineEdit.new()
+	_name_edit.placeholder_text = "NIGHTJAR"
+	_name_edit.text = Settings.player_name
+	_name_edit.max_length = 14
+	_name_edit.custom_minimum_size = Vector2(230, 42)
+	_name_edit.add_theme_font_size_override("font_size", 22)
+	_name_edit.text_changed.connect(func(t):
 		Settings.player_name = t.strip_edges()
 		Settings.save())
-	name_row.add_child(name_edit)
-	_name_edit = name_edit
+	name_row.add_child(_name_edit)
 
-	# Left column: host / practice
-	var left := VBoxContainer.new()
-	left.position = Vector2(140, 292)
-	left.size = Vector2(440, 300)
-	left.add_theme_constant_override("separation", 14)
-	_content.add_child(left)
-	_main_buttons = left
-	left.add_child(_big_button("HOST GAME", _on_host))
-	left.add_child(_big_button("PLAY VS BOT", func(): bot_requested.emit(_bot_level)))
+	var orders := VBoxContainer.new()
+	orders.position = Vector2(690, 222)
+	orders.add_theme_constant_override("separation", 2)
+	_content.add_child(orders)
+	_main_buttons = orders
+	orders.add_child(_order_button("HOST A MISSION", _on_host))
+	orders.add_child(_order_button("TAKE ON THE BOT", func(): bot_requested.emit(_bot_level)))
 	var levels := HBoxContainer.new()
-	levels.add_theme_constant_override("separation", 8)
+	levels.add_theme_constant_override("separation", 6)
+	var lpad := Control.new()
+	lpad.custom_minimum_size = Vector2(36, 0)
+	levels.add_child(lpad)
 	var group := ButtonGroup.new()
 	for lv in ["easy", "medium", "hard"]:
 		var b := Button.new()
@@ -94,69 +84,62 @@ func _ready() -> void:
 		b.toggle_mode = true
 		b.button_group = group
 		b.button_pressed = lv == _bot_level
-		b.custom_minimum_size = Vector2(141, 50)
-		b.add_theme_font_size_override("font_size", 20)
+		b.custom_minimum_size = Vector2(118, 40)
+		b.add_theme_font_size_override("font_size", 19)
 		b.pressed.connect(func():
 			_bot_level = lv
 			Settings.bot_level = lv
 			Settings.save())
 		levels.add_child(b)
-	left.add_child(levels)
-	left.add_child(_big_button("PRACTICE SOLO", func(): practice_requested.emit()))
+	orders.add_child(levels)
+	orders.add_child(_order_button("SOLO TRAINING", func(): practice_requested.emit()))
 
-	# Right column: join
-	var right := VBoxContainer.new()
-	right.position = Vector2(700, 300)
-	right.size = Vector2(440, 400)
-	right.add_theme_constant_override("separation", 14)
-	_content.add_child(right)
-	var jl := Label.new()
-	jl.text = "GAMES ON YOUR NETWORK"
-	jl.add_theme_color_override("font_color", Color("5ab0ff"))
-	right.add_child(jl)
+	var signals := VBoxContainer.new()
+	signals.position = Vector2(700, 470)
+	signals.size = Vector2(450, 120)
+	signals.add_theme_constant_override("separation", 6)
+	_content.add_child(signals)
+	var sl := _label("INTERCEPTED TRANSMISSIONS", Style.mono_bold(), 18)
+	sl.add_theme_color_override("font_color", Style.RED_INK)
+	signals.add_child(sl)
 	_hosts_box = VBoxContainer.new()
-	_hosts_box.add_theme_constant_override("separation", 10)
-	right.add_child(_hosts_box)
-	_searching = Label.new()
-	_searching.text = "Searching…"
-	_searching.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
-	right.add_child(_searching)
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 16)
-	right.add_child(spacer)
-	var ml := Label.new()
-	ml.text = "OR JOIN BY IP ADDRESS"
-	ml.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
-	ml.add_theme_font_size_override("font_size", 20)
-	right.add_child(ml)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	right.add_child(row)
+	signals.add_child(_hosts_box)
+	_searching = _label("Scanning frequencies", Style.typewriter(), 19)
+	_searching.add_theme_color_override("font_color", Color(Style.INK, 0.6))
+	signals.add_child(_searching)
+
+	var join_row := HBoxContainer.new()
+	join_row.position = Vector2(700, 588)
+	join_row.add_theme_constant_override("separation", 8)
+	_content.add_child(join_row)
+	join_row.add_child(_label("FREQUENCY (IP):", Style.mono_bold(), 18))
 	_ip_edit = LineEdit.new()
 	_ip_edit.placeholder_text = "192.168.1.20"
 	_ip_edit.text = Settings.last_ip
-	_ip_edit.custom_minimum_size = Vector2(300, 60)
+	_ip_edit.custom_minimum_size = Vector2(190, 40)
+	_ip_edit.add_theme_font_size_override("font_size", 20)
 	_ip_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
 	_ip_edit.text_submitted.connect(func(_t): _join(_ip_edit.text.strip_edges()))
-	row.add_child(_ip_edit)
+	join_row.add_child(_ip_edit)
 	var jb := Button.new()
-	jb.text = "JOIN"
-	jb.custom_minimum_size = Vector2(130, 60)
+	jb.text = "JOIN ▸"
+	jb.add_theme_font_size_override("font_size", 22)
 	jb.pressed.connect(func(): _join(_ip_edit.text.strip_edges()))
-	row.add_child(jb)
+	join_row.add_child(jb)
 
 	_status = Label.new()
-	_status.position = Vector2(0, 652)
-	_status.size = Vector2(1280, 80)
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status.position = Vector2(700, 640)
+	_status.size = Vector2(450, 70)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_status.add_theme_color_override("font_color", Color("ffd23f"))
+	_status.add_theme_font_override("font", Style.typewriter())
+	_status.add_theme_font_size_override("font_size", 19)
+	_status.add_theme_color_override("font_color", Style.RED_INK)
 	_content.add_child(_status)
 
 	_cancel = Button.new()
-	_cancel.text = "CANCEL"
-	_cancel.position = Vector2(560, 720)
-	_cancel.size = Vector2(160, 56)
+	_cancel.text = "✕ ABORT"
+	_cancel.position = Vector2(1040, 700)
+	_cancel.add_theme_font_size_override("font_size", 22)
 	_cancel.visible = false
 	_cancel.pressed.connect(func():
 		Net.end_session("")
@@ -164,51 +147,175 @@ func _ready() -> void:
 		set_status(""))
 	_content.add_child(_cancel)
 
-	# Small buttons along the bottom.
-	var help := Button.new()
-	help.text = "HOW TO PLAY"
-	help.position = Vector2(140, 730)
-	help.size = Vector2(210, 50)
-	help.add_theme_font_size_override("font_size", 20)
-	help.pressed.connect(_show_help)
-	_content.add_child(help)
-	var settings := Button.new()
-	settings.text = "SETTINGS"
-	settings.position = Vector2(370, 730)
-	settings.size = Vector2(170, 50)
-	settings.add_theme_font_size_override("font_size", 20)
-	settings.pressed.connect(_show_settings)
-	_content.add_child(settings)
+	# ---- Index tabs poking out of the bottom of the folder.
+	_content.add_child(_tab_button("HOW TO PLAY", Vector2(120, 744), _show_help))
+	_content.add_child(_tab_button("SETTINGS", Vector2(330, 744), _show_settings))
 
-	# Every button in the menu clicks.
+	# Every button types a key when pressed.
 	_hook_clicks(self)
 
 	Net.hosts_changed.connect(_refresh_hosts)
-	Net.joined_host.connect(func(): set_status("Connected! Briefing incoming…"))
+	Net.joined_host.connect(func(): set_status("Contact established. Briefing incoming…"))
 	Net.join_failed.connect(func():
 		_set_waiting(false)
-		set_status("Couldn't reach that game. Check you're on the same Wi-Fi."))
+		set_status("No answer on that frequency. Check you're on the same Wi-Fi."))
 	Net.start_listening()
 	_refresh_hosts()
+
+
+# ------------------------------------------------------------------ widgets
+
+func _label(text: String, font: Font, size: int) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_override("font", font)
+	l.add_theme_font_size_override("font_size", size)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.custom_minimum_size = Vector2(0, 40)
+	return l
+
+
+## A typed order with a tick-box: highlighted when hovered.
+func _order_button(text: String, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = "☐  " + text
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.custom_minimum_size = Vector2(440, 56)
+	b.add_theme_font_size_override("font_size", 31)
+	b.pressed.connect(cb)
+	return b
+
+
+func _tab_button(text: String, at: Vector2, cb: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.position = at
+	b.size = Vector2(190, 44)
+	b.add_theme_font_size_override("font_size", 19)
+	var tab := StyleBoxFlat.new()
+	tab.bg_color = Style.MANILA_DARK
+	tab.corner_radius_bottom_left = 8
+	tab.corner_radius_bottom_right = 8
+	tab.shadow_color = Color(0, 0, 0, 0.4)
+	tab.shadow_size = 4
+	tab.set_content_margin_all(6)
+	var tab_hover := tab.duplicate()
+	tab_hover.bg_color = Style.MANILA
+	for s in ["normal", "focus"]:
+		b.add_theme_stylebox_override(s, tab)
+	for s in ["hover", "pressed"]:
+		b.add_theme_stylebox_override(s, tab_hover)
+	b.pressed.connect(cb)
+	return b
 
 
 func _hook_clicks(n: Node) -> void:
 	for c in n.get_children():
 		if c is BaseButton and not c.has_meta("click"):
 			c.set_meta("click", true)
-			(c as BaseButton).pressed.connect(func(): Sound.play("click", -4.0, false, 0.0))
+			(c as BaseButton).pressed.connect(func(): Sound.play("type%d" % randi_range(1, 3), -2.0, false, 0.05))
 		_hook_clicks(c)
 
 
-## A dimmed full-screen panel with a centred card; returns the card's VBox.
+# ------------------------------------------------------------------ the case file art
+
+func _load_photos() -> void:
+	var path := "res://assets/sprites/agents.json"
+	if not FileAccess.file_exists(path):
+		return
+	var m = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not m is Dictionary or not m.has("cols"):
+		return
+	var fsize: float = m["frame"]
+	var cols: int = m["cols"]
+	# Facing the camera: direction 1, first idle frame.
+	var fid: int = 1 * int(m["frames_per_direction"]) + int(m["anims"]["idle"]["start"])
+	var region := Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
+	for name in m["sheets"]:
+		if ResourceLoader.exists(m["sheets"][name]):
+			_photos[name] = [load(m["sheets"][name]), region]
+
+
+func _photo(ci: CanvasItem, r: Rect2, who: String) -> void:
+	# Interrogation-room backdrop, then a head-and-shoulders crop of the agent.
+	ci.draw_rect(r, Color("2b3442"))
+	for i in 5:
+		var y := r.position.y + r.size.y * (0.2 + i * 0.15)
+		ci.draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color(1, 1, 1, 0.08), 1.0)
+	if _photos.has(who):
+		var tex: Texture2D = _photos[who][0]
+		var reg: Rect2 = _photos[who][1]
+		var crop := Rect2(reg.position + Vector2(reg.size.x * 0.22, reg.size.y * 0.02), reg.size * Vector2(0.56, 0.56))
+		ci.draw_texture_rect_region(tex, r, crop)
+	ci.draw_rect(r, Color(1.0, 0.9, 0.7, 0.08))
+
+
+func _draw_dossier() -> void:
+	var a := _art
+	# Back cover of the folder, and its tab.
+	a.draw_rect(Rect2(66, 66, 1160, 700), Color(0, 0, 0, 0.45))
+	a.draw_rect(Rect2(90, 24, 270, 52), Style.MANILA_DARK)
+	a.draw_string(Style.mono_bold(), Vector2(110, 52), "FILE Nº 84-DX", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Style.INK)
+	a.draw_rect(Rect2(60, 60, 1160, 700), Style.MANILA)
+	a.draw_rect(Rect2(60, 60, 1160, 700), Style.MANILA_DARK, false, 3.0)
+	a.draw_line(Vector2(640, 62), Vector2(640, 758), Color(0, 0, 0, 0.25), 4.0)
+	# Two pages.
+	Style.draw_paper(a, Rect2(88, 86, 540, 652), Style.PAPER, -0.015)
+	Style.draw_paper(a, Rect2(660, 92, 530, 646), Style.PAPER, 0.01)
+
+	# Left page: classification line, title, tagline.
+	a.draw_string(Style.mono_bold(), Vector2(118, 136), "CLASSIFIED  //  OPERATION", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Style.RED_INK)
+	a.draw_string(Style.stencil(), Vector2(112, 238), "DOUBLE", HORIZONTAL_ALIGNMENT_LEFT, -1, 104, Style.INK)
+	a.draw_string(Style.stencil(), Vector2(112, 346), "CROSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 122, Style.RED_INK)
+	var shown := TAGLINE.left(int(_tag_chars))
+	a.draw_string(Style.typewriter(), Vector2(118, 392), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Style.INK)
+	if _tag_chars < TAGLINE.length() or int(_t * 2.0) % 2 == 0:
+		var cw := Style.typewriter().get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		a.draw_rect(Rect2(120 + cw, 374, 11, 22), Color(Style.INK, 0.8))
+
+	# Polaroids of the two subjects, taped in.
+	Style.draw_polaroid(a, Vector2(212, 545), -0.09, "SUBJECT: CRIMSON", func(ci, r): _photo(ci, r, "crimson"))
+	Style.draw_polaroid(a, Vector2(420, 552), 0.07, "SUBJECT: COBALT", func(ci, r): _photo(ci, r, "cobalt"))
+	Style.draw_tape(a, Vector2(200, 445), -0.3)
+	Style.draw_tape(a, Vector2(440, 452), 0.25)
+	Style.draw_paperclip(a, Vector2(1160, 104), 1.62, 80.0)
+	Style.draw_redacted(a, Vector2(124, 690), "LAST SEEN:", [120, 70, 90])
+	Style.draw_coffee_ring(a, Vector2(560, 680), 44.0)
+
+	# The TOP SECRET stamp, slightly crooked across the title.
+	Style.draw_stamp(a, "TOP SECRET", Vector2(470, 160), -0.2, Style.RED_INK, 42)
+
+	# Right page: heading and rules.
+	a.draw_string(Style.stencil(), Vector2(694, 146), "MISSION ORDERS", HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Style.INK)
+	a.draw_line(Vector2(694, 156), Vector2(1150, 156), Style.INK, 2.0)
+	for x in range(696, 1150, 14):
+		a.draw_line(Vector2(x, 455), Vector2(x + 7, 455), Color(Style.INK, 0.5), 1.5)
+	Style.draw_stamp(a, "EYES ONLY", Vector2(1080, 720), 0.12, Color("1f4f9a"), 22, 0.7)
+
+
+func _draw() -> void:
+	# The desk: dark wood under a warm lamp, with deep shadows at the edges.
+	var vp := Ui.view_size(self)
+	var wood := Art.wood_tex()
+	draw_texture_rect(wood, Rect2(Vector2.ZERO, vp), true, Color(0.9, 0.85, 0.8))
+	var soft := Art.soft()
+	var flick := 0.95 + 0.05 * sin(_t * 7.0) * sin(_t * 2.3)
+	draw_texture_rect(soft, Rect2(Vector2(-vp.x * 0.2, -vp.y * 0.5), vp * 1.3), false, Color(1.0, 0.8, 0.5, 0.35 * flick))
+	draw_texture_rect(Art.vignette(), Rect2(Vector2.ZERO, vp), false, Color(1, 1, 1, 0.9))
+
+
+# ------------------------------------------------------------------ overlays (memos)
+
+## A typed memo on a sheet of paper, over the dimmed desk. Returns its VBox.
 func _open_overlay(title_text: String, width := 760.0) -> VBoxContainer:
 	_close_overlay()
+	Sound.play("paper", -4.0)
 	_overlay = Control.new()
 	add_child(_overlay)
 	_overlay.position = Vector2.ZERO
 	_overlay.size = Ui.view_size(self)
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
+	dim.color = Color(0, 0, 0, 0.6)
 	_overlay.add_child(dim)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center := CenterContainer.new()
@@ -216,22 +323,36 @@ func _open_overlay(title_text: String, width := 760.0) -> VBoxContainer:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var card := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("0f1621")
-	sb.border_color = Color("5ab0ff")
+	sb.bg_color = Style.PAPER
+	sb.border_color = Style.PAPER_DARK
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	sb.set_content_margin_all(28)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 14
+	sb.shadow_offset = Vector2(6, 10)
+	sb.set_content_margin_all(26)
 	card.add_theme_stylebox_override("panel", sb)
 	card.custom_minimum_size = Vector2(width, 0)
 	center.add_child(card)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", 10)
 	card.add_child(box)
-	var t := Label.new()
-	t.text = title_text
-	t.add_theme_font_size_override("font_size", 40)
-	t.add_theme_color_override("font_color", Color("ff5a5f"))
-	box.add_child(t)
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	var t := _label("MEMORANDUM", Style.stencil(), 40)
+	head.add_child(t)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	var stamp := Control.new()
+	stamp.custom_minimum_size = Vector2(210, 60)
+	stamp.draw.connect(func(): Style.draw_stamp(stamp, "EYES ONLY", Vector2(105, 30), -0.1, Style.RED_INK, 26))
+	head.add_child(stamp)
+	var subj := _label("SUBJECT: " + title_text, Style.mono_bold(), 22)
+	box.add_child(subj)
+	var rule := ColorRect.new()
+	rule.color = Style.INK
+	rule.custom_minimum_size = Vector2(0, 2)
+	box.add_child(rule)
 	return box
 
 
@@ -243,50 +364,50 @@ func _close_overlay() -> void:
 
 func _done_button(box: VBoxContainer) -> void:
 	var done := Button.new()
-	done.text = "DONE"
-	done.custom_minimum_size = Vector2(0, 64)
+	done.text = "[ FILE IT ]"
+	done.add_theme_font_size_override("font_size", 26)
+	done.custom_minimum_size = Vector2(0, 56)
 	done.pressed.connect(func():
 		Settings.save()
+		Sound.play("stamp", -6.0)
 		_close_overlay())
 	box.add_child(done)
 	_hook_clicks(box)
 
 
 func _show_settings() -> void:
-	var box := _open_overlay("SETTINGS", 640.0)
+	var box := _open_overlay("FIELD EQUIPMENT SETTINGS", 660.0)
 	box.add_child(_slider_row("Music", Settings.music_volume, func(v):
 		Settings.music_volume = v
 		Settings.changed.emit()))
 	box.add_child(_slider_row("Sound effects", Settings.sfx_volume, func(v):
 		Settings.sfx_volume = v
 		Settings.changed.emit()
-		Sound.play("click", -4.0, false, 0.0)))
+		Sound.play("type1", -2.0, false, 0.0)))
 	var vib := CheckButton.new()
 	vib.text = "Vibrate when hit"
 	vib.button_pressed = Settings.vibration
 	vib.toggled.connect(func(on): Settings.vibration = on)
 	box.add_child(vib)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var l := Label.new()
-	l.text = "Clock per agent"
-	l.custom_minimum_size = Vector2(230, 0)
+	row.add_theme_constant_override("separation", 8)
+	var l := _label("Clock per agent", Style.mono(), 22)
+	l.custom_minimum_size = Vector2(210, 40)
 	row.add_child(l)
 	var group := ButtonGroup.new()
 	for m in [4, 6, 8, 10]:
 		var b := Button.new()
-		b.text = "%d min" % m
+		b.text = "%d MIN" % m
 		b.toggle_mode = true
 		b.button_group = group
 		b.button_pressed = m == Settings.clock_minutes
-		b.custom_minimum_size = Vector2(90, 50)
+		b.custom_minimum_size = Vector2(92, 46)
+		b.add_theme_font_size_override("font_size", 20)
 		b.pressed.connect(func(): Settings.clock_minutes = m)
 		row.add_child(b)
 	box.add_child(row)
-	var note := Label.new()
-	note.text = "In a two-player game the host's clock setting is used."
-	note.add_theme_font_size_override("font_size", 18)
-	note.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	var note := _label("In a two-player game the host's clock setting is used.", Style.typewriter(), 18)
+	note.add_theme_color_override("font_color", Color(Style.INK, 0.6))
 	box.add_child(note)
 	_done_button(box)
 
@@ -294,9 +415,8 @@ func _show_settings() -> void:
 func _slider_row(label_text: String, value: float, on_change: Callable) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var l := Label.new()
-	l.text = label_text
-	l.custom_minimum_size = Vector2(230, 0)
+	var l := _label(label_text, Style.mono(), 22)
+	l.custom_minimum_size = Vector2(210, 40)
 	row.add_child(l)
 	var sl := HSlider.new()
 	sl.min_value = 0.0
@@ -312,30 +432,39 @@ func _slider_row(label_text: String, value: float, on_change: Callable) -> HBoxC
 
 
 func _show_help() -> void:
-	var box := _open_overlay("HOW TO PLAY", 900.0)
+	var box := _open_overlay("FIELD MANUAL", 920.0)
 	var text := RichTextLabel.new()
 	text.bbcode_enabled = true
-	text.fit_content = true
-	text.custom_minimum_size = Vector2(840, 0)
-	text.add_theme_font_size_override("normal_font_size", 21)
-	text.add_theme_font_size_override("bold_font_size", 21)
-	text.text = """[b][color=#5ab0ff]The mission[/color][/b]  Find the [b]PASSPORT, CASH, MICROFILM[/b] and [b]KEYCARD[/b] hidden in the furniture, then walk out of the glowing [color=#5dff8a][b]EXIT[/b][/color] before your clock runs out. First one out wins.
+	text.fit_content = false
+	text.scroll_active = true
+	text.custom_minimum_size = Vector2(856, 430)
+	text.add_theme_font_size_override("normal_font_size", 19)
+	text.add_theme_font_size_override("bold_font_size", 19)
+	text.add_theme_font_size_override("italics_font_size", 19)
+	text.add_theme_font_override("italics_font", Style.typewriter())
+	text.text = """[b][color=#b3141f]1. THE MISSION.[/color][/b] Recover the [b]PASSPORT, CASH, MICROFILM[/b] and [b]KEYCARD[/b] hidden in the furniture, then walk out of the [b]EXIT[/b] before your clock runs out. First one out wins.
 
-[b][color=#5ab0ff]Searching[/color][/b]  Stand next to furniture and tap [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can only carry one item, so you'll swap and leave the other behind.
+[b][color=#b3141f]2. SEARCHING.[/color][/b] Stand next to furniture and press [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can carry only one item, so you'll swap and leave the other behind.
 
-[b][color=#5ab0ff]Traps[/color][/b]  Tap [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a [b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs 20 seconds. Only you can see your own traps, but they still work on you!
+[b][color=#b3141f]3. TRAPS.[/color][/b] Press [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a [b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs 20 seconds. Only you can see your own traps, but they still work on you.
 
-[b][color=#5ab0ff]Gadgets[/color][/b]  The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the [b]WIRE CUTTERS[/b] beat tripwires. Each one is used up when it saves you.
+[b][color=#b3141f]4. GADGETS.[/color][/b] The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the [b]WIRE CUTTERS[/b] beat tripwires. Each is used up when it saves you.
 
-[b][color=#5ab0ff]Fighting[/color][/b]  [b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: they drop their intel, lose 30 seconds and wake up back at the start.
+[b][color=#b3141f]5. FIGHTING.[/color][/b] [b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: they drop their intel, lose 30 seconds and wake up back at the start.
 
-[b][color=#5ab0ff]Keyboard[/color][/b]  WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart"""
+[b][color=#b3141f]6. KEYBOARD.[/color][/b] WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart
+
+[i]This manual will not self-destruct. Please return it to the file.[/i]"""
 	box.add_child(text)
 	_done_button(box)
 
 
+# ------------------------------------------------------------------ behaviour
+
 func set_status(msg: String) -> void:
-	_status.text = msg
+	_status_full = msg
+	_status_chars = 0.0
+	_status.text = ""
 
 
 func _process(delta: float) -> void:
@@ -357,33 +486,38 @@ func _process(delta: float) -> void:
 	_content.position = ((vp - Ui.BASE * k) / 2.0).floor() - Vector2(0, _lift)
 	if _overlay:
 		_overlay.size = vp
+
+	# Typewriter effects (with the odd key clack).
+	if _tag_chars < TAGLINE.length():
+		var before := int(_tag_chars)
+		_tag_chars = minf(TAGLINE.length(), _tag_chars + delta * 26.0)
+		if int(_tag_chars) != before and TAGLINE[before] != " " and before % 2 == 0:
+			Sound.play("type%d" % randi_range(1, 3), -10.0, false, 0.08)
+	if _status_chars < _status_full.length():
+		var before := int(_status_chars)
+		_status_chars = minf(_status_full.length(), _status_chars + delta * 45.0)
+		_status.text = _status_full.left(int(_status_chars)) + "▌"
+		if int(_status_chars) != before and before % 3 == 0:
+			Sound.play("type%d" % randi_range(1, 3), -12.0, false, 0.08)
+	elif _status_full != "":
+		_status.text = _status_full + ("▌" if int(_t * 2.0) % 2 == 0 else "")
+	_searching.text = "Scanning frequencies" + ".".repeat(int(_t * 2.0) % 4)
+	_art.queue_redraw()
 	queue_redraw()
-
-
-func _draw() -> void:
-	# Animated radar-grid backdrop
-	draw_rect(Rect2(Vector2.ZERO, size), Color("070a0f"))
-	var off := fmod(_t * 20.0, 64.0)
-	for x in range(-64, int(size.x) + 64, 64):
-		draw_line(Vector2(x + off, 0), Vector2(x + off, size.y), Color(0.35, 0.69, 1.0, 0.06), 1.0)
-	for y in range(-64, int(size.y) + 64, 64):
-		draw_line(Vector2(0, y + off), Vector2(size.x, y + off), Color(0.35, 0.69, 1.0, 0.06), 1.0)
-	var sweep := fmod(_t * 0.6, 1.0) * (size.x + 120.0) - 60.0
-	draw_rect(Rect2(sweep, 0, 60, size.y), Color(1.0, 0.35, 0.37, 0.05))
 
 
 func _on_host() -> void:
 	var err := Net.host()
 	if err != OK:
-		set_status("Couldn't start hosting (error %d)." % err)
+		set_status("Couldn't open a channel (error %d)." % err)
 		return
 	_set_waiting(true)
-	set_status("Waiting for a rival agent…\nThey can join from their tablet, or type your address: %s" % Net.local_ip())
+	set_status("Waiting for a rival agent… Their frequency (IP): %s" % Net.local_ip())
 
 
 func _join(ip: String) -> void:
 	if ip == "":
-		set_status("Type the host's IP address first.")
+		set_status("Type the host's frequency (IP address) first.")
 		return
 	Settings.last_ip = ip
 	Settings.save()
@@ -391,7 +525,7 @@ func _join(ip: String) -> void:
 		set_status("That doesn't look like a valid address.")
 		return
 	_set_waiting(true)
-	set_status("Connecting to %s…" % ip)
+	set_status("Dialling %s…" % ip)
 
 
 func _set_waiting(on: bool) -> void:
@@ -407,46 +541,11 @@ func _refresh_hosts() -> void:
 		c.queue_free()
 	for ip in Net.discovered.keys():
 		var b := Button.new()
-		b.text = "%s  (%s)" % [Net.discovered[ip]["name"], ip]
-		b.custom_minimum_size = Vector2(440, 60)
+		b.text = "▸ %s  [%s]" % [Net.discovered[ip]["name"], ip]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size = Vector2(440, 40)
+		b.add_theme_font_size_override("font_size", 21)
 		b.pressed.connect(_join.bind(ip))
 		_hosts_box.add_child(b)
+		_hook_clicks(_hosts_box)
 	_searching.visible = Net.discovered.is_empty()
-
-
-func _big_button(text: String, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(440, 80)
-	b.add_theme_font_size_override("font_size", 34)
-	b.pressed.connect(cb)
-	return b
-
-
-func _make_theme() -> Theme:
-	var t := Theme.new()
-	t.default_font_size = 26
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("141b26")
-	normal.border_color = Color("5ab0ff")
-	normal.set_border_width_all(2)
-	normal.set_corner_radius_all(10)
-	normal.set_content_margin_all(12)
-	var hover := normal.duplicate()
-	hover.bg_color = Color("1d2838")
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color("ff5a5f")
-	pressed.border_color = Color("ff5a5f")
-	var disabled := normal.duplicate()
-	disabled.border_color = Color("333")
-	for kind in ["Button"]:
-		t.set_stylebox("normal", kind, normal)
-		t.set_stylebox("hover", kind, hover)
-		t.set_stylebox("pressed", kind, pressed)
-		t.set_stylebox("disabled", kind, disabled)
-		t.set_stylebox("focus", kind, StyleBoxEmpty.new())
-	var edit := normal.duplicate()
-	edit.bg_color = Color("0c1118")
-	t.set_stylebox("normal", "LineEdit", edit)
-	t.set_stylebox("focus", "LineEdit", edit)
-	return t

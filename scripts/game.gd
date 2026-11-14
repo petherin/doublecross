@@ -172,7 +172,20 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	local_agent.door_passed.connect(func(r, d): if not over: request_door.rpc_id(1, r, d))
 	local_agent.exit_touched.connect(_on_exit_touched)
 	_on_room_changed(local_agent.room, false)
-	_hud.toast("Find all four pieces of intel, then reach the EXIT before your clock runs out.\nWatch out for traps, and for your rival!", Color.WHITE, 4.5)
+	# The briefing: everyone waits until it self-destructs (or is skipped).
+	var rival_name := "AGENT UNKNOWN"
+	for a in agents:
+		if a != local_agent:
+			rival_name = a.display_name
+	local_agent.frozen = true
+	if bot:
+		_agent_by_id[BOT_ID].frozen = true
+	_hud.briefing_done.connect(func():
+		if not over:
+			local_agent.frozen = false
+			if bot:
+				_agent_by_id[BOT_ID].frozen = false)
+	_hud.show_briefing(local_agent.display_name, rival_name, int(time_limit / 60.0))
 	_update_hud_status()
 
 

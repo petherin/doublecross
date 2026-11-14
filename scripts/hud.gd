@@ -5,6 +5,7 @@ extends CanvasLayer
 signal leave_requested
 signal search_pressed
 signal rematch_requested
+signal briefing_done
 signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
@@ -13,6 +14,7 @@ const World = preload("res://scripts/world.gd")
 const Joystick = preload("res://scripts/joystick.gd")
 const ActionButton = preload("res://scripts/action_button.gd")
 const Icons = preload("res://scripts/icons.gd")
+const Style = preload("res://scripts/style.gd")
 const Ui = preload("res://scripts/ui.gd")
 
 var world: World
@@ -37,6 +39,15 @@ var _minimap: Control
 var _inventory: Control
 var _fade: ColorRect
 var _toast: Label
+var _tape: PanelContainer
+var _toast_full := ""
+var _toast_chars := 0.0
+var _briefing: Control
+var _brief_lines: Array = []
+var _brief_t := 0.0
+var _brief_done := false
+var _stamp: Control
+var _stamp_t := -1.0
 var _toast_tween: Tween
 var _end: Control
 var _room := Vector2i.ZERO
@@ -121,8 +132,18 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_inventory.draw.connect(_draw_inventory)
 	add_child(_inventory)
 
-	_room_label = _label("", 28, Color.WHITE)
+	_room_label = _label("", 26, Color.WHITE)
 	_room_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_room_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_room_label.add_theme_font_override("font", Style.stencil())
+	var plate := StyleBoxFlat.new()
+	plate.bg_color = Color(0.05, 0.05, 0.06, 0.9)
+	plate.border_color = Color(1, 1, 1, 0.3)
+	plate.set_border_width_all(2)
+	plate.set_corner_radius_all(4)
+	plate.content_margin_left = 16
+	plate.content_margin_right = 16
+	_room_label.add_theme_stylebox_override("normal", plate)
 	add_child(_room_label)
 
 	_leave = Button.new()
@@ -138,14 +159,30 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_minimap.draw.connect(_draw_minimap)
 	add_child(_minimap)
 
-	_toast = _label("", 26, Color.WHITE)
+	# Messages are typed out onto a strip of ticker tape.
+	_tape = PanelContainer.new()
+	var tape_style := StyleBoxFlat.new()
+	tape_style.bg_color = Style.PAPER
+	tape_style.border_color = Style.PAPER_DARK
+	tape_style.border_width_top = 2
+	tape_style.border_width_bottom = 2
+	tape_style.shadow_color = Color(0, 0, 0, 0.5)
+	tape_style.shadow_size = 6
+	tape_style.shadow_offset = Vector2(3, 4)
+	tape_style.content_margin_left = 22
+	tape_style.content_margin_right = 22
+	tape_style.content_margin_top = 8
+	tape_style.content_margin_bottom = 8
+	_tape.add_theme_stylebox_override("panel", tape_style)
+	_tape.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tape.rotation = -0.012
+	_tape.modulate.a = 0.0
+	add_child(_tape)
+	_toast = _label("", 22, Style.INK)
+	_toast.add_theme_font_override("font", Style.mono_bold())
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_toast.add_theme_color_override("font_outline_color", Color.BLACK)
-	_toast.add_theme_constant_override("outline_size", 8)
-	_toast.modulate.a = 0.0
-	add_child(_toast)
+	_tape.add_child(_toast)
 
 	_flash = ColorRect.new()
 	_flash.color = Color(1, 0, 0, 0)
@@ -240,11 +277,7 @@ func _layout() -> void:
 	_flash.size = L
 	_leave.position = Vector2(L.x - 110, 10)
 	_minimap.position = Vector2(L.x - 190, 12)
-	_room_label.position = Vector2(620, 10)
-	_room_label.size = Vector2(maxf(0.0, L.x - 620 - 200), 40)
-	_room_label.visible = _room_label.size.x > 160
-	_toast.size = Vector2(minf(800.0, L.x - 40), 70)
-	_toast.position = Vector2((L.x - _toast.size.x) / 2, L.y - 160)
+	_fit_room_label()
 	_fade.size = L
 	if _end:
 		_end.size = L
@@ -253,7 +286,8 @@ func _layout() -> void:
 func show_room(room: Vector2i, animate: bool) -> void:
 	_room = room
 	_room_label.text = world.rooms[room]["name"].to_upper()
-	_room_label.add_theme_color_override("font_color", (world.rooms[room]["tint"] as Color).lightened(0.4))
+	_fit_room_label()
+	_room_label.add_theme_color_override("font_color", (world.rooms[room]["tint"] as Color).lightened(0.45))
 	_minimap.queue_redraw()
 	if animate:
 		_fade.color.a = 0.7
@@ -295,6 +329,16 @@ func _close_trap_menu() -> void:
 		_trap_options[k].visible = false
 
 
+## Sizes the room-name plate to the name, centred in the space in the top bar.
+func _fit_room_label() -> void:
+	var L := _area()
+	var space := maxf(0.0, L.x - 620 - 200)
+	var w := Style.stencil().get_string_size(_room_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x + 40
+	_room_label.size = Vector2(minf(space, w), 42)
+	_room_label.position = Vector2(620 + (space - _room_label.size.x) / 2.0, 9)
+	_room_label.visible = space > 160
+
+
 ## A quick coloured flash over the whole screen (when you get caught).
 func flash(col: Color) -> void:
 	_flash.color = Color(col, 0.45)
@@ -302,14 +346,42 @@ func flash(col: Color) -> void:
 
 
 func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:
-	_toast.text = msg
-	_toast.add_theme_color_override("font_color", col)
+	# Warnings (yellow) are typed in red ink, everything else in black.
+	var warn := col.r > 0.9 and col.g > 0.7 and col.b < 0.5
+	_toast.add_theme_color_override("font_color", Style.RED_INK if warn else Style.INK)
+	_toast_full = msg
+	_toast_chars = 0.0
+	_toast.text = ""
 	if _toast_tween:
 		_toast_tween.kill()
-	_toast.modulate.a = 1.0
+	_tape.modulate.a = 1.0
 	_toast_tween = create_tween()
-	_toast_tween.tween_interval(seconds)
-	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.5)
+	_toast_tween.tween_interval(seconds + msg.length() / 70.0)
+	_toast_tween.tween_property(_tape, "modulate:a", 0.0, 0.4)
+
+
+func _process(delta: float) -> void:
+	var L := _area()
+	# Type the ticker tape out, and keep it centred above the controls.
+	if _toast_chars < _toast_full.length():
+		var before := int(_toast_chars)
+		_toast_chars = minf(_toast_full.length(), _toast_chars + delta * 70.0)
+		_toast.text = _toast_full.left(int(_toast_chars))
+		if int(_toast_chars) / 4 != before / 4:
+			Sound.play("type%d" % randi_range(1, 3), -16.0, false, 0.1)
+	# Size the tape to the full text so it doesn't grow while typing.
+	var f := Style.mono_bold()
+	var widest := 0.0
+	for line in _toast_full.split("\n"):
+		widest = maxf(widest, f.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x)
+	_toast.custom_minimum_size = Vector2(minf(widest + 4.0, L.x - 90.0), 0)
+	_tape.size = Vector2.ZERO
+	_tape.position = Vector2((L.x - _tape.size.x) / 2.0, L.y - 150.0 - _tape.size.y / 2.0)
+	if _briefing:
+		_update_briefing(delta)
+	if _stamp_t >= 0.0:
+		_stamp_t += delta
+		_stamp.queue_redraw()
 
 
 func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool) -> void:
@@ -322,54 +394,180 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 	joystick.visible = false
 	if _toast_tween:
 		_toast_tween.kill()
-	_toast.modulate.a = 0.0
+	_tape.modulate.a = 0.0
 	var L := _area()
 	_end = Control.new()
 	_end.size = L
 	add_child(_end)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.0)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.size = L
 	_end.add_child(dim)
-	create_tween().tween_property(dim, "color:a", 0.7, 0.4)
+	create_tween().tween_property(dim, "color:a", 0.65, 0.4)
 
-	var title_text := "MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED!"
-	var sub_text := "You escaped with the intel. Drinks are on you." if won else "%s got out with the intel. Awkward." % winner_name
+	var stamp_text := "MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED"
+	var sub_text := "Escaped with the intel. Drinks are on you." if won else "%s got out with the intel. Awkward." % winner_name
 	if reason == "time":
 		if winner == 0:
-			title_text = "TIME'S UP"
+			stamp_text = "TIME EXPIRED"
 			sub_text = "Nobody got out. The base goes into lockdown."
 		elif won:
-			title_text = "LAST AGENT STANDING"
+			stamp_text = "LAST AGENT STANDING"
 			sub_text = "Your rival's clock ran out. A win's a win."
 		else:
-			title_text = "OUT OF TIME"
+			stamp_text = "OUT OF TIME"
 			sub_text = "Your clock ran out. %s wins by default." % winner_name
-	var title := _label(title_text, 72, Color("5dff8a") if won else Color("ff5a5f"))
-	title.position = Vector2(0, L.y / 2 - 150)
-	title.size = Vector2(L.x, 100)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_end.add_child(title)
-	var sub := _label(sub_text, 28, Color(1, 1, 1, 0.85))
-	sub.position = Vector2(0, L.y / 2 - 50)
-	sub.size = Vector2(L.x, 40)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_end.add_child(sub)
+	var stamp_col := Style.GREEN_INK if won else Style.RED_INK
+
+	# The case file card.
+	var card := Control.new()
+	card.size = Vector2(760, 440)
+	card.position = (L - card.size) / 2.0 + Vector2(0, -20)
+	card.theme = Style.paper_theme()
+	_end.add_child(card)
+	card.draw.connect(func():
+		Style.draw_paper(card, Rect2(Vector2.ZERO, card.size), Style.PAPER, -0.01)
+		card.draw_string(Style.stencil(), Vector2(40, 70), "CASE FILE", HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Style.INK)
+		card.draw_string(Style.mono_bold(), Vector2(44, 104), "OPERATION DOUBLE CROSS  //  DEBRIEF", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Style.RED_INK)
+		card.draw_line(Vector2(40, 120), Vector2(720, 120), Style.INK, 2.0)
+		card.draw_string(Style.mono_bold(), Vector2(44, 168), "OUTCOME:", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Style.INK)
+		card.draw_string(Style.typewriter(), Vector2(44, 204), sub_text, HORIZONTAL_ALIGNMENT_LEFT, 680, 23, Style.INK)
+		Style.draw_redacted(card, Vector2(44, 248), "REMARKS:", [160, 90, 130])
+		Style.draw_paperclip(card, Vector2(700, 6), 1.6, 70.0))
+
+	# The rubber stamp slams down a moment later.
+	_stamp = Control.new()
+	_stamp.size = card.size
+	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(_stamp)
+	_stamp_t = 0.0
+	var stamp_landed := [false]
+	_stamp.draw.connect(func():
+		var k := clampf((_stamp_t - 0.55) / 0.16, 0.0, 1.0)
+		if k <= 0.0:
+			return
+		if not stamp_landed[0] and k >= 1.0:
+			stamp_landed[0] = true
+			Sound.play("stamp", 2.0, false, 0.02)
+			Settings.buzz(60)
+			var shake := create_tween()
+			for i in 4:
+				shake.tween_property(card, "position", card.position + Vector2(randf_range(-7, 7), randf_range(-5, 5)), 0.03)
+			shake.tween_property(card, "position", card.position, 0.04)
+		Style.draw_stamp(_stamp, stamp_text, Vector2(380, 300), -0.08, stamp_col, 40, 0.9 * k, Style.PAPER, lerpf(2.6, 1.0, k)))
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 30)
-	row.position = Vector2(L.x / 2 - 300, L.y / 2 + 50)
-	row.size = Vector2(600, 80)
+	row.position = Vector2(40, 372)
+	row.size = Vector2(680, 56)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_end.add_child(row)
+	card.add_child(row)
 	if can_rematch:
-		row.add_child(_end_button("REMATCH", func(): rematch_requested.emit()))
+		row.add_child(_end_button("[ REMATCH ]", func(): rematch_requested.emit()))
 	else:
-		var wait := _label("Waiting for the host to call a rematch…", 22, Color(1, 1, 1, 0.6))
-		wait.custom_minimum_size = Vector2(0, 70)
-		wait.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var wait := Label.new()
+		wait.text = "Awaiting orders from the host…"
+		wait.add_theme_font_override("font", Style.typewriter())
+		wait.add_theme_font_size_override("font_size", 21)
 		row.add_child(wait)
-	row.add_child(_end_button("MENU", func(): leave_requested.emit()))
+	row.add_child(_end_button("[ BACK TO HQ ]", func(): leave_requested.emit()))
+
+
+## The mission briefing typed out at the start of a match, then it
+## self-destructs. Any tap or key skips it.
+func show_briefing(agent_name: String, rival_name: String, minutes: int) -> void:
+	var L := _area()
+	_briefing = Control.new()
+	_briefing.size = L
+	add_child(_briefing)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.82)
+	dim.size = L
+	_briefing.add_child(dim)
+	var sheet := Control.new()
+	sheet.size = Vector2(minf(860.0, L.x - 60.0), 400)
+	sheet.position = (L - sheet.size) / 2.0
+	sheet.name = "sheet"
+	_briefing.add_child(sheet)
+	_brief_lines = [
+		["OPERATION DOUBLE CROSS", Style.stencil(), 40, Style.INK],
+		["TO: " + agent_name, Style.mono_bold(), 22, Style.INK],
+		["Recover the PASSPORT, CASH, MICROFILM and KEYCARD,", Style.mono(), 22, Style.INK],
+		["then get to the EXIT. You have %d minutes." % minutes, Style.mono(), 22, Style.INK],
+		["Beware: %s is already inside. Trust no one." % rival_name, Style.mono_bold(), 22, Style.RED_INK],
+		["This message will self-destruct in 3… 2… 1…", Style.typewriter(), 22, Style.INK],
+	]
+	_brief_t = 0.0
+	_brief_done = false
+	sheet.draw.connect(_draw_briefing.bind(sheet))
+	Sound.play("paper", -2.0)
+
+
+func _brief_chars() -> int:
+	return int(_brief_t * 55.0)
+
+
+func _update_briefing(delta: float) -> void:
+	var total := 0
+	for l in _brief_lines:
+		total += (l[0] as String).length()
+	var before := _brief_chars()
+	_brief_t += delta
+	if _brief_chars() < total and _brief_chars() / 3 != before / 3:
+		Sound.play("type%d" % randi_range(1, 3), -9.0, false, 0.08)
+	var typed_for := float(total) / 55.0
+	if not _brief_done and _brief_t > typed_for + 1.4:
+		_end_briefing()
+	_briefing.get_node("sheet").queue_redraw()
+
+
+func _draw_briefing(sheet: Control) -> void:
+	var smoke := clampf((_brief_t - (_brief_total_time() + 1.4)) / 0.6, 0.0, 1.0)
+	Style.draw_paper(sheet, Rect2(Vector2.ZERO, sheet.size), Style.PAPER, 0.008)
+	var left := _brief_chars()
+	var y := 70.0
+	for l in _brief_lines:
+		var text: String = l[0]
+		var shown := text.left(maxi(0, left))
+		left -= text.length()
+		sheet.draw_string(l[1], Vector2(40, y), shown, HORIZONTAL_ALIGNMENT_LEFT, sheet.size.x - 80, l[2], l[3])
+		y += 46.0 if l[2] > 30 else 52.0
+	Style.draw_stamp(sheet, "TOP SECRET", Vector2(sheet.size.x - 150, 52), 0.12, Style.RED_INK, 26)
+	if smoke > 0.0:
+		for i in 18:
+			var a := i * 2.4
+			var p := sheet.size / 2.0 + Vector2(cos(a), sin(a)) * (40.0 + 220.0 * smoke) * Vector2(1.6, 0.8)
+			sheet.draw_circle(p, 40.0 + 60.0 * smoke, Color(0.3, 0.3, 0.3, 0.6 * (1.0 - smoke)))
+
+
+func _brief_total_time() -> float:
+	var total := 0
+	for l in _brief_lines:
+		total += (l[0] as String).length()
+	return float(total) / 55.0
+
+
+func _end_briefing() -> void:
+	if _brief_done:
+		return
+	_brief_done = true
+	Sound.play("poof", -2.0)
+	var b := _briefing
+	var tw := create_tween()
+	tw.tween_property(b, "modulate:a", 0.0, 0.6)
+	tw.tween_callback(func():
+		b.queue_free()
+		if _briefing == b:
+			_briefing = null)
+	briefing_done.emit()
+
+
+func _input(event: InputEvent) -> void:
+	if _briefing and not _brief_done:
+		if (event is InputEventScreenTouch and event.pressed) or (event is InputEventKey and event.pressed):
+			_brief_t = maxf(_brief_t, _brief_total_time() + 1.4)
+			_end_briefing()
+			get_viewport().set_input_as_handled()
 
 
 func _draw_inventory() -> void:
@@ -416,8 +614,8 @@ func _draw_minimap() -> void:
 func _end_button(text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(200, 70)
-	b.add_theme_font_size_override("font_size", 28)
+	b.custom_minimum_size = Vector2(220, 56)
+	b.add_theme_font_size_override("font_size", 26)
 	b.pressed.connect(cb)
 	return b
 

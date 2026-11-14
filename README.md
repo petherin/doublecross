@@ -40,7 +40,7 @@ characters, artwork, music and code. See [Acknowledgements](#acknowledgements).
   <img src="docs/screenshot-bomb.png" alt="An agent blackened with soot after a bomb, smoke rising and a scorch mark on the floor" width="49%">
 </p>
 <p align="center">
-  <img src="docs/screenshot-menu.png" alt="Title screen with codename, host, play vs bot and join options" width="60%">
+  <img src="docs/screenshot-menu.png" alt="Title screen styled as a classified case file: stencilled DOUBLE CROSS title, TOP SECRET stamp, polaroids of both agents and typed mission orders" width="70%">
 </p>
 
 ## Status and roadmap
@@ -221,6 +221,15 @@ build locally instead, install the Android SDK and OpenJDK 17, set their paths i
 `android/debug.keystore` is a throwaway **debug-only** signing key (password
 `android`). It's committed so that every build is signed the same way and
 installs over the previous one. Never use it for a store release.
+
+## Fonts
+
+- **Black Ops One** by James Grieshaber (SIL Open Font License 1.1)
+- **Special Elite** by Astigmatic (Apache License 2.0)
+- **Courier Prime** by Quote-Unquote Apps (SIL Open Font License 1.1)
+
+The fonts and their licence files are in `assets/fonts/`. They're covered by
+their own licences, not by this project's.
 
 ## Acknowledgements
 
