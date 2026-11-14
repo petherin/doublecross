@@ -58,6 +58,20 @@ static func soft() -> Texture2D:
 
 
 ## Dark edges for the whole screen.
+## 256x256 noise: white and black specks with random alpha, for film grain.
+static func grain() -> Texture2D:
+	if not _cache.has("grain"):
+		var img := Image.create(256, 256, false, Image.FORMAT_RGBA8)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 7
+		for y in 256:
+			for x in 256:
+				var v := 1.0 if rng.randf() < 0.5 else 0.0
+				img.set_pixel(x, y, Color(v, v, v, rng.randf()))
+		_cache["grain"] = ImageTexture.create_from_image(img)
+	return _cache["grain"]
+
+
 static func vignette() -> Texture2D:
 	if not _cache.has("vignette"):
 		var g := Gradient.new()

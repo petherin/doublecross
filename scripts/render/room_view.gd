@@ -41,10 +41,15 @@ var my_id := 1
 var my_traps := {}
 ## Darts in flight (shared with the game): { owner, room, pos, vel, live }
 var darts: Array = []
+## Where the view sits when still; shakes are offsets from here.
+var base_position := Vector2.ZERO
 ## Trap explosions, hits, vent dust and their comic-book words.
 var effects := RoomEffects.new()
 
 var _t := 0.0
+var _shake_amp := 0.0
+var _shake_t := 0.0
+var _shake_len := 1.0
 
 
 func _ready() -> void:
@@ -78,7 +83,23 @@ func _left_wall_xf() -> Transform2D:
 func _process(delta: float) -> void:
 	_t += delta
 	effects.tick(delta)
+	if _shake_t > 0.0:
+		_shake_t = maxf(0.0, _shake_t - delta)
+		var k := _shake_t / _shake_len
+		var wobble := Vector2(sin(_t * 71.0) + sin(_t * 23.0) * 0.5, cos(_t * 53.0) + cos(_t * 17.0) * 0.5)
+		position = base_position + wobble * _shake_amp * k * k
+	else:
+		position = base_position
 	queue_redraw()
+
+
+## Rattles the whole room for `seconds`, starting `amplitude` pixels out.
+func shake(amplitude: float, seconds: float) -> void:
+	if _shake_t > 0.0 and _shake_amp * _shake_t / _shake_len > amplitude:
+		return   # a bigger shake is already under way
+	_shake_amp = amplitude
+	_shake_t = seconds
+	_shake_len = seconds
 
 
 func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:

@@ -8,6 +8,9 @@ extends Node2D
 
 const World = preload("res://scripts/core/world.gd")
 
+## While on, a red alarm light pulses through the room (your clock is nearly out).
+var alarm := false
+var _alarm_light: PointLight2D
 var _light_tex: Texture2D
 var _flashes: Array = []     # [light, age]
 var _flicker: Array = []     # [light, base energy, phase]
@@ -73,6 +76,7 @@ func rebuild(world: World, room: Vector2i) -> void:
 		if world.is_exit(room, dir):
 			var v := Vector2(World.DIR_VEC[dir])
 			_light(R.get_center() + v * (R.size / 2.0 - Vector2(40, 40)), 360.0, Color(1.0, 0.95, 0.78), 1.4, 120.0)
+	_alarm_light = _light(R.get_center(), 900.0, Color(1.0, 0.12, 0.08), 0.0, 160.0)
 
 
 ## A burst of light (e.g. an explosion) at a floor position.
@@ -83,6 +87,9 @@ func flash(floor_pos: Vector2, color: Color, energy: float) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if is_instance_valid(_alarm_light):
+		var target := (0.55 + 0.45 * sin(_t * 7.0)) * 0.9 if alarm else 0.0
+		_alarm_light.energy = lerpf(_alarm_light.energy, target, minf(1.0, delta * 10.0))
 	for f in _flicker:
 		var l: PointLight2D = f[0]
 		if is_instance_valid(l):

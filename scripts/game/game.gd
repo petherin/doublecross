@@ -19,9 +19,13 @@ const RoomView = preload("res://scripts/render/room_view.gd")
 const Hud = preload("res://scripts/ui/hud/hud.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Bot = preload("res://scripts/game/bot.gd")
+const Art = preload("res://scripts/render/art.gd")
+const Grain = preload("res://scripts/render/grain.gd")
 const Referee = preload("res://scripts/game/referee.gd")
 const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 
+## Seconds left on your clock when the room's alarm light starts.
+const ALARM_TIME := 30.0
 ## Peer ids of computer-controlled rivals in one-player games: 2, 3, 4.
 const FIRST_BOT_ID := 2
 
@@ -123,8 +127,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	view = RoomView.new()
 	view.world = world
 	add_child(view)
-	view.position = Ui.center_offset(self)
-	get_viewport().size_changed.connect(func(): view.position = Ui.center_offset(self))
+	view.base_position = Ui.center_offset(self)
+	get_viewport().size_changed.connect(func(): view.base_position = Ui.center_offset(self))
 
 	var starts := world.start_rooms()
 	for i in ids.size():
@@ -166,12 +170,13 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	vig_layer.layer = 1
 	add_child(vig_layer)
 	var vig := TextureRect.new()
-	vig.texture = preload("res://scripts/render/art.gd").vignette()
+	vig.texture = Art.vignette()
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vig_layer.add_child(vig)
 	vig.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	vig.size = Ui.view_size(self)
+	vig_layer.add_child(Grain.new())
 
 	hud = Hud.new()
 	hud.layer = 2
@@ -263,6 +268,7 @@ func _process(delta: float) -> void:
 		referee.tick_clocks(delta)
 	_update_hud_status()
 	_sounds(delta)
+	view.lights.alarm = not over and clocks.get(my_id, ALARM_TIME) < ALARM_TIME
 
 	var busy := over or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0
 	hud.attack_button.enabled = not busy and _melee_cd <= 0.0
@@ -506,6 +512,12 @@ func rival_near(a: Agent, reach: float) -> Agent:
 			best_d = d
 			best = o
 	return best
+
+
+## A split second of slow motion to sell a knockout.
+func hit_stop(seconds := 0.12) -> void:
+	Engine.time_scale = 0.25
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
 
 
 ## The peer id of agent `a`, or -1.
