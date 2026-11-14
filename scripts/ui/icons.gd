@@ -117,6 +117,30 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			_tri(ci, c, s, [Vector2(0.1, -0.5), Vector2(0.3, -0.62), Vector2(0.3, -0.38)], k.call(Color("ffd23f")))
 
 
+## An agent's identifying shape, with a dark outline so it reads on any
+## background: "circle", "triangle", "square" or "diamond", radius `r`.
+static func mark(ci: CanvasItem, kind: String, c: Vector2, r: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	match kind:
+		"triangle":
+			for i in 3:
+				pts.append(c + Vector2.from_angle(-PI / 2 + i * TAU / 3.0) * r * 1.2)
+		"square":
+			for v in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+				pts.append(c + v * r * 0.85)
+		"diamond":
+			for v in [Vector2(0, -1.2), Vector2(1, 0), Vector2(0, 1.2), Vector2(-1, 0)]:
+				pts.append(c + v * r)
+		_:
+			ci.draw_circle(c, r + 1.5, Color(0, 0, 0, 0.6 * col.a))
+			ci.draw_circle(c, r, col)
+			return
+	var ring := pts.duplicate()
+	ring.append(pts[0])
+	ci.draw_polyline(ring, Color(0, 0, 0, 0.6 * col.a), 3.0, true)
+	ci.draw_colored_polygon(pts, col)
+
+
 ## A magnifying glass, for the search button.
 static func magnifier(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
 	ci.draw_arc(c + Vector2(-0.08, -0.08) * s, 0.24 * s, 0, TAU, 28, col, 0.08 * s, true)
