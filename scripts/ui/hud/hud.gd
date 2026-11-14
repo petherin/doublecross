@@ -20,6 +20,7 @@ const Ui = preload("res://scripts/ui/ui.gd")
 const DuctView = preload("res://scripts/ui/hud/duct_view.gd")
 const Briefing = preload("res://scripts/ui/hud/briefing.gd")
 const Debrief = preload("res://scripts/ui/hud/debrief.gd")
+const Iris = preload("res://scripts/ui/hud/iris.gd")
 
 var world: World
 var joystick: Joystick
@@ -45,6 +46,7 @@ var _room_label: Label
 var _minimap: Control
 var _inventory: Control
 var _fade: ColorRect
+var _iris: Iris
 var _toast: Label
 var _tape: PanelContainer
 var _toast_full := ""
@@ -203,6 +205,8 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_fade.color = Color(0, 0, 0, 0)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade)
+	_iris = Iris.new()
+	add_child(_iris)
 
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -316,19 +320,21 @@ func _layout() -> void:
 	_minimap.position = Vector2(L.x - 190, 12)
 	_fit_room_label()
 	_fade.size = L
+	_iris.size = L
 	if _end:
 		_end.size = L
 
 
-func show_room(room: Vector2i, animate: bool) -> void:
+## `focus` is where the iris opens from, in viewport pixels (the agent).
+func show_room(room: Vector2i, animate: bool, focus := Vector2(-1, -1)) -> void:
 	_room = room
 	_room_label.text = world.rooms[room]["name"].to_upper()
 	_fit_room_label()
 	_room_label.add_theme_color_override("font_color", (world.rooms[room]["tint"] as Color).lightened(0.45))
 	_minimap.queue_redraw()
 	if animate:
-		_fade.color.a = 0.7
-		create_tween().tween_property(_fade, "color:a", 0.0, 0.25)
+		var at := focus / scale.x if focus.x >= 0.0 else _area() / 2.0
+		_iris.play(at)
 
 
 func set_inventory(items: Array, has_case: bool, gadgets: Array = []) -> void:
