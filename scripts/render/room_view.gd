@@ -1,7 +1,7 @@
 extends Node2D
 ## Isometric renderer for the room the local agent is standing in.
 ## Draw order: floor -> back walls -> furniture & agents (depth sorted) -> front ledges.
-## Everything is drawn in code for now; real art can replace each piece later.
+## Wall decorations live in wall_decor.gd and explosions etc. in room_effects.gd.
 
 const World = preload("res://scripts/core/world.gd")
 const Icons = preload("res://scripts/ui/icons.gd")
@@ -9,8 +9,8 @@ const Art = preload("res://scripts/render/art.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const LightLayer = preload("res://scripts/render/light_layer.gd")
 const RoomLights = preload("res://scripts/render/room_lights.gd")
-const POSTERS := ["TRUST NO ONE", "WALLS HAVE EARS", "SHRED AFTER READING", "LOOK BUSY"]
-const SIGNS := ["RESTRICTED", "AUTHORISED ONLY", "NO ENTRY", "DANGER: HIGH VOLTAGE"]
+const WallDecor = preload("res://scripts/render/wall_decor.gd")
+const RoomEffects = preload("res://scripts/render/room_effects.gd")
 
 const DOOR_TOP := 82.0
 const LEDGE_H := 16.0
@@ -41,8 +41,8 @@ var my_id := 1
 var my_traps := {}
 ## Darts in flight (shared with the game): { owner, room, pos, vel, live }
 var darts: Array = []
-## Trap explosions etc: { kind, room, pos, t }
-var _effects: Array = []
+## Trap explosions, hits, vent dust and their comic-book words.
+var effects := RoomEffects.new()
 
 var _t := 0.0
 
@@ -77,22 +77,12 @@ func _left_wall_xf() -> Transform2D:
 
 func _process(delta: float) -> void:
 	_t += delta
-	for e in _effects:
-		e["t"] += delta
-	_effects = _effects.filter(func(e): return e["t"] < _life(e["kind"]))
+	effects.tick(delta)
 	queue_redraw()
 
 
-static func _life(kind: String) -> float:
-	match kind:
-		"BOMB": return 3.2
-		"HIT": return 0.5
-		"PUFF": return 0.7
-		_: return 1.6
-
-
 func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
-	_effects.append({"kind": kind, "room": effect_room, "pos": pos, "t": 0.0})
+	effects.add(kind, effect_room, pos)
 	if effect_room == room and lights:
 		if kind == "BOMB":
 			lights.flash(pos, Color(1.0, 0.55, 0.2), 2.2)
@@ -110,9 +100,9 @@ func _draw() -> void:
 	var area := World.ROOM
 	var tint: Color = world.rooms[room]["tint"]
 	_draw_floor(area, tint)
-	for e in _effects:
-		if e["room"] == room and e["kind"] == "BOMB":
-			_draw_scorch(e)
+	for e in effects.in_room(room):
+		if e["kind"] == "BOMB":
+			effects.draw_scorch(self, e)
 	_draw_back_walls(area, tint)
 
 	# Depth sorting. Furniture is sorted among itself, then each agent is
@@ -146,9 +136,8 @@ func _draw() -> void:
 			_draw_dart(d)
 	_draw_front_ledges(area)
 	_draw_my_tripwires()
-	for e in _effects:
-		if e["room"] == room:
-			_draw_effect(e)
+	for e in effects.in_room(room):
+		effects.draw(self, e)
 
 
 ## An agent standing at floor point `p` is in front of a box if it's past the
@@ -278,8 +267,8 @@ func _draw_back_walls(area: Rect2, tint: Color) -> void:
 		_wall_details(Vector2(s[0], y0), Vector2(s[1], y0), tint, pulse)
 	for s in left_spans:
 		_wall_details(Vector2(x0, s[0]), Vector2(x0, s[1]), tint, pulse)
-	_draw_decor(_up_wall_xf(), up_spans, tint, 0)
-	_draw_decor(_left_wall_xf(), left_spans, tint, 1)
+	WallDecor.draw(self, _up_wall_xf(), up_spans, tint, 0, world.seed_value, room, _t)
+	WallDecor.draw(self, _left_wall_xf(), left_spans, tint, 1, world.seed_value, room, _t)
 	for i in world.vents.size():
 		if world.vents[i]["room"] == room:
 			_draw_vent(i)
@@ -302,135 +291,6 @@ func _textured_wall(xf: Transform2D, spans: Array, modulate_col: Color) -> void:
 					Vector2(r.position.x, -34), Vector2(r.end.x, -34), Vector2(r.end.x, 0), Vector2(r.position.x, 0)]),
 			PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0.45)]))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
-
-
-## Things hung on the back walls: screens, maps, clocks, vents, signs, posters.
-## Chosen per room from the world seed, so both tablets see the same decor.
-func _draw_decor(xf: Transform2D, spans: Array, tint: Color, wall: int) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash([world.seed_value, room, wall])
-	var font := ThemeDB.fallback_font
-	draw_set_transform_matrix(xf)
-	for sp in spans:
-		var a: float = sp[0] + 95.0
-		while a < sp[1] - 70.0:
-			if rng.randf() < 0.6:
-				var kind: String = ["monitor", "monitor", "map", "clock", "map", "sign", "poster", "fusebox"][rng.randi_range(0, 7)]
-				var w := _decor(kind, a, tint, rng.randi(), font)
-				a += w + 50.0
-			else:
-				a += 120.0
-	draw_set_transform_matrix(Transform2D.IDENTITY)
-
-
-## Draws one decoration centred at `a` along the wall; returns its width.
-func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> float:
-	match kind:
-		"monitor":
-			var r := Rect2(a - 38, -76, 76, 48)
-			draw_rect(r, Color("0a0d12"))
-			draw_rect(r, Color("3a4456"), false, 2.0)
-			var sc := r.grow(-5)
-			draw_rect(sc, tint.darkened(0.82))
-			if seed_v % 2 == 0:
-				# Scrolling signal trace.
-				var pts := PackedVector2Array()
-				for i in 25:
-					var x := sc.position.x + i * sc.size.x / 24.0
-					pts.append(Vector2(x, sc.get_center().y + sin(i * 0.7 + _t * 4.0 + seed_v) * 8.0 * sin(i * 0.23 + _t)))
-				draw_polyline(pts, tint.lightened(0.4), 1.5, true)
-			else:
-				# Radar sweep with blips.
-				var cc := sc.get_center()
-				draw_arc(cc, 15, 0, TAU, 24, Color(tint.lightened(0.3), 0.6), 1.0)
-				draw_arc(cc, 8, 0, TAU, 16, Color(tint.lightened(0.3), 0.4), 1.0)
-				var ang := _t * 2.0 + seed_v
-				draw_line(cc, cc + Vector2.from_angle(ang) * 15, tint.lightened(0.5), 1.5)
-				for b in 3:
-					var bp := cc + Vector2.from_angle(seed_v * 0.7 + b * 2.1) * (5 + b * 4)
-					var fade := fposmod(ang - (seed_v * 0.7 + b * 2.1), TAU) / TAU
-					draw_circle(bp, 1.6, Color(1, 0.4, 0.4, 1.0 - fade))
-			return 76.0
-		"map":
-			var r := Rect2(a - 62, -78, 124, 58)
-			draw_rect(r, Color("0d2236"))
-			draw_rect(r, Color("8a6a3a"), false, 3.0)
-			for i in 5:
-				var gx := r.position.x + i * r.size.x / 4.0
-				draw_line(Vector2(gx, r.position.y), Vector2(gx, r.end.y), Color(1, 1, 1, 0.06), 1.0)
-			var land := Color("2e6b57")
-			for blob in [
-					[-38, -58, 10], [-30, -50, 8], [-20, -40, 6], [-2, -60, 9], [4, -50, 8],
-					[10, -40, 7], [30, -58, 11], [40, -50, 9], [44, -34, 6]]:
-				draw_circle(Vector2(a + blob[0], blob[1]), blob[2], land)
-			for i in 3:
-				var dot := Vector2(a - 40 + ((seed_v >> (i * 4)) % 80), -64 + ((seed_v >> (i * 3)) % 30))
-				if int(_t * 2.0 + i) % 2 == 0:
-					draw_circle(dot, 2.2, Color("ff4d4d"))
-			return 124.0
-		"clock":
-			var cc := Vector2(a, -58)
-			draw_circle(cc, 18, Color("2b2f36"))
-			draw_circle(cc, 15, Color("e6e2d3"))
-			for i in 12:
-				var tick := Vector2.from_angle(i * TAU / 12.0)
-				draw_line(cc + tick * 12, cc + tick * 14, Color("2b2f36"), 1.0)
-			var tm := Time.get_time_dict_from_system()
-			var mins: float = tm["minute"] + tm["second"] / 60.0
-			var hrs: float = (tm["hour"] % 12) + mins / 60.0
-			draw_line(cc, cc + Vector2.from_angle(hrs / 12.0 * TAU - PI / 2) * 8, Color("15151a"), 2.0)
-			draw_line(cc, cc + Vector2.from_angle(mins / 60.0 * TAU - PI / 2) * 12, Color("15151a"), 1.5)
-			draw_line(cc, cc + Vector2.from_angle(tm["second"] / 60.0 * TAU - PI / 2) * 13, Color("d32f2f"), 1.0)
-			return 40.0
-		"vent":
-			var r := Rect2(a - 26, -44, 52, 32)
-			draw_rect(r, Color("0d1015"))
-			draw_rect(r, Color("4a5568"), false, 2.0)
-			for i in 6:
-				var y := r.position.y + 4 + i * 4.6
-				draw_line(Vector2(r.position.x + 3, y), Vector2(r.end.x - 3, y), Color("3a4456"), 2.0)
-			return 52.0
-		"sign":
-			var txt: String = SIGNS[seed_v % SIGNS.size()]
-			var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 18
-			var r := Rect2(a - w / 2, -70, w, 24)
-			draw_rect(r, Color("e0b10b"))
-			draw_rect(r.grow(-2), Color("15151a"), false, 1.5)
-			draw_string(font, Vector2(r.position.x + 9, r.end.y - 8), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("15151a"))
-			return w
-		"poster":
-			var txt: String = POSTERS[seed_v % POSTERS.size()]
-			var r := Rect2(a - 28, -84, 56, 70)
-			draw_rect(r, Color("e8dfc8"))
-			draw_rect(Rect2(r.position, Vector2(r.size.x, 14)), Color("b3262e"))
-			# Spy silhouette: fedora and coat collar.
-			var cc := Vector2(a, -50)
-			draw_circle(cc, 8, Color("15151a"))
-			draw_rect(Rect2(cc.x - 13, cc.y - 9, 26, 3), Color("15151a"))
-			draw_rect(Rect2(cc.x - 7, cc.y - 17, 14, 9), Color("15151a"))
-			var base := PackedVector2Array([Vector2(-14, 22), Vector2(14, 22), Vector2(8, 6), Vector2(-8, 6)])
-			base = Transform2D(0.0, cc) * base
-			draw_colored_polygon(base, Color("15151a"))
-			var words := txt.split(" ")
-			for i in mini(words.size(), 3):
-				var ww := font.get_string_size(words[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-				draw_string(font, Vector2(a - ww / 2, r.position.y + 10), "" if i > 0 else words[0],
-						HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
-			var rest := " ".join(words.slice(1))
-			var rw := font.get_string_size(rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-			draw_string(font, Vector2(a - rw / 2, r.end.y - 4), rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("b3262e"))
-			return 56.0
-		"fusebox":
-			var r := Rect2(a - 22, -70, 44, 54)
-			draw_rect(r, Color("4a5260"))
-			draw_rect(r, Color("2b3038"), false, 2.0)
-			for i in 6:
-				var on := int(_t * 2.5 + i * 1.3 + seed_v) % 3 != 0
-				var led := (Color("4dff9a") if i % 2 == 0 else Color("ff4d4d")) if on else Color("1c2026")
-				draw_circle(Vector2(r.position.x + 9 + (i % 3) * 13, r.position.y + 12 + (i / 3) * 10), 2.5, led)
-			draw_rect(Rect2(r.position.x + 8, r.end.y - 18, 28, 8), Color("e0b10b"))
-			return 44.0
-	return 60.0
 
 
 ## A crawl-through air vent at floor level in a back wall.
@@ -542,130 +402,6 @@ func _draw_dart(d: Dictionary) -> void:
 	draw_line(tail, head, Color("c7ccd6"), 3.0, true)
 	draw_circle(tail, 3.5, Color("ff5a5f"))
 	draw_circle(World.iso(p, 0.0), 4.0, Color(0, 0, 0, 0.3))
-
-
-func _draw_effect(e: Dictionary) -> void:
-	var t: float = e["t"]
-	var p := World.iso(e["pos"], 40.0)
-	var font := Style.stencil()
-	var word := "TWANG!"
-	var col := Color("eef1f5")
-	match e["kind"]:
-		"PUFF":
-			# Dust kicked out of a vent.
-			var k := t / 0.7
-			for i in 10:
-				var ang := i * 2.4
-				var q := World.iso(e["pos"], 20.0 + 30.0 * k) + Vector2(cos(ang), sin(ang) * 0.5) * (12.0 + 40.0 * k)
-				draw_circle(q, 8.0 + 10.0 * k, Color(0.6, 0.58, 0.55, 0.45 * (1.0 - k)))
-			return
-		"HIT":
-			# Quick impact burst.
-			var k := t / 0.5
-			for i in 8:
-				var a := i * TAU / 8.0
-				var ray := Vector2.from_angle(a)
-				draw_line(p + ray * (12.0 + 30.0 * k), p + ray * (20.0 + 44.0 * k), Color(1, 0.9, 0.4, 1.0 - k), 3.0, true)
-			return
-		"DOWN":
-			word = "WHAM!"
-			col = Color("ff5a5f")
-			var k := minf(1.0, t * 5.0)
-			var pts := PackedVector2Array()
-			for i in 16:
-				var r := (60.0 if i % 2 == 0 else 30.0) * k
-				pts.append(p + Vector2.from_angle(i * TAU / 16.0) * r)
-			draw_colored_polygon(pts, Color(1, 0.85, 0.2, clampf(1.6 - t, 0.0, 1.0) * 0.8))
-		"BOMB":
-			word = "KABOOM!"
-			col = Color("ffb13b")
-			_draw_explosion(e)
-		"SPRING":
-			word = "BOING!"
-			col = Color("ffd23f")
-			var base := World.iso(e["pos"])
-			var coil := PackedVector2Array()
-			var hgt := minf(1.0, t * 5.0) * 70.0
-			for i in 11:
-				coil.append(base + Vector2(10 if i % 2 == 0 else -10, -i * hgt / 10.0))
-			draw_polyline(coil, Color("c7ccd6"), 3.0, true)
-	# Comic-book word that pops and floats up
-	var size := int(40 + 20 * minf(1.0, t * 8.0))
-	var a := clampf(_life(e["kind"]) - 0.4 - t, 0.0, 1.0)
-	if e["kind"] == "BOMB":
-		size = int(52 + 26 * minf(1.0, t * 8.0))
-		p.y -= 50.0
-	var w := font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var at := p + Vector2(-w / 2, -60 - t * 40)
-	draw_string_outline(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 10, Color(0, 0, 0, a))
-	draw_string(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col, a))
-
-
-## A fiery, smoky blast: flash, fireball, flying sparks, then rolling smoke.
-func _draw_explosion(e: Dictionary) -> void:
-	var t: float = e["t"]
-	var ground := World.iso(e["pos"])
-	var c := World.iso(e["pos"], 45.0)
-	var seed_v := int(e["pos"].x * 7.0 + e["pos"].y * 13.0)
-	# 1) White-hot flash
-	if t < 0.18:
-		var f := t / 0.18
-		draw_circle(c, 40.0 + f * 120.0, Color(1.0, 0.97, 0.8, 0.85 * (1.0 - f)))
-	# 2) Sparks and debris flying out
-	if t < 0.9:
-		for i in 16:
-			var ang := i * TAU / 16.0 + float((seed_v + i * 31) % 10) * 0.05
-			var spd := 160.0 + float((seed_v + i * 17) % 90)
-			var d := spd * t
-			var start := c + Vector2(cos(ang), sin(ang) * 0.7) * d
-			var tail := c + Vector2(cos(ang), sin(ang) * 0.7) * maxf(0.0, d - 22.0)
-			var fall := Vector2(0, 160.0 * t * t)
-			draw_line(tail + fall, start + fall, Color(1.0, 0.75, 0.25, 1.0 - t / 0.9), 3.0, true)
-	# 3) Smoke: dark puffs that billow up and spread out
-	if t > 0.12:
-		var st := t - 0.12
-		for i in 22:
-			var k := float((seed_v + i * 53) % 100) / 100.0
-			var born := k * 0.35
-			if st < born:
-				continue
-			var age := st - born
-			var drift := Vector2((k - 0.5) * 120.0 + sin(age * 2.0 + i) * 14.0, -40.0 - age * (55.0 + k * 40.0))
-			var r := 18.0 + age * 26.0 + k * 10.0
-			var a := clampf(1.0 - age / 2.7, 0.0, 1.0) * 0.75
-			var grey := 0.1 + k * 0.16
-			draw_circle(c + drift, r, Color(grey, grey * 0.96, grey * 0.93, a))
-	# 4) Fireball: layered, flickering, swelling then collapsing into the smoke
-	if t < 0.75:
-		var grow := minf(1.0, t / 0.12)
-		var fade := 1.0 - clampf((t - 0.25) / 0.5, 0.0, 1.0)
-		var layers := [[Color("ff3b1f"), 1.0], [Color("ff7a1a"), 0.78], [Color("ffb13b"), 0.55], [Color("fff1a8"), 0.3]]
-		for li in layers.size():
-			var lc: Color = layers[li][0]
-			var lr: float = layers[li][1]
-			for j in 7:
-				var ang := j * TAU / 7.0 + t * 3.0 + li
-				var wob := 0.75 + 0.25 * sin(t * 40.0 + j * 2.1 + li)
-				var off := Vector2(cos(ang), sin(ang) * 0.75) * 34.0 * lr * grow
-				draw_circle(c + off - Vector2(0, t * 30.0), 46.0 * lr * grow * wob, Color(lc, fade))
-	# 5) Ground glow
-	if t < 0.6:
-		draw_set_transform(ground, 0.0, Vector2(1.0, 0.5))
-		draw_circle(Vector2.ZERO, 110.0, Color(1.0, 0.5, 0.15, 0.35 * (1.0 - t / 0.6)))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-
-## Black scorch mark left on the floor by a bomb (fades with the smoke).
-func _draw_scorch(e: Dictionary) -> void:
-	var t: float = e["t"]
-	var a := clampf(minf(t * 6.0, (3.2 - t) / 1.2), 0.0, 1.0)
-	var g := World.iso(e["pos"])
-	draw_set_transform(g, 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, 70.0, Color(0.05, 0.04, 0.03, 0.55 * a))
-	for i in 9:
-		var ang := i * TAU / 9.0
-		draw_line(Vector2.from_angle(ang) * 50.0, Vector2.from_angle(ang) * 95.0, Color(0.05, 0.04, 0.03, 0.4 * a), 7.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## Pulsing outline round the furniture you can search, plus a magnifier.
