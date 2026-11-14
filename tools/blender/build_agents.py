@@ -40,15 +40,34 @@ import pack_sprites  # noqa: E402  (trims and packs frames into small atlases)
 from bpy_extras.object_utils import world_to_camera_view
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-OUT_DIR = os.path.join(ROOT, "assets", "sprites")
 PREVIEW = "--preview" in sys.argv
+OUT_DIR = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--out=")), os.path.join(ROOT, "assets", "sprites"))
 
 FRAME = 96 if PREVIEW else 224          # pixels per frame (square)
 SAMPLES = 8 if PREVIEW else 32
 DIRECTIONS = 8
 
 # Animation name -> number of frames.
-ANIMS = [("idle", 2), ("walk", 12), ("run", 8), ("search", 4), ("swing", 4), ("hurt", 1), ("down", 1), ("victory", 6)]
+ANIMS = [
+    ("idle", 2), ("walk", 12), ("run", 8), ("search", 4), ("swing", 4), ("hurt", 2), ("down", 2),
+    ("victory", 6), ("trap", 4), ("dizzy", 2),
+]
+
+
+def _arg(name, default):
+    """--name=value from the command line, or default."""
+    for a in sys.argv:
+        if a.startswith("--%s=" % name):
+            return a.split("=", 1)[1]
+    return default
+
+
+# Previews: --anims=trap,dizzy renders only those; --dirs=1 only the first
+# direction(s); --out=DIR writes somewhere other than assets/sprites.
+ONLY_ANIMS = [a for a in _arg("anims", "").split(",") if a]
+DIRS_LIMIT = int(_arg("dirs", "0"))
+if ONLY_ANIMS:
+    ANIMS = [(a, n) for a, n in ANIMS if a in ONLY_ANIMS]
 
 AGENTS = {
     "crimson": {"coat": (0.5, 0.025, 0.04), "band": (1.0, 0.18, 0.2), "hat": (0.05, 0.02, 0.02)},
@@ -468,7 +487,7 @@ def render_agent(name, colors, tmp):
     agent = agent_model.Agent(colors)
     nmat = normal_material()
     frames = []
-    for d in range(DIRECTIONS):
+    for d in range(DIRS_LIMIT or DIRECTIONS):
         agent.root.rotation_euler = Euler((0, 0, math.radians(-45 * d)))
         row = []
         for anim, n in ANIMS:
@@ -487,6 +506,7 @@ def render_agent(name, colors, tmp):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
+    pack_sprites.OUT_DIR = OUT_DIR
     tmp = tempfile.mkdtemp(prefix="agents_")
     meta = {"frame": FRAME, "directions": DIRECTIONS, "anims": {}, "sheets": {}, "normals": {}}
     meta_path = os.path.join(OUT_DIR, "agents.json")
@@ -516,6 +536,10 @@ def main():
             print("  packed into", size, flush=True)
             meta["anchor"] = [round(ax, 2), round(ay, 2)]
             meta["pixels_per_metre"] = round(ppm, 3)
+            # Save after every agent, so an interrupted render can carry on
+            # with --only for the agents still to do.
+            with open(meta_path, "w") as f:
+                json.dump(meta, f, indent=1)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     with open(meta_path, "w") as f:
