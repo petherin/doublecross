@@ -19,7 +19,42 @@ env:
   GODOT_VERSION: "4.3"
 
 jobs:
+  test:
+    # Lint, then headless tests. The apps are only built if these pass.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint GDScript
+        run: |
+          pip install --quiet "gdtoolkit==4.5.0"
+          gdlint scripts tests
+
+      - name: Cache Godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-editor
+
+      - name: Install Godot
+        run: |
+          if [ ! -x ~/godot/godot ]; then
+            mkdir -p ~/godot
+            wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+            unzip -q /tmp/godot.zip -d ~/godot
+            mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+          fi
+
+      - name: Smoke test
+        run: |
+          ~/godot/godot --headless --import || true
+          ~/godot/godot --headless -s res://tests/smoke.gd
+
+      - name: Bot match
+        run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd
+
   android:
+    needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: write   # to publish releases
