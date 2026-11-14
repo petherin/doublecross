@@ -8,6 +8,11 @@ original and can be regenerated or tweaked at any time:
 
 Writes 16-bit mono WAVs (effects) and an Ogg Vorbis loop (music) into
 assets/audio/. Needs numpy, and ffmpeg for the Ogg encoding.
+
+The effects are built from simple physical models: struck objects are sums of
+decaying partials (wood knocks, metal tinks), thuds are pitch-dropping sine
+bodies, explosions layer a crack, a punch, sub-bass, a closing-down noise body,
+rumble and falling debris, with saturation and a synthetic room reverb.
 """
 import os
 import subprocess
@@ -15,7 +20,7 @@ import wave
 
 import numpy as np
 
-SR = 22050
+SR = 44100
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "audio")
 rng = np.random.default_rng(1985)
 
@@ -130,117 +135,265 @@ def bell(freq, seconds, bright=0.4):
     return x * env(len(t), 0.002, seconds * 0.5, 0.05)
 
 
+# ------------------------------------------------------------------ physical-ish DSP
+
+def biquad(x, kind, freq, q=0.707, gain_db=0.0):
+    """RBJ biquad filter: lowpass, highpass, bandpass or peak."""
+    w0 = 2 * np.pi * freq / SR
+    alpha = np.sin(w0) / (2 * q)
+    cw = np.cos(w0)
+    A = 10 ** (gain_db / 40)
+    if kind == "lowpass":
+        b = [(1 - cw) / 2, 1 - cw, (1 - cw) / 2]
+        a = [1 + alpha, -2 * cw, 1 - alpha]
+    elif kind == "highpass":
+        b = [(1 + cw) / 2, -(1 + cw), (1 + cw) / 2]
+        a = [1 + alpha, -2 * cw, 1 - alpha]
+    elif kind == "bandpass":
+        b = [alpha, 0, -alpha]
+        a = [1 + alpha, -2 * cw, 1 - alpha]
+    else:  # peak
+        b = [1 + alpha * A, -2 * cw, 1 - alpha * A]
+        a = [1 + alpha / A, -2 * cw, 1 - alpha / A]
+    b = [v / a[0] for v in b]
+    a1, a2 = a[1] / a[0], a[2] / a[0]
+    y = np.zeros_like(x)
+    x1 = x2 = y1 = y2 = 0.0
+    b0, b1, b2 = b
+    for i in range(len(x)):
+        xi = x[i]
+        yi = b0 * xi + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, xi, y1, yi
+        y[i] = yi
+    return y
+
+
+def brown(seconds):
+    """Brown (red) noise: deep, rumbly."""
+    w = rng.normal(0, 1, int(SR * seconds))
+    b = np.cumsum(w)
+    b -= lowpass(b, 8.0)
+    return b / (np.max(np.abs(b)) + 1e-9)
+
+
+def pink(seconds):
+    n = int(SR * seconds)
+    f = np.fft.rfftfreq(n, 1 / SR)
+    spec = (rng.normal(size=len(f)) + 1j * rng.normal(size=len(f))) / np.sqrt(np.maximum(f, 20.0))
+    x = np.fft.irfft(spec, n)
+    return x / (np.max(np.abs(x)) + 1e-9)
+
+
+def modal(freqs, decays, amps, seconds, jitter=0.0):
+    """Struck object: a sum of exponentially decaying partials."""
+    t = t_axis(seconds)
+    out = np.zeros_like(t)
+    for f, d, a in zip(freqs, decays, amps):
+        f *= 1 + rng.uniform(-jitter, jitter)
+        out += a * np.sin(2 * np.pi * f * t + rng.uniform(0, 6.28)) * np.exp(-t / d)
+    return out
+
+
+def click(seconds=0.004, hp=2000.0):
+    n = noise(seconds) * np.exp(-np.arange(int(SR * seconds)) / (SR * seconds / 4))
+    return highpass(n, hp)
+
+
+def saturate(x, drive=2.0):
+    return np.tanh(x * drive) / np.tanh(drive)
+
+
+def at(x, seconds):
+    """Delays x by `seconds` (for building sequences with mix())."""
+    return np.concatenate([np.zeros(int(SR * seconds)), x])
+
+
+def reverb(x, length=1.2, wet=0.3, damp=3000.0, early=(0.011, 0.023, 0.037, 0.053, 0.071)):
+    """Synthetic room: early reflections plus a decaying, darkening noise tail."""
+    n = int(SR * length)
+    t = np.arange(n) / SR
+    tail = rng.normal(0, 1, n) * np.exp(-t * 6.9 / length)
+    tail = lowpass(tail, damp * np.exp(-t * 1.5) + 200)
+    ir = np.zeros(n)
+    for i, d in enumerate(early):
+        ir[int(d * SR)] += 0.6 / (i + 1)
+    ir += tail * 0.12
+    m = len(x) + n
+    size = 1 << (m - 1).bit_length()
+    y = np.fft.irfft(np.fft.rfft(x, size) * np.fft.rfft(ir, size), size)[:m]
+    y /= np.max(np.abs(y)) + 1e-9
+    dry = np.concatenate([x / (np.max(np.abs(x)) + 1e-9), np.zeros(n)])
+    return dry * (1 - wet) + y * wet
+
+
 # ------------------------------------------------------------------ sound effects
 
+def wood_knock(f0=180.0, strength=1.0):
+    k = modal([f0, f0 * 2.28, f0 * 3.9, f0 * 6.1], [0.07, 0.04, 0.025, 0.015], [1, 0.6, 0.35, 0.2], 0.3, 0.04)
+    return mix(k, click(0.003, 1500) * 0.6) * strength
+
+
+def metal_tink(f0=1800.0, strength=1.0):
+    return modal([f0, f0 * 1.47, f0 * 2.13, f0 * 2.94], [0.12, 0.08, 0.05, 0.03], [1, 0.7, 0.5, 0.3], 0.4, 0.05) * strength
+
+
+def thud(f0=70.0, length=0.35, strength=1.0):
+    t = t_axis(length)
+    body = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 1.5 * np.exp(-t * 30))) / SR) * np.exp(-t * 14)
+    return (body + lowpass(noise(length), 900) * np.exp(-t * 40) * 0.6) * strength
+
+
+def drawer_slide(length=0.32):
+    n = brown(length) * 0.5 + noise(length) * 0.25
+    n = biquad(n, "bandpass", 700, 0.9)
+    rattle = 1 + 0.6 * np.sign(np.sin(2 * np.pi * 38 * t_axis(length)))
+    return n * rattle * env(int(SR * length), 0.03, None, 0.06)
+
+
 def sfx():
-    # Footsteps: soft heel thump + a little scuff.
-    for i, f in enumerate([95, 110]):
-        n = t_axis(0.09)
-        thump = np.sin(2 * np.pi * f * n * (1 - n * 3)) * env(len(n), 0.002, 0.03, 0.01)
-        scuff = bandpass(noise(0.09), 1500, 5000) * env(len(n), 0.001, 0.02, 0.01) * 0.5
-        save_wav("step%d" % (i + 1), thump + scuff, 0.5)
+    # Footsteps on steel plate: heel thump + shoe click, then a softer toe.
+    for i in range(4):
+        f = 85 + i * 9
+        shoe = modal([1300 + i * 140, 2100 + i * 170], [0.018, 0.012], [0.12, 0.08], 0.06, 0.05)
+        heel = mix(thud(f, 0.12, 0.8), shoe, click(0.004, 3000) * 0.35)
+        toe = mix(thud(f * 1.2, 0.08, 0.35), click(0.003, 2500) * 0.2)
+        grit = highpass(noise(0.06), 4000) * env(int(SR * 0.06), 0.002, 0.02, 0.01) * 0.12
+        save_wav("step%d" % (i + 1), mix(heel, at(toe, 0.045), grit), 0.55)
 
-    # Rummaging: a drawer sliding, papers shuffling.
-    parts = []
-    for k in range(6):
-        burst = bandpass(noise(0.08), 800 + k * 300, 4000) * env(int(SR * 0.08), 0.01, 0.04, 0.02)
-        parts.append(np.concatenate([np.zeros(int(SR * (0.06 + k * 0.1))), burst]))
-    slide = bandpass(noise(0.3), 200, 1200) * env(int(SR * 0.3), 0.05, 0.2, 0.05) * 0.7
-    save_wav("rummage", mix(slide, *parts), 0.55)
+    # Searching: knocking on wood, drawers, rummaging - three takes.
+    save_wav("rummage1", reverb(mix(
+        wood_knock(170), at(wood_knock(185, 0.8), 0.14), at(drawer_slide(), 0.3),
+        at(thud(95, 0.25, 0.9), 0.62), at(wood_knock(150, 0.5), 0.72)), 0.4, 0.15), 0.8)
+    save_wav("rummage2", reverb(mix(
+        at(drawer_slide(0.25), 0.0), at(metal_tink(2100, 0.5), 0.27), at(metal_tink(2600, 0.35), 0.33),
+        at(wood_knock(200, 0.9), 0.45), at(wood_knock(160, 1.0), 0.6), at(thud(80, 0.3), 0.75)), 0.4, 0.15), 0.8)
+    save_wav("rummage3", reverb(mix(
+        wood_knock(220, 0.9), at(wood_knock(210, 0.7), 0.1), at(wood_knock(240, 0.6), 0.2),
+        at(bandpass(noise(0.3), 1500, 6000) * env(int(SR * 0.3), 0.02, 0.12, 0.05) * 0.4, 0.3),
+        at(thud(110, 0.25, 0.8), 0.68)), 0.4, 0.15), 0.8)
 
-    # Found an item: rising vibraphone arpeggio.
-    notes = ["D5", "F#5", "A5", "D6"]
-    out = np.zeros(int(SR * 1.2))
-    for i, nm in enumerate(notes):
-        b = bell(note(nm), 0.8)
-        s = int(SR * i * 0.08)
+    # Found an item: vibraphone flourish in a room.
+    out = np.zeros(int(SR * 1.6))
+    for i, nm in enumerate(["D5", "F#5", "A5", "D6"]):
+        t = t_axis(1.0)
+        b = bell(note(nm), 1.0) * (1 + 0.3 * np.sin(2 * np.pi * 6 * t))
+        s = int(SR * i * 0.075)
         out[s: s + len(b)] += b[: len(out) - s]
-    save_wav("found", out, 0.7)
+    save_wav("found", reverb(out, 1.0, 0.25), 0.7)
 
-    # Found a gadget: metallic double ding.
-    save_wav("gadget", mix(bell(note("A5"), 0.7, 0.9), np.concatenate([np.zeros(int(SR * 0.12)), bell(note("E6"), 0.6, 0.9)])), 0.6)
+    # Gadget: a heavy steel tool clank plus a chime.
+    clank = mix(metal_tink(900, 1.0), metal_tink(2400, 0.6), thud(140, 0.15, 0.6))
+    save_wav("gadget", reverb(mix(clank, at(bell(note("E6"), 0.7, 0.9) * 0.5, 0.12)), 0.8, 0.2), 0.7)
 
-    # Nothing here: two soft descending notes.
-    a = bell(note("E4"), 0.25, 0.1)
-    b = bell(note("C4"), 0.35, 0.1)
-    save_wav("nothing", mix(a, np.concatenate([np.zeros(int(SR * 0.12)), b])), 0.45)
+    # Nothing here: a drawer pushed shut.
+    save_wav("nothing", reverb(mix(drawer_slide(0.18), at(thud(100, 0.25, 1.0), 0.17), at(wood_knock(160, 0.4), 0.18)), 0.5, 0.15), 0.55)
 
-    # Trap set: mechanical click-clack.
-    c1 = highpass(noise(0.02), 2000) * env(int(SR * 0.02), 0.0005, 0.005, 0.005)
-    c2 = highpass(noise(0.03), 1200) * env(int(SR * 0.03), 0.0005, 0.008, 0.005)
-    save_wav("trap_set", mix(c1, np.concatenate([np.zeros(int(SR * 0.09)), c2]), np.concatenate([np.zeros(int(SR * 0.2)), c1 * 0.7])), 0.6)
+    # Setting a trap: ratchet clicks speeding up, then a latch.
+    parts = []
+    tt = 0.0
+    for k in range(7):
+        parts.append(at(mix(metal_tink(2600 + k * 60, 0.35), click(0.003, 4000) * 0.5), tt))
+        tt += 0.09 - k * 0.008
+    parts.append(at(mix(thud(160, 0.15, 0.8), metal_tink(1200, 0.6)), tt + 0.06))
+    save_wav("trap_set", reverb(mix(*parts), 0.4, 0.12), 0.65)
 
-    # Bomb: crack, deep boom, rumbling smoke and crackle.
-    n = t_axis(2.4)
-    crack = highpass(noise(0.05), 1500) * env(int(SR * 0.05), 0.0005, 0.02, 0.01)
-    sweep = 3000 * np.exp(-n * 3.5) + 120
-    body = lowpass(noise(2.4), sweep) * env(len(n), 0.003, 0.8, 0.3) * 1.6
-    sub = np.sin(2 * np.pi * (55 * np.exp(-n * 1.5) + 30) * n) * env(len(n), 0.002, 0.5, 0.3) * 1.2
-    crackle = np.zeros(len(n))
-    for _ in range(60):
-        s = int(rng.uniform(0.1, 1.8) * SR)
-        crackle[s: s + 60] += rng.uniform(-1, 1, 60) * np.exp(-np.arange(60) / 10) * rng.uniform(0.1, 0.4)
-    save_wav("boom", mix(crack, body, sub, crackle), 0.95)
+    # BOMB: crack, punch, sub, a body that closes down, rumble, debris, bunker echo.
+    L = 3.6
+    t = t_axis(L)
+    crack = click(0.012, 800) * 3.0
+    punch = np.sin(2 * np.pi * np.cumsum(38 + 110 * np.exp(-t * 9)) / SR) * np.exp(-t * 3.2) * 1.6
+    sub = np.sin(2 * np.pi * 31 * t) * np.exp(-t * 1.2) * env(len(t), 0.01, None, 0.3) * 0.9
+    body = lowpass(brown(L) * 0.7 + noise(L) * 0.3, 6000 * np.exp(-t * 3.0) + 160) * np.exp(-t * 1.4) * 2.0
+    rumble = lowpass(brown(L), 140) * (0.6 + 0.4 * np.sin(2 * np.pi * 2.3 * t)) * np.exp(-t * 0.9) * 1.2
+    debris = np.zeros(len(t))
+    for k in range(70):
+        s = rng.uniform(0.15, 2.8)
+        amp = rng.uniform(0.05, 0.35) * np.exp(-s * 0.8)
+        hit = metal_tink(rng.uniform(900, 3500), amp) if k % 3 else thud(rng.uniform(90, 200), 0.15, amp * 2)
+        i0 = int(s * SR)
+        debris[i0: i0 + len(hit)] += hit[: len(debris) - i0]
+    boom = saturate(mix(crack, punch, sub, body, rumble, debris) * 0.8, 2.6)
+    save_wav("boom", reverb(boom, 2.2, 0.38, 2000), 0.97)
 
-    # Spring trap: cartoon boing.
-    n = t_axis(0.9)
-    f = 180 + 120 * np.sin(2 * np.pi * 9 * n) * np.exp(-n * 3) + 140 * np.exp(-n * 4)
-    boing = sine(f, 0.9) * env(len(n), 0.003, 0.5, 0.1)
-    save_wav("boing", boing + 0.3 * sine(f * 2, 0.9) * env(len(n), 0.003, 0.3, 0.1), 0.7)
+    # Spring trap: a coiled spring "sproing" with a thump.
+    t = t_axis(1.1)
+    f = 260 + 380 * np.exp(-t * 3) + 40 * np.sin(2 * np.pi * 17 * t) * np.exp(-t * 2)
+    coil = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t * 2.4)
+    coil += 0.4 * np.sin(2 * np.pi * np.cumsum(f * 2.9) / SR) * np.exp(-t * 4)
+    save_wav("boing", reverb(mix(saturate(coil, 1.5), thud(90, 0.25, 0.9), metal_tink(1500, 0.3)), 0.8, 0.2), 0.75)
 
-    # Tripwire: taut wire twang + snap.
-    tw = pluck(note("A3"), 0.8, 0.997)
-    snap = highpass(noise(0.03), 2500) * env(int(SR * 0.03), 0.0005, 0.01, 0.005)
-    save_wav("twang", mix(tw * env(len(tw), 0.001, 0.4, 0.1), snap), 0.75)
+    # Tripwire: a taut steel wire snapping and ringing.
+    wire = pluck(note("A3"), 1.4, 0.9985)
+    wire = biquad(wire, "peak", 1800, 2.0, 8) * env(len(wire), 0.001, 0.8, 0.2)
+    save_wav("twang", reverb(mix(wire, click(0.01, 2500) * 1.5, thud(120, 0.2, 0.6)), 0.8, 0.2), 0.8)
 
-    # Cosh swing: whoosh.
-    n = t_axis(0.28)
-    wh = bandpass(noise(0.28), 300 + 2500 * np.sin(np.pi * n / 0.28), 4000) * np.sin(np.pi * n / 0.28) ** 2
-    save_wav("swing", wh, 0.5)
+    # Cosh swing: a resonant doppler whoosh.
+    L = 0.32
+    t = t_axis(L)
+    shape = np.sin(np.pi * t / L) ** 2
+    wh = biquad(noise(L), "bandpass", 900, 0.8) * shape
+    wh += biquad(pink(L), "bandpass", 300, 1.2) * shape * 0.6
+    save_wav("swing", wh, 0.55)
 
-    # Hit: punchy thud.
-    n = t_axis(0.25)
-    thud = np.sin(2 * np.pi * (140 * np.exp(-n * 20) + 60) * n) * env(len(n), 0.001, 0.08, 0.05)
-    smack = bandpass(noise(0.05), 800, 6000) * env(int(SR * 0.05), 0.0005, 0.015, 0.01)
-    save_wav("hit", mix(thud * 1.2, smack), 0.85)
+    # Hit: a meaty punch - thump, body slap, a crunch.
+    slap = biquad(noise(0.05), "bandpass", 1600, 0.7) * env(int(SR * 0.05), 0.0005, 0.015, 0.01)
+    punch = saturate(mix(thud(95, 0.3, 1.4), slap * 1.2, click(0.006, 1200) * 0.8), 2.2)
+    save_wav("hit", reverb(punch, 0.5, 0.12), 0.9)
 
-    # Taken out: big WHAM + a little cartoon bird tweet.
-    n = t_axis(0.5)
-    wham = np.sin(2 * np.pi * (90 * np.exp(-n * 8) + 45) * n) * env(len(n), 0.001, 0.2, 0.1)
-    crash = bandpass(noise(0.5), 2000, 9000) * env(len(n), 0.001, 0.15, 0.1) * 0.6
-    tweets = np.zeros(int(SR * 1.3))
+    # Taken out: body falls (two thuds), an "oof", then cartoon birds.
+    t = t_axis(0.32)
+    pitch = 150 * np.exp(-t * 2.2) + 85
+    phase = np.cumsum(pitch) / SR
+    glottal = (2 * (phase % 1.0) - 1) ** 3
+    voice = biquad(glottal, "bandpass", 420, 4) + 0.6 * biquad(glottal, "bandpass", 820, 5)
+    voice *= env(len(t), 0.02, None, 0.1) * 1.8
+    birds = np.zeros(int(SR * 1.4))
     for k in range(3):
         nn = t_axis(0.09)
-        tw = sine(2600 + 900 * np.sin(np.pi * nn / 0.09), 0.09) * env(len(nn), 0.005, 0.05, 0.02) * 0.25
-        s = int(SR * (0.55 + k * 0.22))
-        tweets[s: s + len(tw)] += tw
-    save_wav("down", mix(wham * 1.3, crash, tweets), 0.9)
+        tw = sine(2600 + 900 * np.sin(np.pi * nn / 0.09), 0.09) * env(len(nn), 0.005, 0.05, 0.02) * 0.18
+        s = int(SR * (0.7 + k * 0.2))
+        birds[s: s + len(tw)] += tw
+    fall = mix(at(voice, 0.0), at(saturate(thud(70, 0.4, 1.5), 2.0), 0.12), at(thud(110, 0.3, 0.8), 0.27),
+               at(metal_tink(1600, 0.15), 0.3), birds)
+    save_wav("down", reverb(fall, 0.7, 0.15), 0.92)
 
-    # Dart pistol: pneumatic pfft + tick.
-    pf = bandpass(noise(0.12), 600, 5000) * env(int(SR * 0.12), 0.001, 0.04, 0.03)
-    tick = highpass(noise(0.01), 3000) * env(int(SR * 0.01), 0.0005, 0.003, 0.003)
-    save_wav("dart", mix(pf, tick), 0.6)
+    # Dart pistol: compressed-air pop, metallic click, hiss.
+    pop = biquad(noise(0.08), "bandpass", 2500, 0.8) * env(int(SR * 0.08), 0.0005, 0.02, 0.02)
+    hiss = highpass(noise(0.25), 3500) * env(int(SR * 0.25), 0.01, 0.1, 0.05) * 0.25
+    save_wav("dart", mix(pop * 1.3, metal_tink(3200, 0.4), thud(180, 0.08, 0.4), hiss), 0.65)
 
-    # Door: pneumatic sliding hiss.
-    n = t_axis(0.45)
-    hiss = bandpass(noise(0.45), 1500, 7000) * np.sin(np.pi * n / 0.45) ** 1.5 * 0.6
-    clunk = np.sin(2 * np.pi * 80 * n) * env(len(n), 0.001, 0.05, 0.05) * 0.5
-    save_wav("door", mix(hiss, np.concatenate([np.zeros(int(SR * 0.3)), clunk[: int(SR * 0.15)]])), 0.4)
+    # Blast door: pneumatic hiss, servo whine, heavy clunk.
+    L = 0.6
+    t = t_axis(L)
+    hiss = biquad(noise(L), "bandpass", 3500, 0.6) * np.sin(np.pi * t / L) ** 1.5 * 0.5
+    servo = (np.sin(2 * np.pi * np.cumsum(400 + 140 * t / L) / SR) + 0.4 * np.sign(np.sin(2 * np.pi * np.cumsum(800 + 280 * t / L) / SR))) * 0.08 * np.sin(np.pi * t / L)
+    door = mix(hiss, servo, at(mix(saturate(thud(55, 0.35, 1.4), 1.8), metal_tink(700, 0.3)), 0.48))
+    save_wav("door", reverb(door, 0.9, 0.22, 2500), 0.5)
 
-    # UI click.
-    n = t_axis(0.05)
-    save_wav("click", np.sin(2 * np.pi * 1800 * n) * env(len(n), 0.001, 0.01, 0.01), 0.4)
+    # UI: typewriter keys, a rubber stamp, a paper flip, a self-destruct puff.
+    for i in range(3):
+        key = mix(click(0.004, 3500) * 1.2, metal_tink(2900 + i * 350, 0.25), at(thud(260 + i * 30, 0.06, 0.5), 0.004),
+                  at(metal_tink(700 + i * 90, 0.15), 0.006))
+        save_wav("type%d" % (i + 1), reverb(key, 0.25, 0.1), 0.5)
+    stamp = saturate(mix(thud(85, 0.25, 1.6), biquad(noise(0.04), "bandpass", 900, 0.8) * env(int(SR * 0.04), 0.0005, 0.01, 0.01),
+                         at(wood_knock(140, 0.6), 0.002)), 2.0)
+    save_wav("stamp", reverb(stamp, 0.5, 0.15), 0.85)
+    flips = mix(*[at(biquad(noise(0.06), "bandpass", rng.uniform(1500, 3500), 0.7) * env(int(SR * 0.06), 0.005, 0.02, 0.02) * rng.uniform(0.4, 1.0), k * 0.035) for k in range(6)])
+    save_wav("paper", flips, 0.45)
+    puff = mix(lowpass(pink(0.7), 900) * env(int(SR * 0.7), 0.02, 0.35, 0.15), thud(60, 0.4, 0.8))
+    save_wav("poof", reverb(puff, 0.8, 0.25), 0.6)
+    save_wav("click", reverb(mix(click(0.004, 3500), metal_tink(3000, 0.2)), 0.2, 0.1), 0.4)
 
-    # Exit locked: two-tone buzzer.
-    n = t_axis(0.35)
-    buzz = np.sign(np.sin(2 * np.pi * 110 * n)) * 0.5 + np.sign(np.sin(2 * np.pi * 116 * n)) * 0.5
-    save_wav("locked", lowpass(buzz, 1500) * env(len(n), 0.005, None, 0.05), 0.4)
+    # Exit locked: a two-tone buzzer and a rattled door.
+    t = t_axis(0.4)
+    buzz = np.sign(np.sin(2 * np.pi * 110 * t)) * 0.5 + np.sign(np.sin(2 * np.pi * 116 * t)) * 0.5
+    save_wav("locked", reverb(mix(lowpass(buzz, 1500) * env(len(t), 0.005, None, 0.05) * 0.6,
+                                  at(metal_tink(900, 0.5), 0.05), at(metal_tink(950, 0.4), 0.15)), 0.5, 0.15), 0.45)
 
-    # Clock low: tick-tock.
-    n = t_axis(0.06)
-    save_wav("tick", bandpass(noise(0.06), 2000, 6000) * env(len(n), 0.0005, 0.01, 0.01) + 0.3 * np.sin(2 * np.pi * 1200 * n) * env(len(n), 0.0005, 0.01, 0.01), 0.5)
+    # Clock tick: a woody tick-tock.
+    save_wav("tick", mix(wood_knock(1200, 0.6), click(0.003, 4000) * 0.4), 0.5)
 
-    # Win: jazzy major-seventh flourish.
+    # Win: jazzy major-seventh flourish in a room.
     out = np.zeros(int(SR * 2.4))
     for i, nm in enumerate(["D4", "F#4", "A4", "C#5", "E5", "A5"]):
         b = bell(note(nm), 1.6, 0.5)
@@ -249,7 +402,7 @@ def sfx():
     for nm in ["D3", "A3"]:
         p = pluck(note(nm), 2.0, 0.998)
         out[int(SR * 0.6): int(SR * 0.6) + len(p)] += p[: len(out) - int(SR * 0.6)] * 0.6
-    save_wav("win", out, 0.8)
+    save_wav("win", reverb(out, 1.4, 0.25), 0.8)
 
     # Lose: sad trombone "wah wah wah wahhh".
     out = []
@@ -259,7 +412,7 @@ def sfx():
         saw = 2 * ((np.cumsum(np.broadcast_to(f, n.shape)) / SR) % 1.0) - 1
         wah = lowpass(saw, 400 + 1400 * np.sin(np.pi * n / d)) * env(len(n), 0.03, None, 0.08)
         out.append(wah)
-    save_wav("lose", np.concatenate(out), 0.7)
+    save_wav("lose", reverb(np.concatenate(out), 1.2, 0.25), 0.7)
 
 
 # ------------------------------------------------------------------ music

@@ -249,9 +249,9 @@ func _sounds(delta: float) -> void:
 			_step_t[a] = _step_t.get(a, 0.0) - delta
 			if _step_t[a] <= 0.0:
 				_step_t[a] = 0.3
-				Sound.play("step1" if randf() < 0.5 else "step2", vol)
+				Sound.play("step", vol)
 		if a.searching and not _was_searching.get(a, false):
-			Sound.play("rummage", vol + 8.0)
+			Sound.play("rummage", vol + 9.0)
 		_was_searching[a] = a.searching
 	if over:
 		return

@@ -4,9 +4,10 @@ extends Node
 ## Buses: Music, SFX, and Distant (SFX heard through walls: quieter and muffled).
 
 const NAMES := [
-	"step1", "step2", "rummage", "found", "gadget", "nothing", "trap_set", "boom",
-	"boing", "twang", "swing", "hit", "down", "dart", "door", "click", "locked",
-	"tick", "win", "lose",
+	"step1", "step2", "step3", "step4", "rummage1", "rummage2", "rummage3",
+	"found", "gadget", "nothing", "trap_set", "boom", "boing", "twang", "swing",
+	"hit", "down", "dart", "door", "click", "locked", "tick", "win", "lose",
+	"type1", "type2", "type3", "stamp", "paper", "poof",
 ]
 const VOICES := 12
 
@@ -19,6 +20,23 @@ var _music: AudioStreamPlayer
 func _ready() -> void:
 	_make_bus("Music")
 	_make_bus("SFX")
+	# A compressor for punch and a touch of room on the effects.
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	var comp := AudioEffectCompressor.new()
+	comp.threshold = -14.0
+	comp.ratio = 4.0
+	comp.attack_us = 2000.0
+	comp.release_ms = 180.0
+	comp.gain = 3.0
+	AudioServer.add_bus_effect(sfx_bus, comp)
+	var room := AudioEffectReverb.new()
+	room.room_size = 0.35
+	room.damping = 0.6
+	room.wet = 0.1
+	room.dry = 1.0
+	AudioServer.add_bus_effect(sfx_bus, room)
+	var limiter := AudioEffectHardLimiter.new()
+	AudioServer.add_bus_effect(0, limiter)
 	var distant := _make_bus("Distant")
 	var lp := AudioEffectLowPassFilter.new()
 	lp.cutoff_hz = 700.0
@@ -66,7 +84,14 @@ func _apply_volumes() -> void:
 ## Plays an effect. `distant` = it happened in another room (muffled).
 func play(sound_name: String, volume_db := 0.0, distant := false, pitch_jitter := 0.06) -> void:
 	if not _streams.has(sound_name):
-		return
+		# "step" -> one of step1, step2, ... at random.
+		var takes := []
+		for n in _streams:
+			if n.begins_with(sound_name) and n.trim_prefix(sound_name).is_valid_int():
+				takes.append(n)
+		if takes.is_empty():
+			return
+		sound_name = takes[randi() % takes.size()]
 	var p := _players[_next]
 	_next = (_next + 1) % _players.size()
 	p.stop()
