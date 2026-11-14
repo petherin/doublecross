@@ -90,7 +90,10 @@ always fetch the newest one:
 | | |
 |---|---|
 | **Android** phones and tablets | [⬇ DoubleCross.apk](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross.apk) |
-| **Mac** (Apple Silicon and Intel) | [⬇ DoubleCross-macOS.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS.zip) |
+| **Mac** with Apple Silicon (M1 and later) | [⬇ DoubleCross-macOS-AppleSilicon.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-AppleSilicon.zip) |
+| **Mac** with an Intel processor | [⬇ DoubleCross-macOS-Intel.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-Intel.zip) |
+
+Not sure which Mac you have? **Apple menu → About This Mac** shows *Chip: Apple M…* or *Processor: Intel…*.
 
 Older builds are on the [releases page](https://github.com/petherin/doublecross/releases).
 Each build has a higher version number, so a new APK installs over the old one.
@@ -109,8 +112,10 @@ Each build has a higher version number, so a new APK installs over the old one.
 
 ### As a Mac app
 
-1. Download [**DoubleCross-macOS.zip**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS.zip)
-   and unzip it to get **Double Cross.app**. It runs natively on Apple Silicon and Intel Macs.
+1. Download the zip for your Mac from the [Download](#download) table
+   ([Apple Silicon](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-AppleSilicon.zip)
+   or [Intel](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-Intel.zip))
+   and unzip it to get **Double Cross.app**.
 2. Drag it into **Applications**.
 3. The app isn't signed with an Apple developer certificate, so the first time you open it macOS will
    refuse. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the

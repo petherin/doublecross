@@ -99,18 +99,25 @@ jobs:
           name: double-cross-apk
           path: build/double-cross.apk
 
-      - name: Export Mac app
+      - name: Export Mac apps
+        # One per processor family: much smaller than a universal app.
         run: |
-          ~/godot/godot --headless --export-release "macOS" build/DoubleCross-macOS.zip
-          test -f build/DoubleCross-macOS.zip
+          # Godot only ships a universal Mac template; split it per processor.
+          python3 tools/thin_macos_template.py ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/macos.zip build/templates
+          ~/godot/godot --headless --export-release "macOS Apple Silicon" build/DoubleCross-macOS-AppleSilicon.zip
+          ~/godot/godot --headless --export-release "macOS Intel" build/DoubleCross-macOS-Intel.zip
+          test -f build/DoubleCross-macOS-AppleSilicon.zip
+          test -f build/DoubleCross-macOS-Intel.zip
           ls -la build
 
       - uses: actions/upload-artifact@v4
         with:
           name: double-cross-mac
-          # Godot's zip keeps the app's executable permissions; GitHub's own
-          # artifact zipping would not, so upload the zip as-is.
-          path: build/DoubleCross-macOS.zip
+          # Godot's zips keep the app's executable permissions; GitHub's own
+          # artifact zipping would not, so upload the zips as-is.
+          path: |
+            build/DoubleCross-macOS-AppleSilicon.zip
+            build/DoubleCross-macOS-Intel.zip
 
       - name: Publish a release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -128,7 +135,10 @@ jobs:
             echo "## Download"
             echo
             echo "- **Android (phones and tablets):** \`DoubleCross.apk\`. Open it on the device and allow installs from that source the first time."
-            echo "- **Mac (Apple Silicon and Intel):** \`DoubleCross-macOS.zip\`. Unzip, move *Double Cross.app* to Applications, then see the README for getting past macOS's unidentified-developer warning."
+            echo "- **Mac with Apple Silicon (M1 and later):** \`DoubleCross-macOS-AppleSilicon.zip\`"
+            echo "- **Mac with an Intel processor:** \`DoubleCross-macOS-Intel.zip\`"
+            echo
+            echo "Not sure which Mac you have? Apple menu → About This Mac: it says *Chip: Apple M…* or *Processor: Intel…*. Unzip, move *Double Cross.app* to Applications, then see the README for getting past macOS's unidentified-developer warning."
           } > notes.md
-          gh release create "$TAG" build/DoubleCross.apk build/DoubleCross-macOS.zip \
+          gh release create "$TAG" build/DoubleCross.apk build/DoubleCross-macOS-AppleSilicon.zip build/DoubleCross-macOS-Intel.zip \
             --title "Double Cross $TAG" --notes-file notes.md --target "$GITHUB_SHA" --latest
