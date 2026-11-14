@@ -663,11 +663,16 @@ func _handle_search(pid: int, room: Vector2i, idx: int) -> void:
 			return
 	var found: String = contents.get(key, "")
 	var left := ""
+	var spare := false
 	contents.erase(key)
 	if found in World.GADGETS:
 		inv["gadgets"].append(found)
 	elif found == World.BRIEFCASE:
-		inv["case"] = true
+		if inv["case"]:
+			spare = true   # one's enough: leave it for someone else
+			contents[key] = found
+		else:
+			inv["case"] = true
 	elif found != "":
 		if not inv["case"] and inv["items"].size() >= 1:
 			# Hands full, no briefcase: swap what you're holding for what you found.
@@ -675,7 +680,8 @@ func _handle_search(pid: int, room: Vector2i, idx: int) -> void:
 			inv["items"].erase(left)
 			contents[key] = left
 		inv["items"].append(found)
-	_broadcast({"type": "search", "pid": pid, "key": key, "found": found, "left": left, "disarmed": disarmed})
+	_broadcast({"type": "search", "pid": pid, "key": key, "found": found, "left": left, "disarmed": disarmed,
+			"spare": spare})
 
 
 func _handle_trap(pid: int, info: Dictionary) -> void:
@@ -884,6 +890,8 @@ func _on_event(e: Dictionary) -> void:
 				_hud.toast(msg + "Nothing here.", col if msg != "" else Color(1, 1, 1, 0.8), 2.0 if msg != "" else 1.2)
 			elif found in World.GADGETS:
 				_hud.toast(msg + "Found the %s! It beats a %s." % [found, World.TRAP_NAMES[_trap_for(found)]], col, 3.0)
+			elif found == World.BRIEFCASE and e.get("spare", false):
+				_hud.toast(msg + "Another briefcase. One's enough; you left it here.", Color(1, 1, 1, 0.8), 2.5)
 			elif found == World.BRIEFCASE:
 				_hud.toast(msg + "Found a BRIEFCASE! Now you can carry everything.", col)
 			elif e["left"] != "":

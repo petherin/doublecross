@@ -304,9 +304,15 @@ func _hide_items(rng: RandomNumberGenerator) -> void:
 			spots.append([r, i])
 	spots = _shuffled(spots, rng)
 	var used_rooms := {}
-	var items: Array = INTEL + [BRIEFCASE] + GADGETS
+	# One of each piece of intel, however many agents: that's what the
+	# fighting is for. Always one briefcase fewer than there are agents, so
+	# somebody goes without. Bigger games get a second set of gadgets.
+	var items: Array = INTEL.duplicate()
+	for b in players - 1:
+		items.append(BRIEFCASE)
+	items += GADGETS
 	if players > 2:
-		items += GADGETS   # more agents, more traps: a second set of gadgets
+		items += GADGETS
 	for item in items:
 		for spot in spots:
 			var key := furniture_key(spot[0], spot[1])

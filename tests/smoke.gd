@@ -66,6 +66,9 @@ func _check_worlds() -> void:
 		var items: Array = w.hidden.values()
 		for item in World.INTEL + [World.BRIEFCASE] + World.GADGETS:
 			_check(item in items, item + " hidden" + tag)
+		_check(items.count(World.BRIEFCASE) == players - 1, "one briefcase fewer than agents" + tag)
+		for item in World.INTEL:
+			_check(items.count(item) == 1, "exactly one " + item + tag)
 		_check(w.opening(w.exit_room, w.exit_dir) == 2, "exit on an outer wall" + tag)
 		_check(w.vents.size() >= 2 and w.vents.size() % 2 == 0, "vents come in pairs" + tag)
 		for i in w.vents.size():

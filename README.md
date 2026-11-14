@@ -61,7 +61,7 @@ What works today:
 
 - Host a game on one tablet. The other tablet finds it automatically, or you can type the host's IP address.
 - A seeded secret base that grows with the party: 3×3 rooms for two agents, 4×3 for three, 4×4 for four. Every device builds the identical map from one shared number.
-- **Up to four agents:** Crimson, Cobalt, Amber and Jade. The host opens a lobby, rivals join, and the host presses START once two to four are in. If an agent's clock runs out (or they leave) they're out and their intel scatters; the last one in, or the first one out of the exit, wins.
+- **Up to four agents:** Crimson, Cobalt, Amber and Jade. There's still only one of each piece of intel, but one briefcase fewer than there are agents, so somebody always goes without. The host opens a lobby, rivals join, and the host presses START once two to four are in. If an agent's clock runs out (or they leave) they're out and their intel scatters; the last one in, or the first one out of the exit, wins.
 - Isometric rooms with depth-sorted furniture, doors and a mini-map.
 - Touch joystick (left half of the screen), plus WASD or arrow keys on a computer.
 - Works on phones as well as tablets: wide screens get a wider view, and on small screens the controls and text are scaled up. You can mix a phone and a tablet in one match.
