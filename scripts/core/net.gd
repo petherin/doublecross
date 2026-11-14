@@ -4,7 +4,7 @@ extends Node
 ##
 ## Discovery works two ways, because many Android phones silently drop
 ## broadcast packets:
-## - the host broadcasts "DBLX1|codename|version" once a second, and
+## - the host broadcasts "DBLX1|codename|version" every few seconds, and
 ## - joiners scan: they send a probe to every address on their subnet and a
 ##   host answers each probe directly (unicast), which phones always receive.
 
@@ -18,10 +18,14 @@ const GAME_PORT := 47810
 const DISCOVERY_PORT := 47811
 const PROBE_PORT := 47812
 const PROBE := "DBLX1?"
-## Seconds between automatic subnet scans while the menu is open.
-const SCAN_INTERVAL := 3.0
+## Seconds between automatic subnet scans while idle on the multiplayer menu.
+const SCAN_INTERVAL := 10.0
+## Minimum gap between scans, including manual refreshes.
+const MIN_SCAN_GAP := 2.0
+## Seconds between host announcements.
+const BROADCAST_INTERVAL := 3.0
 const MAGIC := "DBLX1"
-const HOST_TIMEOUT := 7.0
+const HOST_TIMEOUT := 25.0
 
 ## This build's version ("0.27" on released builds, "dev" from the editor).
 ## Both devices must run the same version to play together.
@@ -40,6 +44,7 @@ var _responder: PacketPeerUDP
 var _listener: PacketPeerUDP
 var _broadcast_timer := 0.0
 var _scan_timer := 0.0
+var _last_scan_clock := -MIN_SCAN_GAP
 var _clock := 0.0
 
 
@@ -76,6 +81,7 @@ func join(ip: String) -> Error:
 
 
 func stop_broadcasting() -> void:
+	_broadcast_timer = 0.0
 	if _broadcaster:
 		_broadcaster.close()
 		_broadcaster = null
@@ -115,13 +121,23 @@ func stop_listening() -> void:
 	if _listener:
 		_listener.close()
 		_listener = null
+	_scan_timer = 0.0
+	_last_scan_clock = -MIN_SCAN_GAP
+	var had_hosts := not discovered.is_empty()
 	discovered.clear()
+	if had_hosts:
+		hosts_changed.emit()
 
 
 ## Probes every address on this device's local subnet(s) for a host.
 func scan() -> void:
 	if _listener == null:
 		return
+	# FIND HOST can request an immediate scan, but repeated clicks must not
+	# turn into a burst of hundreds of UDP probes.
+	if _clock - _last_scan_clock < MIN_SCAN_GAP:
+		return
+	_last_scan_clock = _clock
 	_scan_timer = SCAN_INTERVAL
 	var probe := PROBE.to_utf8_buffer()
 	var mine := IP.get_local_addresses()
@@ -162,7 +178,7 @@ func _process(delta: float) -> void:
 	if _broadcaster:
 		_broadcast_timer -= delta
 		if _broadcast_timer <= 0.0:
-			_broadcast_timer = 1.0
+			_broadcast_timer = BROADCAST_INTERVAL
 			_broadcaster.put_packet(_announcement())
 	if _responder:
 		# Answer joiners' probes directly.
@@ -217,6 +233,7 @@ func _start_broadcasting() -> void:
 		_broadcaster = PacketPeerUDP.new()
 		_broadcaster.set_broadcast_enabled(true)
 		_broadcaster.set_dest_address("255.255.255.255", DISCOVERY_PORT)
+		_broadcast_timer = 0.0
 	if _responder == null:
 		_responder = PacketPeerUDP.new()
 		if _responder.bind(PROBE_PORT) != OK:
