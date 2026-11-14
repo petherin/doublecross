@@ -271,11 +271,19 @@ func _process(delta: float) -> void:
 	if hud.joystick.output != Vector2.ZERO:
 		move = hud.joystick.output
 	if first_person:
-		# Tank controls: forward/back walks, left/right turns.
-		var turn := move.x
+		# W/S or the sticks walk; ←/→ or the right stick turn; A/D or the
+		# left stick sidestep. The touch stick walks and turns.
+		var forward := -Input.get_axis("move_up", "move_down")
+		var turn := Input.get_axis("turn_left", "turn_right")
+		var strafe := Input.get_axis("strafe_left", "strafe_right")
+		if hud.joystick.output != Vector2.ZERO:
+			forward = -hud.joystick.output.y
+			turn = hud.joystick.output.x
+			strafe = 0.0
 		if not (local_agent.frozen or local_agent.searching or local_agent.ko_time > 0.0):
 			local_agent.facing = wrapf(local_agent.facing + turn * FP_TURN_SPEED * delta, -PI, PI)
-		local_agent.move_input = Vector2.from_angle(local_agent.facing) * -move.y
+		var ahead := Vector2.from_angle(local_agent.facing)
+		local_agent.move_input = (ahead * forward + ahead.orthogonal() * -strafe).limit_length(1.0)
 		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
 		fp.show_extras(view.effects.in_room(local_agent.room), view.my_traps, view.vent_highlight)
 	else:

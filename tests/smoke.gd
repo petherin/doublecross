@@ -24,7 +24,8 @@ func _process(_delta: float) -> bool:
 		_check_scripts("res://scripts")
 		_check_worlds()
 		for action in ["move_left", "move_right", "move_up", "move_down", "search", "crawl",
-				"attack", "fire", "trap_bomb", "trap_spring", "trap_wire", "trap_shock", "toggle_view"]:
+				"attack", "fire", "trap_bomb", "trap_spring", "trap_wire", "trap_shock", "toggle_view", "turn_left", "turn_right",
+				"strafe_left", "strafe_right"]:
 			_check(InputMap.has_action(action) and not InputMap.action_get_events(action).is_empty(),
 					"input action " + action)
 		_menu = load("res://scripts/ui/menu.gd").new()

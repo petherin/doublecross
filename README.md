@@ -124,8 +124,10 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
 - **First person (experimental):** the **1ST PERSON** button (or <kbd>Tab</kbd>)
   switches to seeing the room through your agent's eyes: real 3D walls,
   floor and Blender-modelled furniture, with the other agents as *Doom*-style
-  cut-outs from their sprite sheets. Forward and back walk, left and right
-  turn, and on a touch screen you can swipe the right half to look around.
+  cut-outs from their sprite sheets. Through each doorway you see the next
+  room (though not who's in it, which stays hidden as it does overhead).
+  W/S walk, ←/→ turn, A/D sidestep; on a touch screen the stick walks and
+  turns, and you can swipe the right half to look around.
   Explosions, shocks, flying paperwork and the comic-book words happen in 3D
   too, your trap markers and tripwires show, and when you're stunned the
   view reels (or drops to the floor when you're taken out).
@@ -212,6 +214,7 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 | Fire a dart | **FIRE** | <kbd>G</kbd> | Y |
 | Crawl through a vent | **CRAWL** (appears at a vent) | <kbd>V</kbd> | B |
 | Switch overhead / first person | **1ST PERSON** / **OVERHEAD** (top bar) | <kbd>Tab</kbd> | Start |
+| First person: turn / sidestep | Stick left/right, or swipe the right half | <kbd>←</kbd>/<kbd>→</kbd> turn · <kbd>A</kbd>/<kbd>D</kbd> sidestep | Right stick turns · left stick sidesteps |
 | Skip the briefing | Tap | Any key | |
 | Leave the match | **LEAVE** / Android back | Close the window | |
 
@@ -258,9 +261,9 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
-- **First person, finished:** still to come are the furniture's full
-  materials in 3D (Blender's procedural textures don't export yet), looking
-  through doorways into the next room, and strafing.
+- **First person, finished:** wall decorations (screens, maps, posters) on
+  the 3D walls, a sense of the whole base (lit corridors beyond the
+  neighbouring rooms), and a frame-rate check on older phones.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.
