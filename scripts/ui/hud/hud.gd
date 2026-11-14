@@ -10,6 +10,7 @@ signal crawl_pressed
 signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
+signal view_pressed
 
 const World = preload("res://scripts/core/world.gd")
 const Joystick = preload("res://scripts/ui/joystick.gd")
@@ -58,6 +59,7 @@ var _accent := Color.WHITE
 var _held: Array = []
 var _bar: ColorRect
 var _leave: Button
+var _view_button: Button
 var _has_case := false
 
 
@@ -164,6 +166,14 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_leave.add_theme_font_size_override("font_size", 18)
 	_leave.pressed.connect(func(): leave_requested.emit())
 	add_child(_leave)
+	# Isometric / first-person switch.
+	_view_button = Button.new()
+	_view_button.text = "1ST PERSON"
+	_view_button.size = Vector2(128, 40)
+	_view_button.add_theme_font_size_override("font_size", 16)
+	_view_button.focus_mode = Control.FOCUS_NONE
+	_view_button.pressed.connect(func(): view_pressed.emit())
+	add_child(_view_button)
 
 	_minimap = Control.new()
 	_minimap.size = Vector2(56, 56)
@@ -317,7 +327,8 @@ func _layout() -> void:
 	_status.size = Vector2(L.x, 44)
 	_flash.size = L
 	_leave.position = Vector2(L.x - 110, 10)
-	_minimap.position = Vector2(L.x - 190, 12)
+	_view_button.position = Vector2(L.x - 252, 10)
+	_minimap.position = Vector2(L.x - 330, 12)
 	_fit_room_label()
 	_fade.size = L
 	_iris.size = L
@@ -373,6 +384,11 @@ func _close_trap_menu() -> void:
 		_trap_options[k].visible = false
 
 
+## Updates the view switch to offer the other view.
+func set_first_person(on: bool) -> void:
+	_view_button.text = "OVERHEAD" if on else "1ST PERSON"
+
+
 ## Shows the CRAWL button while standing at a vent.
 func set_crawl(on: bool) -> void:
 	if crawl_button.visible != on:
@@ -395,7 +411,7 @@ func show_duct(crawl_sheet: Texture2D, seconds: float) -> void:
 ## Sizes the room-name plate to the name, centred in the space in the top bar.
 func _fit_room_label() -> void:
 	var L := _area()
-	var space := maxf(0.0, L.x - 620 - 200)
+	var space := maxf(0.0, L.x - 620 - 340)
 	var w := Style.stencil().get_string_size(_room_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x + 40
 	_room_label.size = Vector2(minf(space, w), 42)
 	_room_label.position = Vector2(620 + (space - _room_label.size.x) / 2.0, 9)

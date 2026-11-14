@@ -7,6 +7,7 @@ Each type is built from scratch with bpy, in *game units* (1 Blender unit =
 wall it can stand against, with a matching normal map.
 
     .blendenv/bin/python tools/blender/build_furniture.py [--preview] [--only safe,console]
+    .blendenv/bin/python tools/blender/build_furniture.py --gltf   # 3D models
 
 Output: assets/sprites/furniture/<type>_<wall>.png (+ _n.png normal maps)
 and assets/sprites/furniture.json with each sprite's anchor (the pixel where
@@ -533,5 +534,49 @@ def main():
     print("done")
 
 
+def export_models():
+    """--gltf: saves each furniture type as a 3D model for the first-person
+    view, assets/models/furniture/<type>.glb. Built facing the top wall (the
+    game rotates it to its wall), in game units at true height (the sprites'
+    isometric height stretch is undone)."""
+    out = os.path.join(ROOT, "assets", "models", "furniture")
+    os.makedirs(out, exist_ok=True)
+    BA.reset_scene()
+    mats = materials()
+    for kind in TYPES:
+        if only_types and kind not in only_types:
+            continue
+        for o in list(bpy.data.objects):
+            bpy.data.objects.remove(o, do_unlink=True)
+        root = bpy.data.objects.new(kind, None)
+        bpy.context.collection.objects.link(root)
+        build(kind, Kit(root), mats)
+        bpy.context.view_layer.update()
+        # Text curves become meshes so they export.
+        for o in list(root.children_recursive):
+            if o.type == "FONT":
+                bpy.ops.object.select_all(action="DESELECT")
+                o.select_set(True)
+                bpy.context.view_layer.objects.active = o
+                bpy.ops.object.convert(target="MESH")
+        root.scale = (1.0, 1.0, 1.0 / ZS)
+        bpy.ops.object.select_all(action="DESELECT")
+        root.select_set(True)
+        for o in root.children_recursive:
+            o.select_set(True)
+        path = os.path.join(out, kind + ".glb")
+        bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True,
+                                  export_apply=True, export_yup=True)
+        print("  exported", kind, os.path.getsize(path) // 1024, "KB", flush=True)
+
+
+only_types = None
+if "--only" in sys.argv:
+    only_types = set(sys.argv[sys.argv.index("--only") + 1].split(","))
+
+
 if __name__ == "__main__":
-    main()
+    if "--gltf" in sys.argv:
+        export_models()
+    else:
+        main()
