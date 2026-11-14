@@ -84,7 +84,7 @@ func hello(player_name: String, their_version: String) -> void:
 	if their_version != Net.version:
 		wrong_version.rpc_id(id, Net.version)
 		if _menu:
-			_menu.set_status("A rival tried to join with version %s, but this device has %s. Update both to the latest version. Still waiting…" % [their_version, Net.version])
+			_menu.set_status("A rival with v%s was turned away (you have v%s). Still waiting…" % [their_version, Net.version])
 		await get_tree().create_timer(0.5).timeout
 		Net.kick(id)
 		return
@@ -95,7 +95,7 @@ func hello(player_name: String, their_version: String) -> void:
 @rpc("authority", "call_remote", "reliable")
 func wrong_version(host_version: String) -> void:
 	Net.end_session("")
-	_show_menu("Can't join: that game is version %s and this device has %s. Update both devices to the latest version from the Download page." % [host_version, Net.version])
+	_show_menu("Can't join: host has v%s, you have v%s. Update both devices." % [host_version, Net.version])
 
 
 @rpc("authority", "call_local", "reliable")
@@ -136,7 +136,8 @@ func _begin(seed_value: int, ids: Array) -> void:
 	_game = Game.new()
 	_game.name = "Game"
 	add_child(_game)
-	_game.setup(seed_value, multiplayer.get_unique_id(), ids, _bot_level if _offline_mode == "bot" else "", _minutes, _names)
+	var bot_level := _bot_level if _offline_mode == "bot" else ""
+	_game.setup(seed_value, multiplayer.get_unique_id(), ids, bot_level, _minutes, _names)
 	Sound.music(true)
 	Sound.music_tempo(1.0)
 	_game.leave_requested.connect(_leave)

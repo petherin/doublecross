@@ -14,6 +14,8 @@ var _status: Label
 var _hosts_box: VBoxContainer
 var _searching: Label
 var _ip_edit: LineEdit
+var _find_row: HBoxContainer
+var _ip_row: HBoxContainer
 var _name_edit: LineEdit
 var _main_buttons: Control
 var _cancel: Button
@@ -96,7 +98,7 @@ func _ready() -> void:
 
 	var signals := VBoxContainer.new()
 	signals.position = Vector2(700, 470)
-	signals.size = Vector2(450, 120)
+	signals.size = Vector2(450, 0)
 	signals.add_theme_constant_override("separation", 6)
 	_content.add_child(signals)
 	var sl := _label("INTERCEPTED TRANSMISSIONS", Style.mono_bold(), 18)
@@ -104,37 +106,43 @@ func _ready() -> void:
 	signals.add_child(sl)
 	_hosts_box = VBoxContainer.new()
 	signals.add_child(_hosts_box)
-	_searching = _label("Scanning frequencies", Style.typewriter(), 19)
+	_searching = _label("Looking for hosts", Style.typewriter(), 19)
 	_searching.add_theme_color_override("font_color", Color(Style.INK, 0.6))
 	signals.add_child(_searching)
 
-	var join_row := HBoxContainer.new()
-	join_row.position = Vector2(700, 588)
-	join_row.add_theme_constant_override("separation", 8)
-	_content.add_child(join_row)
-	join_row.add_child(_label("FREQUENCY (IP):", Style.mono_bold(), 18))
+	# Finding a host: hosts on the same Wi-Fi turn up in the list above by
+	# themselves; FIND HOST rescans at once. Typing an IP is the last resort.
+	_find_row = HBoxContainer.new()
+	_find_row.add_theme_constant_override("separation", 18)
+	signals.add_child(_find_row)
+	_find_row.add_child(_small_button("FIND HOST", func():
+		Net.scan()
+		set_status("Scanning the Wi-Fi for hosts…")))
+	_find_row.add_child(_small_button("TYPE IP", func(): _show_ip_row(true)))
+
+	_ip_row = HBoxContainer.new()
+	_ip_row.add_theme_constant_override("separation", 8)
+	_ip_row.visible = false
+	signals.add_child(_ip_row)
 	_ip_edit = LineEdit.new()
 	_ip_edit.placeholder_text = "192.168.1.20"
 	_ip_edit.text = Settings.last_ip
-	_ip_edit.custom_minimum_size = Vector2(190, 40)
+	_ip_edit.custom_minimum_size = Vector2(220, 40)
 	_ip_edit.add_theme_font_size_override("font_size", 20)
-	_ip_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
+	# The URL keyboard always has a dot key (the number pad often doesn't).
+	_ip_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_URL
 	_ip_edit.text_submitted.connect(func(_t): _join(_ip_edit.text.strip_edges()))
-	join_row.add_child(_ip_edit)
-	var jb := Button.new()
-	jb.text = "JOIN ▸"
-	jb.add_theme_font_size_override("font_size", 22)
-	jb.pressed.connect(func(): _join(_ip_edit.text.strip_edges()))
-	join_row.add_child(jb)
+	_ip_row.add_child(_ip_edit)
+	_ip_row.add_child(_small_button("JOIN ▸", func(): _join(_ip_edit.text.strip_edges())))
+	_ip_row.add_child(_small_button("✕", func(): _show_ip_row(false)))
 
 	_status = Label.new()
-	_status.position = Vector2(700, 640)
-	_status.size = Vector2(450, 70)
+	_status.custom_minimum_size = Vector2(450, 0)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_font_override("font", Style.typewriter())
 	_status.add_theme_font_size_override("font_size", 19)
 	_status.add_theme_color_override("font_color", Style.RED_INK)
-	_content.add_child(_status)
+	signals.add_child(_status)
 
 	_cancel = Button.new()
 	_cancel.text = "✕ ABORT"
@@ -158,12 +166,30 @@ func _ready() -> void:
 	Net.joined_host.connect(func(): set_status("Contact established. Briefing incoming…"))
 	Net.join_failed.connect(func():
 		_set_waiting(false)
-		set_status("No answer on that frequency. Check you're on the same Wi-Fi."))
+		set_status("No answer. Check both devices are on the same Wi-Fi."))
 	Net.start_listening()
 	_refresh_hosts()
 
 
 # ------------------------------------------------------------------ widgets
+
+func _small_button(text: String, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(0, 42)
+	b.add_theme_font_size_override("font_size", 21)
+	b.pressed.connect(on_press)
+	return b
+
+
+func _show_ip_row(on: bool) -> void:
+	_ip_row.visible = on
+	_find_row.visible = not on
+	if on:
+		_ip_edit.grab_focus()
+	else:
+		_ip_edit.release_focus()
+
 
 func _label(text: String, font: Font, size: int) -> Label:
 	var l := Label.new()
@@ -513,7 +539,7 @@ func _process(delta: float) -> void:
 			Sound.play("type%d" % randi_range(1, 3), -12.0, false, 0.08)
 	elif _status_full != "":
 		_status.text = _status_full + ("▌" if int(_t * 2.0) % 2 == 0 else "")
-	_searching.text = "Scanning frequencies" + ".".repeat(int(_t * 2.0) % 4)
+	_searching.text = "Looking for hosts" + ".".repeat(int(_t * 2.0) % 4)
 	_art.queue_redraw()
 	queue_redraw()
 
@@ -524,12 +550,12 @@ func _on_host() -> void:
 		set_status("Couldn't open a channel (error %d)." % err)
 		return
 	_set_waiting(true)
-	set_status("Waiting for a rival agent… Their frequency (IP): %s" % Net.local_ip())
+	set_status("Waiting for a rival… They'll see you under FIND HOST. (IP %s)" % Net.local_ip())
 
 
 func _join(ip: String) -> void:
 	if ip == "":
-		set_status("Type the host's frequency (IP address) first.")
+		set_status("Type the host's IP address first.")
 		return
 	Settings.last_ip = ip
 	Settings.save()
@@ -546,19 +572,25 @@ func _set_waiting(on: bool) -> void:
 		if b is Button:
 			(b as Button).disabled = on
 	_cancel.visible = on
+	_find_row.visible = not on
+	_ip_row.visible = false
+	_ip_edit.release_focus()
 
 
 func _refresh_hosts() -> void:
 	for c in _hosts_box.get_children():
 		c.queue_free()
-	for ip in Net.discovered.keys():
+	# Room for two on the page (there's only ever one rival anyway).
+	for ip in Net.discovered.keys().slice(0, 2):
 		var b := Button.new()
 		var their: String = Net.discovered[ip].get("version", "?")
-		b.text = "▸ %s  [%s]  v%s" % [Net.discovered[ip]["name"], ip, their]
+		var host_name: String = Net.discovered[ip]["name"]
+		b.text = "▸ JOIN AGENT %s" % host_name
 		if their != Net.version:
 			# Different app version: can't play together.
-			b.text = "✕ %s  v%s: UPDATE NEEDED (you have v%s)" % [Net.discovered[ip]["name"], their, Net.version]
+			b.text = "✕ %s: needs v%s" % [host_name, their]
 			b.disabled = true
+		b.clip_text = true
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.custom_minimum_size = Vector2(440, 40)
 		b.add_theme_font_size_override("font_size", 21)

@@ -1,6 +1,12 @@
 extends Node
 ## Networking: hosting/joining a 2-player game over the local network,
-## plus LAN auto-discovery so nobody has to type IP addresses.
+## plus LAN discovery so nobody has to type IP addresses.
+##
+## Discovery works two ways, because many Android phones silently drop
+## broadcast packets:
+## - the host broadcasts "DBLX1|codename|version" once a second, and
+## - joiners scan: they send a probe to every address on their subnet and a
+##   host answers each probe directly (unicast), which phones always receive.
 
 signal opponent_joined(peer_id: int)
 signal joined_host
@@ -10,8 +16,12 @@ signal hosts_changed
 
 const GAME_PORT := 47810
 const DISCOVERY_PORT := 47811
+const PROBE_PORT := 47812
+const PROBE := "DBLX1?"
+## Seconds between automatic subnet scans while the menu is open.
+const SCAN_INTERVAL := 3.0
 const MAGIC := "DBLX1"
-const HOST_TIMEOUT := 3.5
+const HOST_TIMEOUT := 7.0
 
 ## This build's version ("0.27" on released builds, "dev" from the editor).
 ## Both devices must run the same version to play together.
@@ -22,12 +32,14 @@ var in_game := false
 
 var is_hosting := false
 var in_session := false
-## ip -> { "name": String, "seen": float }
+## ip -> { "name": String, "version": String, "seen": float }
 var discovered := {}
 
 var _broadcaster: PacketPeerUDP
+var _responder: PacketPeerUDP
 var _listener: PacketPeerUDP
 var _broadcast_timer := 0.0
+var _scan_timer := 0.0
 var _clock := 0.0
 
 
@@ -48,9 +60,7 @@ func host() -> Error:
 	multiplayer.multiplayer_peer = peer
 	is_hosting = true
 	in_session = true
-	_broadcaster = PacketPeerUDP.new()
-	_broadcaster.set_broadcast_enabled(true)
-	_broadcaster.set_dest_address("255.255.255.255", DISCOVERY_PORT)
+	_start_broadcasting()
 	return OK
 
 
@@ -69,6 +79,9 @@ func stop_broadcasting() -> void:
 	if _broadcaster:
 		_broadcaster.close()
 		_broadcaster = null
+	if _responder:
+		_responder.close()
+		_responder = null
 
 
 ## Tears down the current connection. A non-empty reason is reported to the UI.
@@ -90,7 +103,12 @@ func start_listening() -> void:
 		return
 	_listener = PacketPeerUDP.new()
 	if _listener.bind(DISCOVERY_PORT) != OK:
-		_listener = null
+		# Port busy (e.g. a second copy on this computer): any port will do
+		# for scanning, since hosts answer probes directly.
+		_listener = PacketPeerUDP.new()
+		if _listener.bind(0) != OK:
+			_listener = null
+	scan()
 
 
 func stop_listening() -> void:
@@ -98,6 +116,32 @@ func stop_listening() -> void:
 		_listener.close()
 		_listener = null
 	discovered.clear()
+
+
+## Probes every address on this device's local subnet(s) for a host.
+func scan() -> void:
+	if _listener == null:
+		return
+	_scan_timer = SCAN_INTERVAL
+	var probe := PROBE.to_utf8_buffer()
+	var mine := IP.get_local_addresses()
+	for addr: String in _lan_addresses():
+		var prefix := addr.substr(0, addr.rfind(".") + 1)
+		for i in range(1, 255):
+			var target: String = prefix + str(i)
+			if target in mine:
+				continue
+			_listener.set_dest_address(target, PROBE_PORT)
+			_listener.put_packet(probe)
+
+
+## This device's private IPv4 addresses (home/office Wi-Fi ranges).
+func _lan_addresses() -> Array:
+	var out := []
+	for addr in IP.get_local_addresses():
+		if addr.begins_with("192.168.") or addr.begins_with("10.") or addr.begins_with("172."):
+			out.append(addr)
+	return out
 
 
 ## Best guess at this device's LAN address, shown on the host screen
@@ -119,9 +163,18 @@ func _process(delta: float) -> void:
 		_broadcast_timer -= delta
 		if _broadcast_timer <= 0.0:
 			_broadcast_timer = 1.0
-			var msg := "%s|%s|%s" % [MAGIC, OS.get_model_name(), version]
-			_broadcaster.put_packet(msg.to_utf8_buffer())
+			_broadcaster.put_packet(_announcement())
+	if _responder:
+		# Answer joiners' probes directly.
+		while _responder.get_available_packet_count() > 0:
+			var data := _responder.get_packet().get_string_from_utf8()
+			if data == PROBE:
+				_responder.set_dest_address(_responder.get_packet_ip(), _responder.get_packet_port())
+				_responder.put_packet(_announcement())
 	if _listener:
+		_scan_timer -= delta
+		if _scan_timer <= 0.0:
+			scan()
 		var changed := false
 		while _listener.get_available_packet_count() > 0:
 			var data := _listener.get_packet().get_string_from_utf8()
@@ -160,11 +213,22 @@ func kick(id: int) -> void:
 
 
 func _start_broadcasting() -> void:
-	if _broadcaster:
-		return
-	_broadcaster = PacketPeerUDP.new()
-	_broadcaster.set_broadcast_enabled(true)
-	_broadcaster.set_dest_address("255.255.255.255", DISCOVERY_PORT)
+	if _broadcaster == null:
+		_broadcaster = PacketPeerUDP.new()
+		_broadcaster.set_broadcast_enabled(true)
+		_broadcaster.set_dest_address("255.255.255.255", DISCOVERY_PORT)
+	if _responder == null:
+		_responder = PacketPeerUDP.new()
+		if _responder.bind(PROBE_PORT) != OK:
+			_responder = null
+
+
+## What a host says about itself: magic|codename|version.
+func _announcement() -> PackedByteArray:
+	var host_name := Settings.player_name.strip_edges().left(14)
+	if host_name == "":
+		host_name = "UNKNOWN"
+	return ("%s|%s|%s" % [MAGIC, host_name, version]).to_utf8_buffer()
 
 
 func _on_connection_failed() -> void:
