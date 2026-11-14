@@ -85,6 +85,14 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.44, 0.06) * s, c + Vector2(-0.22, 0.12) * s]), k.call(Color("ff5a5f")))
 			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.3, 0.34) * s, c + Vector2(-0.2, 0.16) * s]), k.call(Color("ff5a5f")))
 
+		"VENT":
+			ci.draw_rect(Rect2(c + Vector2(-0.42, -0.3) * s, Vector2(0.84, 0.6) * s), k.call(Color("9aa3b0")))
+			ci.draw_rect(Rect2(c + Vector2(-0.36, -0.24) * s, Vector2(0.72, 0.48) * s), k.call(Color("15171c")))
+			for i in 4:
+				var y := -0.18 + i * 0.12
+				ci.draw_line(c + Vector2(-0.34, y) * s, c + Vector2(0.34, y + 0.04) * s, k.call(Color("6b7280")), 0.05 * s)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0.1, -0.5) * s, c + Vector2(0.3, -0.62) * s, c + Vector2(0.3, -0.38) * s]), k.call(Color("ffd23f")))
+
 
 ## A magnifying glass, for the search button.
 static func magnifier(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:

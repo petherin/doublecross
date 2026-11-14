@@ -384,6 +384,27 @@ def sfx():
     save_wav("poof", reverb(puff, 0.8, 0.25), 0.6)
     save_wav("click", reverb(mix(click(0.004, 3500), metal_tink(3000, 0.2)), 0.2, 0.1), 0.4)
 
+    # Crawling through a duct: knees and palms on thin sheet metal, a
+    # boomy tin resonance, scraping cloth.
+    parts = []
+    tt = 0.0
+    k = 0
+    while tt < 2.3:
+        tin = modal([170 + (k % 3) * 25, 410, 760, 1320], [0.18, 0.12, 0.07, 0.04], [1, 0.6, 0.35, 0.2], 0.4, 0.06)
+        parts.append(at(mix(tin * (0.8 if k % 2 else 0.55), click(0.004, 1800) * 0.3), tt))
+        scrape = biquad(noise(0.18), "bandpass", 900 + (k % 2) * 400, 0.9) * env(int(SR * 0.18), 0.03, 0.08, 0.05) * 0.25
+        parts.append(at(scrape, tt + 0.05))
+        tt += 0.19 + (0.05 if k % 2 else 0.0)
+        k += 1
+    duct = mix(*parts)
+    duct = biquad(duct, "peak", 320, 3.0, 6.0)
+    save_wav("crawl", reverb(duct, 0.6, 0.3, 1800, (0.004, 0.009, 0.013, 0.021)), 0.75)
+
+    # A vent grille being pushed aside: rattly sheet-metal clang.
+    grille = mix(metal_tink(620, 1.0), metal_tink(1450, 0.6), at(metal_tink(700, 0.5), 0.05), at(metal_tink(1500, 0.4), 0.09),
+                 thud(160, 0.15, 0.6), click(0.006, 2000) * 0.6)
+    save_wav("vent", reverb(grille, 0.5, 0.2), 0.7)
+
     # Exit locked: a two-tone buzzer and a rattled door.
     t = t_axis(0.4)
     buzz = np.sign(np.sin(2 * np.pi * 110 * t)) * 0.5 + np.sign(np.sin(2 * np.pi * 116 * t)) * 0.5

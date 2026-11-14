@@ -7,7 +7,7 @@ const NAMES := [
 	"step1", "step2", "step3", "step4", "rummage1", "rummage2", "rummage3",
 	"found", "gadget", "nothing", "trap_set", "boom", "boing", "twang", "swing",
 	"hit", "down", "dart", "door", "click", "locked", "tick", "win", "lose",
-	"type1", "type2", "type3", "stamp", "paper", "poof",
+	"type1", "type2", "type3", "stamp", "paper", "poof", "crawl", "vent",
 ]
 const VOICES := 12
 

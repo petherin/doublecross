@@ -9,6 +9,8 @@ signal trap_finished(info: Dictionary)
 signal door_passed(from_room: Vector2i, dir: int)
 ## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE" or "DOWN").
 signal recovered(kind: String)
+## Emitted when the agent ducks into a vent (true) or pops out of one (false).
+signal vent_moved(entering: bool)
 
 const World = preload("res://scripts/world.gd")
 const Ui = preload("res://scripts/ui.gd")
@@ -55,6 +57,11 @@ var attack_anim := 0.0       # counts down while swinging the cosh
 var hurt_time := 0.0         # red flash after being hit
 ## Can't be hit for a moment after getting back up (flickers).
 var protect_time := 0.0
+## Index (world.vents) of the vent this agent is crawling through, or -1.
+var vent := -1
+var _vent_fx := 0.0   # ducking-in animation
+var _pop_fx := 0.0    # popping-out animation
+var _last_vent := -1
 var _knock := Vector2.ZERO   # knock-back velocity
 
 var _busy_kind := ""       # "search" or "trap"
@@ -94,6 +101,8 @@ func _physics_process(delta: float) -> void:
 	if moving or searching:
 		_walk += delta * (15.0 if running else 12.0)
 	attack_anim = maxf(0.0, attack_anim - delta)
+	_vent_fx = maxf(0.0, _vent_fx - delta)
+	_pop_fx = maxf(0.0, _pop_fx - delta)
 	if ko_time <= 0.0:
 		protect_time = maxf(0.0, protect_time - delta)
 	hurt_time = maxf(0.0, hurt_time - delta)
@@ -114,6 +123,30 @@ func knock_out(kind: String, seconds: float) -> void:
 	_ko_total = seconds
 	if kind == "BOMB":
 		soot = 1.0
+
+
+## Ducks into vent `idx` (the agent is hidden and can't be hit until it
+## comes out again).
+func enter_vent(idx: int) -> void:
+	cancel_busy()
+	vent = idx
+	_last_vent = idx
+	_vent_fx = 0.35
+	_send_state()
+	vent_moved.emit(true)
+
+
+## Pops out of vent `idx` in another room.
+func exit_vent(idx: int) -> void:
+	var v: Dictionary = world.vents[idx]
+	vent = -1
+	room = v["room"]
+	position = v["front"]
+	_target = position
+	_pop_fx = 0.35
+	_send_state()
+	room_changed.emit(room)
+	vent_moved.emit(false)
 
 
 func swing() -> void:
@@ -180,7 +213,7 @@ func _local_move(delta: float) -> void:
 			else:
 				search_finished.emit(_search_room, _search_idx)
 	var v := move_input.limit_length(1.0) * SPEED
-	if frozen or searching or ko_time > 0.0:
+	if frozen or searching or ko_time > 0.0 or vent >= 0:
 		v = Vector2.ZERO
 	moving = v.length() > 25.0
 	running = v.length() > SPEED * 0.8
@@ -258,11 +291,24 @@ func _enter(dir: int) -> Vector2:
 
 func _send_state() -> void:
 	if multiplayer.has_multiplayer_peer() and multiplayer.get_peers().size() > 0:
-		net_state.rpc(room, position, facing, (2 if running else 1) if moving else 0, searching)
+		net_state.rpc(room, position, facing, (2 if running else 1) if moving else 0, searching, vent)
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func net_state(r: Vector2i, pos: Vector2, f: float, m: int, s: bool) -> void:
+func net_state(r: Vector2i, pos: Vector2, f: float, m: int, s: bool, v := -1) -> void:
+	if v != vent:
+		# The other tablet's agent went into, or came out of, a vent.
+		if v >= 0:
+			vent = v
+			_vent_fx = 0.35
+			vent_moved.emit(true)
+		else:
+			vent = -1
+			room = r
+			position = pos
+			_target = pos
+			_pop_fx = 0.35
+			vent_moved.emit(false)
 	searching = s
 	if r != room:
 		room = r
@@ -339,6 +385,8 @@ func _sprite_frame() -> Array:
 
 
 func _paint_sprite(ci: CanvasItem) -> void:
+	if vent >= 0 and _vent_fx <= 0.0:
+		return
 	var m := _load_meta()
 	var tex := _sheet()
 	var fsize: float = m["frame"]
@@ -346,6 +394,16 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var anchor := Vector2(m["anchor"][0], m["anchor"][1])
 	var scale_f := SPRITE_HEIGHT / (SPRITE_METRES * float(m["pixels_per_metre"]))
 	var foot := World.iso(position)
+	var squash := 1.0
+	if vent >= 0 and _vent_fx > 0.0:
+		# Ducking into the vent: shrink down towards the grille.
+		var k := 1.0 - _vent_fx / 0.35
+		var v: Dictionary = world.vents[vent]
+		var mouth: Vector2 = v["front"] + (Vector2(0, -60) if v["dir"] == World.Dir.UP else Vector2(-60, 0))
+		foot = foot.lerp(World.iso(mouth, 12.0), k)
+		squash = 1.0 - 0.75 * k
+	elif _pop_fx > 0.0:
+		squash = 1.0 - 0.5 * (_pop_fx / 0.35)
 	var ko := ko_time > 0.0
 	var ko_age := _ko_total - ko_time
 	if ko and ko_kind == "SPRING" and ko_age < 0.9:
@@ -382,7 +440,7 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		tint = tint.lerp(Color(1.0, 0.45, 0.45), hurt_time / 0.3)
 	if protect_time > 0.0 and ko_time <= 0.0:
 		tint.a = 0.35 if int(Time.get_ticks_msec() / 90) % 2 == 0 else 0.85
-	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f))
+	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f * squash))
 	if m.get("packed", false):
 		ci.draw_texture_rect_region(tex, Rect2(-anchor + _frame_offset, region.size), region, tint)
 	else:
@@ -397,6 +455,8 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(-2, 0, 4, 3), Color("e8c25a"))
 		ci.draw_rect(Rect2(-10, -2, 20, 14), Color(0, 0, 0, 0.6), false, 1.5)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if vent >= 0:
+		return
 	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 24.0 if not (ko and ko_kind == "DOWN") else 50.0)
 
 

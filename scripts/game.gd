@@ -43,6 +43,7 @@ const MELEE_COOLDOWN := 0.55
 const DART_COOLDOWN := 0.7
 const DART_SPEED := 950.0
 const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians)
+const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 const STYLES := [
 	{"name": "AGENT CRIMSON", "coat": Color("b3262e"), "hat": Color("2a0d10"), "accent": Color("ff5a5f"), "sheet": "crimson"},
@@ -81,6 +82,8 @@ var time_limit := TIME_LIMIT
 var _step_t := {}
 var _was_searching := {}
 var _last_tick := -1
+## Vent shortcuts the local player has been through: [vent index, partner].
+var known_vents: Array = []
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
@@ -128,6 +131,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		a.max_hp = MAX_HP
 		a.hp = MAX_HP
 		a.recovered.connect(func(kind): _on_recovered(id, kind))
+		a.vent_moved.connect(func(entering): _on_vent_moved(a, entering))
 		if id == my_id:
 			local_agent = a
 	_view.agents = agents
@@ -165,6 +169,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	_hud.search_pressed.connect(_try_search)
 	_hud.trap_chosen.connect(_try_trap)
 	_hud.attack_pressed.connect(_try_melee)
+	_hud.crawl_pressed.connect(_try_vent)
 	_hud.fire_pressed.connect(_try_fire)
 	local_agent.room_changed.connect(_on_room_changed)
 	local_agent.search_finished.connect(func(r, i): if not over: request_search.rpc_id(1, r, i))
@@ -210,13 +215,16 @@ func _process(delta: float) -> void:
 	_update_hud_status()
 	_sounds(delta)
 
-	var busy := over or local_agent.searching or local_agent.ko_time > 0.0
+	var busy := over or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0
 	_hud.attack_button.enabled = not busy and _melee_cd <= 0.0
 	_hud.fire_button.enabled = not busy and _dart_cd <= 0.0 and inventories[my_id]["darts"] > 0
 	var near := -1 if busy else nearest_furniture(local_agent)
 	var door := -1 if busy else near_door(local_agent)
 	_view.highlight = near
 	_hud.search_button.enabled = near != -1
+	var vent_here := -1 if busy else world.vent_near(local_agent.room, local_agent.position)
+	_view.vent_highlight = vent_here
+	_hud.set_crawl(vent_here != -1)
 	_hud.set_trap_options(near != -1, door != -1)
 
 
@@ -228,6 +236,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: _try_trap("SPRING")
 			KEY_3: _try_trap("WIRE")
 			KEY_F: _try_melee()
+			KEY_V: _try_vent()
 			KEY_G: _try_fire()
 
 
@@ -364,6 +373,46 @@ func _on_exit_touched() -> void:
 		_hud.toast("The exit won't open yet. Still missing: %s" % ", ".join(PackedStringArray(missing)), Color("ffd23f"), 3.0)
 
 
+# ------------------------------------------------------------------ air-vent shortcuts
+
+func _try_vent() -> void:
+	if over or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0:
+		return
+	var idx := world.vent_near(local_agent.room, local_agent.position)
+	if idx != -1:
+		do_vent(my_id, idx)
+
+
+## Crawl agent `id` into vent `idx`; it comes out of the partner vent
+## CRAWL_TIME later. Used for the local player and the bot.
+func do_vent(id: int, idx: int) -> void:
+	var a: Agent = _agent_by_id[id]
+	var dest: int = world.vents[idx]["link"]
+	a.enter_vent(idx)
+	if id == my_id:
+		var sheet := "res://assets/sprites/crawl_%s.png" % a.sheet_name
+		_hud.show_duct(load(sheet) if ResourceLoader.exists(sheet) else null, CRAWL_TIME)
+		Sound.play("crawl", 0.0, false, 0.0)
+		var pair := [mini(idx, dest), maxi(idx, dest)]
+		if not known_vents.has(pair):
+			known_vents.append(pair)
+			_hud.set_known_vents(known_vents)
+	get_tree().create_timer(CRAWL_TIME).timeout.connect(func():
+		if is_instance_valid(a) and a.vent == idx:
+			a.exit_vent(dest)
+			if id == my_id and not over:
+				_hud.toast("Out of the vent in the %s." % world.rooms[a.room]["name"].to_upper(), Color.WHITE, 2.0))
+
+
+func _on_vent_moved(a: Agent, entering: bool) -> void:
+	# Grille rattles and a puff of dust, for whoever's in that room.
+	if a.room != local_agent.room:
+		return
+	Sound.play("vent", -2.0)
+	if not entering:
+		_view.add_effect("PUFF", a.room, a.position)
+
+
 # ------------------------------------------------------------------ combat (local side)
 
 func _update_hud_status() -> void:
@@ -380,7 +429,7 @@ func rival_near(a: Agent, reach: float) -> Agent:
 	var best: Agent = null
 	var best_d := reach
 	for o in agents:
-		if o == a or o.room != a.room or o.ko_time > 0.0:
+		if o == a or o.room != a.room or o.ko_time > 0.0 or o.vent >= 0:
 			continue
 		var d := a.position.distance_to(o.position)
 		if d < best_d:
@@ -482,7 +531,7 @@ func _physics_process(delta: float) -> void:
 		if d["live"] and not stop:
 			for o in agents:
 				var oid := _id_of(o)
-				if oid == d["owner"] or o.room != d["room"] or o.ko_time > 0.0:
+				if oid == d["owner"] or o.room != d["room"] or o.ko_time > 0.0 or o.vent >= 0:
 					continue
 				if Geometry2D.get_closest_point_to_segment(o.position, old, p).distance_to(o.position) < 30.0:
 					_send_hit(d["owner"], oid, "dart")
@@ -634,7 +683,7 @@ func _handle_hit(by: int, target: int, kind: String) -> void:
 		return
 	var ta: Agent = _agent_by_id[target]
 	var ba: Agent = _agent_by_id[by]
-	if ta.ko_time > 0.0 or ta.protect_time > 0.0:
+	if ta.ko_time > 0.0 or ta.protect_time > 0.0 or ta.vent >= 0:
 		return
 	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > MELEE_RANGE * 2.0):
 		return

@@ -515,6 +515,21 @@ def _pose_angles(anim, i, n):
         a["pelvis"] = Matrix.Translation((0, 0, -0.05 + 0.05 * abs(c))) @ rot(twist=10 * s, fwd=12)
         a["chest"] = rot(twist=-12 * s, fwd=6)
         a["head"] = rot(fwd=-10)
+    elif anim == "crawl":
+        # On hands and knees: body tipped forward to horizontal, thighs
+        # straight down, shins back along the floor, arms reaching ahead.
+        sw = math.sin(ph)
+        root = (Matrix.Translation((-1.25, 0, 0.47 + 0.015 * abs(math.cos(ph))))
+                @ Matrix.Rotation(math.radians(90), 4, "Y"))
+        a["hip_l"] = rot(fwd=90 + 16 * sw, side=4)
+        a["hip_r"] = rot(fwd=90 - 16 * sw, side=-4)
+        a["knee_l"] = rot(fwd=-95)
+        a["knee_r"] = rot(fwd=-95)
+        a["shoulder_l"] = rot(fwd=128 - 16 * sw, side=6)
+        a["shoulder_r"] = rot(fwd=128 + 16 * sw, side=-6)
+        a["elbow_l"] = rot(fwd=-6)
+        a["elbow_r"] = rot(fwd=-6)
+        a["head"] = rot(fwd=-62)
     elif anim == "victory":
         # Hopping fist-pumps.
         k = math.sin(ph)

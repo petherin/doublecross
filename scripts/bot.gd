@@ -17,6 +17,8 @@ const CELL := 40.0
 ##  avoid_own: chance it remembers (and steers clear of) its own traps
 ##  trap:    chance of setting a trap after a search
 ##  sneaky:  re-searches a room when it hears a trap go off there (dropped intel)
+##  vents:   "none" ignores air-vent shortcuts, "learn" finds them by trying
+##           vents it comes across, "all" knows every duct from the start
 ## Fighting, per difficulty:
 ##  aggro:  chance it picks a fight when it meets you
 ##  react:  delay before each attack (seconds)
@@ -29,9 +31,9 @@ const FIGHT := {
 }
 
 const LEVELS := {
-	"easy": {"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7, "trap": 0.12, "sneaky": false},
-	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0, "trap": 0.2, "sneaky": false},
-	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": 1.0, "trap": 0.3, "sneaky": true},
+	"easy": {"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7, "trap": 0.12, "sneaky": false, "vents": "none"},
+	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0, "trap": 0.2, "sneaky": false, "vents": "learn"},
+	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": 1.0, "trap": 0.3, "sneaky": true, "vents": "all"},
 }
 
 var game: Node
@@ -50,7 +52,9 @@ var _chase_replan := 0.0
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
 var _known := {}
-var _own_memory := {}        # own trap key -> does it remember this one?             # furniture key -> item the bot knows is there
+var _own_memory := {}        # own trap key -> does it remember this one?
+var _vents_known := {}       # vent index -> true once the bot knows where it goes
+var _vents_tried := {}             # furniture key -> item the bot knows is there
 var _path: PackedVector2Array = PackedVector2Array()
 var _action := {}            # what to do once the path is done
 var _wait := 0.6
@@ -66,6 +70,9 @@ func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard") -> void:
 	level = p_level if LEVELS.has(p_level) else "hard"
 	_p = LEVELS[level]
 	_f = FIGHT[level]
+	if _p["vents"] == "all":
+		for i in game.world.vents.size():
+			_vents_known[i] = true
 	_rng.randomize()
 	agent.room_changed.connect(func(_r):
 		_path = PackedVector2Array()
@@ -135,7 +142,7 @@ func _maybe_trap(key: String, chance: float) -> void:
 func _physics_process(delta: float) -> void:
 	agent.move_input = Vector2.ZERO
 	_attack_cd -= delta
-	if game.over or agent.frozen or agent.searching or agent.ko_time > 0.0:
+	if game.over or agent.frozen or agent.searching or agent.ko_time > 0.0 or agent.vent >= 0:
 		return
 	if _fight(delta):
 		return
@@ -291,16 +298,68 @@ func _head_for_room(target: Vector2i, final_action: Dictionary) -> void:
 		if final_action.get("type", "") == "exit":
 			_go_to(_door_approach(world().exit_dir), {"type": "push", "dir": world().exit_dir})
 		return
-	var step := _next_room(agent.room, target)
-	for dir in World.DIR_VEC:
-		if agent.room + World.DIR_VEC[dir] == step:
-			_go_to(_door_approach(dir), {"type": "push", "dir": dir})
-			return
+	# A curious bot sometimes tries a vent it hasn't been through yet.
+	if _p["vents"] == "learn":
+		for i in world().vents.size():
+			if world().vents[i]["room"] == agent.room and not _vents_tried.has(i):
+				_vents_tried[i] = true
+				if _rng.randf() < 0.4:
+					_go_to(world().vents[i]["front"], {"type": "vent", "idx": i})
+					return
+	var step := _route_step(agent.room, target)
+	if step.get("type", "") == "vent":
+		_go_to(world().vents[step["idx"]]["front"], {"type": "vent", "idx": step["idx"]})
+	elif step.get("type", "") == "door":
+		_go_to(_door_approach(step["dir"]), {"type": "push", "dir": step["dir"]})
+
+
+## First move on the shortest route to `target`, through doors and any
+## vent shortcuts the bot knows: {type: "door", dir} or {type: "vent", idx}.
+func _route_step(from: Vector2i, target: Vector2i) -> Dictionary:
+	var prev := {from: from}
+	var how := {}
+	var queue := [from]
+	while not queue.is_empty():
+		var r: Vector2i = queue.pop_front()
+		if r == target:
+			break
+		var steps := []
+		var near := _next_room(r, target)
+		# Prefer the door the old router would pick (it avoids own tripwires).
+		for d in World.DIR_VEC:
+			if world().has_door(r, d):
+				var n: Vector2i = r + World.DIR_VEC[d]
+				if n == near:
+					steps.push_front([n, {"type": "door", "dir": d}])
+				else:
+					steps.append([n, {"type": "door", "dir": d}])
+		for i in world().vents.size():
+			if world().vents[i]["room"] == r and _vents_known.has(i):
+				steps.append([world().vents[world().vents[i]["link"]]["room"], {"type": "vent", "idx": i}])
+		for st in steps:
+			if not prev.has(st[0]):
+				prev[st[0]] = r
+				how[st[0]] = st[1]
+				queue.append(st[0])
+	if not prev.has(target) or target == from:
+		return {}
+	var r := target
+	while prev[r] != from:
+		r = prev[r]
+	return how[r]
 
 
 func _do_action() -> void:
 	var a := _action
 	match a.get("type", ""):
+		"vent":
+			_action = {}
+			var i: int = a["idx"]
+			if world().vent_near(agent.room, agent.position, 90.0) == i:
+				_vents_known[i] = true
+				_vents_known[world().vents[i]["link"]] = true
+				game.do_vent(id, i)
+			_think_pause()
 		"search":
 			_action = {}
 			agent.start_search(a["idx"], game.SEARCH_TIME)

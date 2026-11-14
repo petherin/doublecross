@@ -68,6 +68,10 @@ var exit_room := Vector2i(1, 0)
 var exit_dir: int = Dir.UP
 ## Starting contents of the furniture: furniture_key -> item name.
 var hidden := {}
+## Air-vent shortcuts: { room, dir (UP/LEFT wall), along (x or y on that
+## wall), front (floor point to stand at), link (index of the partner vent) }.
+var vents: Array = []
+const VENT_HALF := 34.0
 ## Vector2i -> { "name": String, "tint": Color, "furniture": Array[Dictionary] }
 var rooms := {}
 
@@ -97,6 +101,7 @@ func _init(seed_in: int) -> void:
 	exit_room = e[0]
 	exit_dir = e[1]
 	_hide_items(rng)
+	_place_vents(rng)
 
 
 func has_door(room: Vector2i, dir: int) -> bool:
@@ -215,6 +220,70 @@ func _make_furniture(rng: RandomNumberGenerator) -> Array:
 
 
 ## Hides each intel item and the briefcase in a different room.
+## Pairs of vents joining rooms that are at least two rooms apart.
+func _place_vents(rng: RandomNumberGenerator) -> void:
+	var all_rooms: Array = _shuffled(rooms.keys(), rng)
+	var used := {}
+	var pairs := 0
+	for a in all_rooms:
+		if pairs >= 3:
+			break
+		if used.has(a):
+			continue
+		var partners := []
+		for b in all_rooms:
+			if not used.has(b) and absi(a.x - b.x) + absi(a.y - b.y) >= 2:
+				partners.append(b)
+		for b in partners:
+			var va := _vent_spot(a, rng)
+			var vb := _vent_spot(b, rng)
+			if va.is_empty() or vb.is_empty():
+				continue
+			va["link"] = vents.size() + 1
+			vb["link"] = vents.size()
+			vents.append(va)
+			vents.append(vb)
+			used[a] = true
+			used[b] = true
+			pairs += 1
+			break
+
+
+## A clear stretch of back wall for a vent in `room`, or {} if there isn't one.
+func _vent_spot(room: Vector2i, rng: RandomNumberGenerator) -> Dictionary:
+	var c := ROOM.get_center()
+	var options := []
+	for dir in [Dir.UP, Dir.LEFT]:
+		var lo := ROOM.position.x if dir == Dir.UP else ROOM.position.y
+		var hi := ROOM.end.x if dir == Dir.UP else ROOM.end.y
+		var mid := c.x if dir == Dir.UP else c.y
+		var a := lo + 70.0
+		while a < hi - 70.0:
+			if absf(a - mid) > DOOR_HALF + VENT_HALF + 30.0:
+				var front := Vector2(a, ROOM.position.y + 60) if dir == Dir.UP else Vector2(ROOM.position.x + 60, a)
+				var clear := Rect2(front - Vector2(VENT_HALF + 10, 60), Vector2(VENT_HALF * 2 + 20, 120)) if dir == Dir.UP \
+					else Rect2(front - Vector2(60, VENT_HALF + 10), Vector2(120, VENT_HALF * 2 + 20))
+				var blocked := false
+				for f in rooms[room]["furniture"]:
+					if (f["rect"] as Rect2).grow(8).intersects(clear):
+						blocked = true
+						break
+				if not blocked:
+					options.append({"room": room, "dir": dir, "along": a, "front": front})
+			a += 40.0
+	if options.is_empty():
+		return {}
+	return options[rng.randi_range(0, options.size() - 1)]
+
+
+## The vent in `room` that `p` is standing at, or -1.
+func vent_near(room: Vector2i, p: Vector2, reach := 70.0) -> int:
+	for i in vents.size():
+		if vents[i]["room"] == room and (vents[i]["front"] as Vector2).distance_to(p) < reach:
+			return i
+	return -1
+
+
 func _hide_items(rng: RandomNumberGenerator) -> void:
 	var spots := []
 	for r in rooms:

@@ -6,6 +6,7 @@ signal leave_requested
 signal search_pressed
 signal rematch_requested
 signal briefing_done
+signal crawl_pressed
 signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
@@ -22,6 +23,12 @@ var joystick: Joystick
 var search_button: ActionButton
 var trap_button: ActionButton
 var attack_button: ActionButton
+var crawl_button: ActionButton
+var _known_vents: Array = []
+var _duct: Control
+var _duct_t := 0.0
+var _duct_len := 1.0
+var _duct_tex: Texture2D
 var fire_button: ActionButton
 var _status: Control
 var _clock_mine := 0.0
@@ -82,6 +89,15 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	attack_button.radius = 58.0
 	attack_button.pressed.connect(func(): attack_pressed.emit())
 	add_child(attack_button)
+
+	crawl_button = ActionButton.new()
+	crawl_button.label = "CRAWL"
+	crawl_button.icon = "VENT"
+	crawl_button.accent = Color("ffd23f")
+	crawl_button.radius = 52.0
+	crawl_button.visible = false
+	crawl_button.pressed.connect(func(): crawl_pressed.emit())
+	add_child(crawl_button)
 
 	fire_button = ActionButton.new()
 	fire_button.label = "FIRE"
@@ -267,6 +283,7 @@ func _layout() -> void:
 	_place(attack_button, Vector2(L.x - 95, L.y - 268))
 	_place(fire_button, Vector2(L.x - 228, L.y - 222))
 	_place(trap_button, Vector2(L.x - 250, L.y - 78))
+	_place(crawl_button, Vector2(L.x - 238, L.y - 352))
 	# Trap options fan out to the left of the TRAP button.
 	var spots := [Vector2(L.x - 380, L.y - 72), Vector2(L.x - 392, L.y - 178), Vector2(L.x - 345, L.y - 280)]
 	var kinds := ["BOMB", "SPRING", "WIRE"]
@@ -329,6 +346,94 @@ func _close_trap_menu() -> void:
 		_trap_options[k].visible = false
 
 
+## Shows the CRAWL button while standing at a vent.
+func set_crawl(on: bool) -> void:
+	if crawl_button.visible != on:
+		crawl_button.visible = on
+		if on:
+			crawl_button.scale = Vector2(0.6, 0.6)
+			create_tween().tween_property(crawl_button, "scale", Vector2.ONE, 0.15)
+
+
+func set_known_vents(pairs: Array) -> void:
+	_known_vents = pairs.duplicate()
+	_minimap.queue_redraw()
+
+
+## The cut-away of the agent crawling through a duct, shown for `seconds`.
+func show_duct(crawl_sheet: Texture2D, seconds: float) -> void:
+	if _duct:
+		_duct.queue_free()
+	var L := _area()
+	_duct = Control.new()
+	_duct.size = L
+	_duct.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_duct.modulate.a = 0.0
+	add_child(_duct)
+	_duct_t = 0.0
+	_duct_len = seconds
+	_duct_tex = crawl_sheet
+	_duct.draw.connect(_draw_duct)
+	var tw := create_tween()
+	tw.tween_property(_duct, "modulate:a", 1.0, 0.2)
+	tw.tween_interval(seconds - 0.4)
+	tw.tween_property(_duct, "modulate:a", 0.0, 0.2)
+	tw.tween_callback(func():
+		if _duct:
+			_duct.queue_free()
+			_duct = null)
+
+
+func _draw_duct() -> void:
+	var L := _area()
+	var d := _duct
+	d.draw_rect(Rect2(Vector2.ZERO, L), Color(0.02, 0.02, 0.03, 0.96))
+	var mid := L.y / 2.0
+	var h := 230.0
+	var top := mid - h / 2.0
+	var scroll := _duct_t * 240.0
+	# The duct: sheet-metal walls, the inside lit by passing grilles.
+	d.draw_rect(Rect2(0, top, L.x, h), Color("15181d"))
+	for band in [[top - 26.0, 26.0], [top + h, 26.0]]:
+		d.draw_rect(Rect2(0, band[0], L.x, band[1]), Color("4a5260"))
+		d.draw_rect(Rect2(0, band[0], L.x, 4), Color("6b7585"))
+	var x := -fmod(scroll, 180.0)
+	while x < L.x:
+		d.draw_line(Vector2(x, top - 26), Vector2(x, top), Color("2b3038"), 2.0)
+		d.draw_line(Vector2(x, top + h), Vector2(x, top + h + 26), Color("2b3038"), 2.0)
+		d.draw_circle(Vector2(x + 10, top - 13), 2.5, Color("9aa3b0"))
+		d.draw_circle(Vector2(x + 10, top + h + 13), 2.5, Color("9aa3b0"))
+		x += 180.0
+	# Slatted light from grilles in the duct roof drifting past.
+	x = -fmod(scroll * 1.0, 520.0) + 120.0
+	while x < L.x + 200.0:
+		var pts := PackedVector2Array([Vector2(x - 40, top), Vector2(x + 40, top), Vector2(x + 110, top + h), Vector2(x - 110, top + h)])
+		d.draw_colored_polygon(pts, Color(1.0, 0.92, 0.7, 0.07))
+		for k in 4:
+			d.draw_line(Vector2(x - 34 + k * 22, top + 2), Vector2(x - 26 + k * 22, top + 2), Color(1.0, 0.95, 0.75, 0.6), 3.0)
+		x += 520.0
+	# The agent crawling along.
+	if _duct_tex:
+		var frames := 8
+		var fw := _duct_tex.get_width() / frames
+		var fh := _duct_tex.get_height()
+		var f := int(_duct_t * 11.0) % frames
+		var sc := 1.25
+		var at := Vector2(L.x / 2.0 - fw * sc / 2.0 + sin(_duct_t * 2.0) * 20.0, top + h - fh * sc + 6)
+		d.draw_texture_rect_region(_duct_tex, Rect2(at, Vector2(fw, fh) * sc), Rect2(f * fw, 0, fw, fh))
+	# Dust drifting by.
+	for i in 24:
+		var px := fmod(i * 97.0 - scroll * (0.5 + (i % 3) * 0.3), L.x + 40.0)
+		if px < 0:
+			px += L.x + 40.0
+		var py := top + fmod(i * 53.0, h)
+		d.draw_circle(Vector2(px, py), 1.5, Color(1, 0.95, 0.8, 0.25))
+	var caption := "…crawling through the air ducts…"
+	var f2 := Style.typewriter()
+	var w := f2.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+	d.draw_string(f2, Vector2((L.x - w) / 2.0, top + h + 80), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.92, 0.88, 0.78))
+
+
 ## Sizes the room-name plate to the name, centred in the space in the top bar.
 func _fit_room_label() -> void:
 	var L := _area()
@@ -379,6 +484,9 @@ func _process(delta: float) -> void:
 	_tape.position = Vector2((L.x - _tape.size.x) / 2.0, L.y - 150.0 - _tape.size.y / 2.0)
 	if _briefing:
 		_update_briefing(delta)
+	if _duct:
+		_duct_t += delta
+		_duct.queue_redraw()
 	if _stamp_t >= 0.0:
 		_stamp_t += delta
 		_stamp.queue_redraw()
@@ -390,6 +498,7 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 	trap_button.visible = false
 	attack_button.visible = false
 	fire_button.visible = false
+	crawl_button.visible = false
 	_close_trap_menu()
 	joystick.visible = false
 	if _toast_tween:
@@ -609,6 +718,15 @@ func _draw_minimap() -> void:
 			if not here and Vector2i(x, y) == world.exit_room:
 				col = Color("5dff8a", 0.55)
 			_minimap.draw_colored_polygon(pts, col)
+	# Vent shortcuts you've found: dashed yellow links.
+	for pair in _known_vents:
+		var ra: Vector2i = world.vents[pair[0]]["room"]
+		var rb: Vector2i = world.vents[pair[1]]["room"]
+		var ca := origin + Vector2((ra.x - ra.y) * a, (ra.x + ra.y) * a * 0.5 + a * 0.5)
+		var cb := origin + Vector2((rb.x - rb.y) * a, (rb.x + rb.y) * a * 0.5 + a * 0.5)
+		_minimap.draw_dashed_line(ca, cb, Color(1.0, 0.86, 0.15, 0.9), 1.5, 3.0)
+		_minimap.draw_circle(ca, 2.0, Color(1.0, 0.86, 0.15))
+		_minimap.draw_circle(cb, 2.0, Color(1.0, 0.86, 0.15))
 
 
 func _end_button(text: String, cb: Callable) -> Button:

@@ -32,6 +32,8 @@ var agents: Array = []
 ## Index of the furniture the local agent can search right now (-1 = none).
 var highlight := -1
 var highlight_color := Color.WHITE
+## Index of the vent the local agent is standing at (-1 = none).
+var vent_highlight := -1
 var my_id := 1
 ## Traps the local player has set: furniture/doorway key -> trap kind.
 var my_traps := {}
@@ -83,6 +85,7 @@ static func _life(kind: String) -> float:
 	match kind:
 		"BOMB": return 3.2
 		"HIT": return 0.5
+		"PUFF": return 0.7
 		_: return 1.6
 
 
@@ -272,6 +275,9 @@ func _draw_back_walls(R: Rect2, tint: Color) -> void:
 		_wall_details(Vector2(x0, s[0]), Vector2(x0, s[1]), tint, pulse)
 	_draw_decor(_up_wall_xf(), up_spans, tint, 0)
 	_draw_decor(_left_wall_xf(), left_spans, tint, 1)
+	for i in world.vents.size():
+		if world.vents[i]["room"] == room:
+			_draw_vent(i)
 	# Top caps (wall thickness) and the corner post
 	var cap := Color("3d4759")
 	var t := 14.0
@@ -303,7 +309,7 @@ func _draw_decor(xf: Transform2D, spans: Array, tint: Color, wall: int) -> void:
 		var a: float = sp[0] + 95.0
 		while a < sp[1] - 70.0:
 			if rng.randf() < 0.6:
-				var kind: String = ["monitor", "monitor", "map", "clock", "vent", "sign", "poster", "fusebox"][rng.randi_range(0, 7)]
+				var kind: String = ["monitor", "monitor", "map", "clock", "map", "sign", "poster", "fusebox"][rng.randi_range(0, 7)]
 				var w := _decor(kind, a, tint, rng.randi(), font)
 				a += w + 50.0
 			else:
@@ -413,6 +419,34 @@ func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> flo
 	return 60.0
 
 
+## A crawl-through air vent at floor level in a back wall.
+func _draw_vent(i: int) -> void:
+	var v: Dictionary = world.vents[i]
+	var xf := _up_wall_xf() if v["dir"] == World.Dir.UP else _left_wall_xf()
+	draw_set_transform_matrix(xf)
+	var a: float = v["along"]
+	var h := World.VENT_HALF
+	var outer := Rect2(a - h - 6, -56, h * 2 + 12, 52)
+	var inner := outer.grow(-6)
+	draw_rect(outer, Color("2b3038"))
+	draw_rect(outer, Color("596273"), false, 2.0)
+	draw_rect(inner, Color("06080b"))
+	# Slats, angled down.
+	for k in 6:
+		var y := inner.position.y + 4 + k * (inner.size.y - 8) / 5.0
+		draw_line(Vector2(inner.position.x + 2, y - 2), Vector2(inner.end.x - 2, y + 2), Color("4a5260"), 3.0)
+	for corner in [outer.position + Vector2(4, 4), Vector2(outer.end.x - 4, outer.position.y + 4),
+			Vector2(outer.position.x + 4, outer.end.y - 4), outer.end - Vector2(4, 4)]:
+		draw_circle(corner, 2.0, Color("9aa3b0"))
+	if i == vent_highlight:
+		var pulse := 0.55 + 0.45 * sin(_t * 6.0)
+		draw_rect(outer.grow(4), Color(1.0, 0.86, 0.15, pulse), false, 3.0)
+		# A little arrow pointing in.
+		var tip := Vector2(a, outer.position.y - 10)
+		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-9, -14), tip + Vector2(9, -14)]), Color(1.0, 0.86, 0.15, pulse))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
 func _wall_details(a: Vector2, b: Vector2, tint: Color, pulse: float) -> void:
 	var len := a.distance_to(b)
 	if len < 40:
@@ -502,6 +536,14 @@ func _draw_effect(e: Dictionary) -> void:
 	var word := "TWANG!"
 	var col := Color("eef1f5")
 	match e["kind"]:
+		"PUFF":
+			# Dust kicked out of a vent.
+			var k := t / 0.7
+			for i in 10:
+				var ang := i * 2.4
+				var q := World.iso(e["pos"], 20.0 + 30.0 * k) + Vector2(cos(ang), sin(ang) * 0.5) * (12.0 + 40.0 * k)
+				draw_circle(q, 8.0 + 10.0 * k, Color(0.6, 0.58, 0.55, 0.45 * (1.0 - k)))
+			return
 		"HIT":
 			# Quick impact burst.
 			var k := t / 0.5
