@@ -547,18 +547,18 @@ def music():
     tom = np.sin(2 * np.pi * (120 * np.exp(-tom_t * 6) + 70) * tom_t) * env(len(tom_t), 0.002, 0.2, 0.1)
     for b in range(bars * 4):
         t = b * beat
-        place(shaker, t, 0.5, tension)
-        place(shaker, t + swing, 0.3, tension)
+        place(shaker, t, 1.1, tension)
+        place(shaker, t + swing, 0.7, tension)
         if b % 8 == 7:
-            place(tom, t + swing, 0.6, tension)
-            place(tom, t + beat * 0.5 + swing, 0.4, tension)
+            place(tom, t + swing, 0.5, tension)
+            place(tom, t + beat * 0.5 + swing, 0.35, tension)
     for bar, ch in enumerate(prog):
         # Low tremolo swell on the chord's root and fifth, rising through the bar.
         n = t_axis(beat * 4)
         r, _, t5, _ = tones[ch]
         swell = sum(np.sin(2 * np.pi * note(x + "2") * n) for x in (r, t5))
         swell = lowpass(swell, 500) * (0.7 + 0.3 * np.sign(np.sin(2 * np.pi * 7.0 * n)))
-        place(swell * env(len(n), 1.2, None, 0.5) * 0.16, bar * 4 * beat, 1.0, tension)
+        place(swell * env(len(n), 1.2, None, 0.5) * 0.05, bar * 4 * beat, 1.0, tension)
 
     # ---- Hurry layer: the clock is nearly out.
     tick = highpass(noise(0.03), 7000) * env(int(SR * 0.03), 0.001, 0.012, 0.01)
