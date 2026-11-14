@@ -253,6 +253,10 @@ rendered in Blender.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
+- **First-person view:** a button to switch between the usual isometric view
+  and seeing the room through your agent's eyes, peering round doorframes and
+  over desks. It would need the rooms and furniture as real 3D scenes in
+  Godot, using the Blender models the sprites are already rendered from.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.
