@@ -638,6 +638,70 @@ def music():
         _write_loop(name, buf, int(SR * total))
 
 
+def ambience():
+    """Quiet room-tone loops, one per kind of room (the game picks by name):
+      amb_hvac      air-conditioning: a breathy low roar and a 50 Hz hum
+      amb_machines  server racks: fan whine, a hum and relays clicking
+      amb_pipes     plumbing: a drone, drips into a puddle, a pipe creak
+    """
+    L = 16.0
+    n = int(SR * L)
+    rng = np.random.default_rng(11)
+
+    def make(length=L):
+        return np.zeros(int(SR * length) + SR)
+
+    def put(buf, x, at, gain=1.0):
+        s = int(at * SR)
+        e = min(len(buf), s + len(x))
+        buf[s:e] += x[: e - s] * gain
+
+    t = t_axis(L + 1.0)
+    # HVAC: brown noise through a low band, breathing slowly, plus mains hum.
+    hvac = make()
+    roar = bandpass(brown(L + 1.0), 40, 600) * (0.8 + 0.2 * np.sin(2 * np.pi * t / 8.0))
+    hum = 0.25 * np.sin(2 * np.pi * 50 * t) + 0.12 * np.sin(2 * np.pi * 100 * t)
+    hvac += roar * 1.0 + hum * 0.35
+    _write_loop("amb_hvac", _crossfade(hvac, n), n)
+
+    # Server room: a steady fan whine with a slow beat, hum, relay clicks.
+    machines = make()
+    whine = sum(np.sin(2 * np.pi * f * t) / k for k, f in enumerate([1180.0, 1186.0, 2364.0], 1))
+    machines += whine * 0.05 + bandpass(noise(L + 1.0), 300, 3000) * 0.18 + hum * 0.3
+    for _ in range(14):
+        at = rng.uniform(0, L)
+        put(machines, mix(click(0.004, 2500) * 0.6, metal_tink(rng.uniform(2500, 4200), 0.15)), at)
+    _write_loop("amb_machines", _crossfade(machines, n), n)
+
+    # Pipes: a low drone, drips plinking into a puddle, an occasional creak.
+    pipes = make()
+    pipes += bandpass(brown(L + 1.0), 30, 300) * 0.6 + np.sin(2 * np.pi * 62 * t) * 0.05
+    for _ in range(9):
+        at = rng.uniform(0, L)
+        f = rng.uniform(900, 1700)
+        dn = t_axis(0.25)
+        drip = np.sin(2 * np.pi * (f + 900 * np.exp(-dn * 30)) * dn) * env(len(dn), 0.001, 0.08, 0.05)
+        put(pipes, reverb(drip, 0.8, 0.4), at, 0.5)
+    for at in (3.5, 11.0):
+        cn = t_axis(0.9)
+        creak = np.sin(2 * np.pi * np.cumsum(140 + 40 * np.sin(2 * np.pi * 3 * cn)) / SR)
+        creak = saturate(creak * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 23 * cn))), 2.0)
+        put(pipes, lowpass(creak, 900) * env(len(cn), 0.1, None, 0.3) * 0.25, at)
+    _write_loop("amb_pipes", _crossfade(pipes, n), n)
+
+
+def _crossfade(buf, loop_len, fade=1.0):
+    """Turns a continuous sound into a seamless loop: the part after
+    loop_len is faded out over the start while the start fades in (equal
+    power), so the loop point has no bump or gap."""
+    f = int(SR * fade)
+    out = buf[:loop_len].copy()
+    tail = buf[loop_len: loop_len + f]
+    k = np.linspace(0.0, 1.0, len(tail))
+    out[: len(tail)] = out[: len(tail)] * np.sqrt(k) + tail * np.sqrt(1.0 - k)
+    return out
+
+
 def _write_loop(name, buf, loop_len):
     """Folds the tail back into the start so the loop is seamless, then
     writes an Ogg Vorbis file of exactly loop_len samples."""
@@ -661,4 +725,6 @@ if __name__ == "__main__":
     voices()
     if not ONLY or "music" in ONLY:
         music()
+    if not ONLY or "ambience" in ONLY:
+        ambience()
     print("audio written to", os.path.abspath(OUT))

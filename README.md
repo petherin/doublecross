@@ -61,6 +61,7 @@ What works today:
 
 - Host a game on one tablet. The other tablet finds it automatically, or you can type the host's IP address.
 - A seeded secret base that grows with the party: 3×3 rooms for two agents, 4×3 for three, 4×4 for four. Every device builds the identical map from one shared number.
+- **Room tone:** every room hums with its own quiet background: air-conditioning, server racks with clicking relays, or dripping pipes, crossfading as you walk between rooms.
 - **Voices:** agents grunt when hit, cry out when knocked down, shriek when electrocuted and crow "ha-HAH!" when they win, each agent at their own pitch.
 - **Music that reacts:** the spy-jazz loop is three loops played together. A shaker, toms and a low tremolo swell fade in while a rival is in your room; driving hats, brass stabs and a rising riff come in when your clock is nearly out.
 - **Four kinds of trap:** a bomb, a spring, a tripwire across a doorway, and a shock trap that fries whoever opens the drawer, skeleton flashing and all. Each has a gadget that beats it: extinguisher, toolkit, wire cutters, rubber gloves.
