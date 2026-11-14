@@ -52,10 +52,10 @@ const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 const STYLES := [
-	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson"},
-	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt"},
-	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber"},
-	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade"},
+	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson", "mark": "circle"},
+	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt", "mark": "triangle"},
+	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber", "mark": "square"},
+	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade", "mark": "diamond"},
 ]
 
 var world: World
@@ -501,7 +501,8 @@ func _update_hud_status() -> void:
 		if id != my_id:
 			var out: bool = eliminated.has(id)
 			var left := ceilf(clocks.get(id, 0.0))
-			rivals.append({"clock": left, "accent": _agent_by_id[id].accent, "out": out})
+			var ra: Agent = _agent_by_id[id]
+			rivals.append({"clock": left, "accent": ra.accent, "mark": ra.mark, "out": out})
 	hud.set_status(clocks.get(my_id, 0.0), rivals,
 		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"])
 

@@ -15,6 +15,7 @@ signal vent_moved(entering: bool)
 const World = preload("res://scripts/core/world.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Art = preload("res://scripts/render/art.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
@@ -41,6 +42,8 @@ var display_name := "Agent"
 ## Which sprite sheet to draw ("crimson" / "cobalt").
 var sheet_name := ""
 var accent := Color("ff5a5f")
+## Shape that tells agents apart without relying on colour.
+var mark := "circle"
 
 ## Set by the game: no movement at all (e.g. after the match ends).
 var frozen := false
@@ -90,6 +93,7 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	_target = position
 	display_name = style["name"]
 	accent = style["accent"]
+	mark = style.get("mark", "circle")
 	sheet_name = style.get("sheet", "")
 
 
@@ -501,7 +505,8 @@ func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> v
 	var font := ThemeDB.fallback_font
 	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	ci.draw_string(font, foot + Vector2(-w / 2, -top), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	ci.draw_string(font, foot + Vector2(-w / 2 + 9, -top), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	Icons.mark(ci, mark, foot + Vector2(-w / 2 - 5, -top - size * 0.33), 6.0 * Ui.scale(), accent)
 	for i in max_hp:
 		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -top + 6.0)
 		ci.draw_circle(pip, 4.0, Color(0, 0, 0, 0.6))
