@@ -31,9 +31,18 @@ const FIGHT := {
 }
 
 const LEVELS := {
-	"easy": {"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7, "trap": 0.12, "sneaky": false, "vents": "none"},
-	"medium": {"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0, "trap": 0.2, "sneaky": false, "vents": "learn"},
-	"hard": {"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": 1.0, "trap": 0.3, "sneaky": true, "vents": "all"},
+	"easy": {
+		"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7,
+		"trap": 0.12, "sneaky": false, "vents": "none",
+	},
+	"medium": {
+		"speed": 0.82, "think": [0.4, 1.0], "memory": 1.0, "avoid_own": 1.0,
+		"trap": 0.2, "sneaky": false, "vents": "learn",
+	},
+	"hard": {
+		"speed": 0.92, "think": [0.2, 0.6], "memory": 1.0, "avoid_own": 1.0,
+		"trap": 0.3, "sneaky": true, "vents": "all",
+	},
 }
 
 var game: Node

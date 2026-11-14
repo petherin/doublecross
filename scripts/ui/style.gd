@@ -128,7 +128,9 @@ static func draw_paper(ci: CanvasItem, r: Rect2, col := PAPER, angle := 0.0) -> 
 
 
 ## An inked rubber stamp: bordered text, rotated, with worn gaps in the ink.
-static func draw_stamp(ci: CanvasItem, text: String, centre: Vector2, angle: float, col: Color, size: int, alpha := 0.85, gap_col := PAPER, scale := 1.0) -> void:
+static func draw_stamp(
+		ci: CanvasItem, text: String, centre: Vector2, angle: float, col: Color, size: int,
+		alpha := 0.85, gap_col := PAPER, scale := 1.0) -> void:
 	var f := stencil()
 	var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var h := float(size)
@@ -168,7 +170,8 @@ static func draw_tape(ci: CanvasItem, at: Vector2, angle := 0.0, size := Vector2
 	ci.draw_set_transform(at, angle, Vector2.ONE)
 	ci.draw_rect(Rect2(-size / 2, size), Color(0.95, 0.9, 0.72, 0.6))
 	for i in 5:
-		ci.draw_line(Vector2(-size.x / 2, -size.y / 2 + i * size.y / 4), Vector2(-size.x / 2 - 2, -size.y / 2 + i * size.y / 4 + 3), Color(0.95, 0.9, 0.72, 0.6), 2.0)
+		var notch := Vector2(-size.x / 2, -size.y / 2 + i * size.y / 4)
+		ci.draw_line(notch, notch + Vector2(-2, 3), Color(0.95, 0.9, 0.72, 0.6), 2.0)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

@@ -214,11 +214,8 @@ func _process(delta: float) -> void:
 	if local_agent == null:
 		return
 	_exit_cooldown -= delta
-	var kb := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	var wasd := Vector2(
-		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
-		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
-	var move := kb + wasd
+	# Keyboard / gamepad (see Project Settings > Input Map), or the touch stick.
+	var move := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if _hud.joystick.output != Vector2.ZERO:
 		move = _hud.joystick.output
 	# Controls are screen-relative: up on the stick = up the screen.
@@ -245,15 +242,22 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		match event.physical_keycode:
-			KEY_E, KEY_SPACE: _try_search()
-			KEY_1: _try_trap("BOMB")
-			KEY_2: _try_trap("SPRING")
-			KEY_3: _try_trap("WIRE")
-			KEY_F: _try_melee()
-			KEY_V: _try_vent()
-			KEY_G: _try_fire()
+	if event.is_echo():
+		return
+	if event.is_action_pressed("search"):
+		_try_search()
+	elif event.is_action_pressed("trap_bomb"):
+		_try_trap("BOMB")
+	elif event.is_action_pressed("trap_spring"):
+		_try_trap("SPRING")
+	elif event.is_action_pressed("trap_wire"):
+		_try_trap("WIRE")
+	elif event.is_action_pressed("attack"):
+		_try_melee()
+	elif event.is_action_pressed("crawl"):
+		_try_vent()
+	elif event.is_action_pressed("fire"):
+		_try_fire()
 
 
 func _on_room_changed(room: Vector2i, animate := true) -> void:
@@ -838,7 +842,8 @@ func _on_event(e: Dictionary) -> void:
 			elif found == World.BRIEFCASE:
 				_hud.toast(msg + "Found a BRIEFCASE! Now you can carry everything.", col)
 			elif e["left"] != "":
-				_hud.toast(msg + "Found the %s, but your hands are full,\nso you left the %s here. Find a briefcase!" % [found, e["left"]], warn, 4.0)
+				var full := "Found the %s, but your hands are full,\nso you left the %s here. Find a briefcase!"
+				_hud.toast(msg + full % [found, e["left"]], warn, 4.0)
 			else:
 				var n: int = inventories[my_id]["items"].size()
 				var line := "Found the %s!  (%d/%d)" % [found, n, World.INTEL.size()]
@@ -885,7 +890,8 @@ func _on_event(e: Dictionary) -> void:
 				_hud.toast("Caught in your own %s! Nice one. -%ds.%s" % [trap_name, int(TRAP_PENALTY), dropped], warn, 3.5)
 				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif me:
-				_hud.toast("%s! You walked into a %s. -%ds.%s" % [_exclamation(e["kind"]), trap_name, int(TRAP_PENALTY), dropped], warn, 3.5)
+				var args := [_exclamation(e["kind"]), trap_name, int(TRAP_PENALTY), dropped]
+				_hud.toast("%s! You walked into a %s. -%ds.%s" % args, warn, 3.5)
 				_hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
 			elif e["owner"] == my_id:
 				_hud.toast("Your %s got %s!" % [trap_name, victim.display_name], col, 3.0)

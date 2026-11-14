@@ -14,7 +14,8 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 		"CASH":
 			for i in 3:
 				var o := Vector2(0, (1 - i) * 0.12) * s
-				ci.draw_rect(Rect2(c + o + Vector2(-0.45, -0.2) * s, Vector2(0.9, 0.4) * s), k.call(Color("2f8f46").darkened(i * 0.1)))
+				var note := Rect2(c + o + Vector2(-0.45, -0.2) * s, Vector2(0.9, 0.4) * s)
+				ci.draw_rect(note, k.call(Color("2f8f46").darkened(i * 0.1)))
 			ci.draw_rect(Rect2(c + Vector2(-0.45, -0.32) * s, Vector2(0.9, 0.4) * s), k.call(Color("4fbf6a")))
 			ci.draw_circle(c + Vector2(0, -0.12) * s, 0.12 * s, k.call(Color("2f8f46")))
 			ci.draw_rect(Rect2(c + Vector2(-0.08, -0.36) * s, Vector2(0.16, 0.6) * s), k.call(Color("e6e2c8")))
@@ -81,9 +82,9 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			ci.draw_line(c + Vector2(-0.36, 0.38) * s, c + Vector2(-0.22, 0.24) * s, k.call(Color("15151a")), 0.15 * s)
 		"DART":
 			ci.draw_line(c + Vector2(-0.36, 0.2) * s, c + Vector2(0.3, -0.16) * s, k.call(Color("c7ccd6")), 0.06 * s, true)
-			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0.42, -0.23) * s, c + Vector2(0.26, -0.2) * s, c + Vector2(0.31, -0.1) * s]), k.call(Color("eef1f5")))
-			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.44, 0.06) * s, c + Vector2(-0.22, 0.12) * s]), k.call(Color("ff5a5f")))
-			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.36, 0.2) * s, c + Vector2(-0.3, 0.34) * s, c + Vector2(-0.2, 0.16) * s]), k.call(Color("ff5a5f")))
+			_tri(ci, c, s, [Vector2(0.42, -0.23), Vector2(0.26, -0.2), Vector2(0.31, -0.1)], k.call(Color("eef1f5")))
+			_tri(ci, c, s, [Vector2(-0.36, 0.2), Vector2(-0.44, 0.06), Vector2(-0.22, 0.12)], k.call(Color("ff5a5f")))
+			_tri(ci, c, s, [Vector2(-0.36, 0.2), Vector2(-0.3, 0.34), Vector2(-0.2, 0.16)], k.call(Color("ff5a5f")))
 
 		"VENT":
 			ci.draw_rect(Rect2(c + Vector2(-0.42, -0.3) * s, Vector2(0.84, 0.6) * s), k.call(Color("9aa3b0")))
@@ -91,10 +92,15 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			for i in 4:
 				var y := -0.18 + i * 0.12
 				ci.draw_line(c + Vector2(-0.34, y) * s, c + Vector2(0.34, y + 0.04) * s, k.call(Color("6b7280")), 0.05 * s)
-			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(0.1, -0.5) * s, c + Vector2(0.3, -0.62) * s, c + Vector2(0.3, -0.38) * s]), k.call(Color("ffd23f")))
+			_tri(ci, c, s, [Vector2(0.1, -0.5), Vector2(0.3, -0.62), Vector2(0.3, -0.38)], k.call(Color("ffd23f")))
 
 
 ## A magnifying glass, for the search button.
 static func magnifier(ci: CanvasItem, c: Vector2, s: float, col: Color) -> void:
 	ci.draw_arc(c + Vector2(-0.08, -0.08) * s, 0.24 * s, 0, TAU, 28, col, 0.08 * s, true)
 	ci.draw_line(c + Vector2(0.1, 0.1) * s, c + Vector2(0.32, 0.32) * s, col, 0.11 * s, true)
+
+
+## A filled triangle; `pts` are in icon units around centre `c`, scaled by `s`.
+static func _tri(ci: CanvasItem, c: Vector2, s: float, pts: Array, col: Color) -> void:
+	ci.draw_colored_polygon(PackedVector2Array([c + pts[0] * s, c + pts[1] * s, c + pts[2] * s]), col)

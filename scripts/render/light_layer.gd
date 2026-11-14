@@ -35,7 +35,10 @@ func _draw() -> void:
 	var warm := Color(1.0, 0.88, 0.7).lerp(tint, 0.35)
 
 	# Ceiling lamps: a pool on the floor and a faint shaft of light above it.
-	var lamps := [Vector2(R.position.x + R.size.x * 0.3, R.get_center().y), Vector2(R.position.x + R.size.x * 0.72, R.get_center().y)]
+	var lamps := [
+		Vector2(R.position.x + R.size.x * 0.3, R.get_center().y),
+		Vector2(R.position.x + R.size.x * 0.72, R.get_center().y),
+	]
 	var hash_v := room.x * 7 + room.y * 13 + world.seed_value % 97
 	for i in lamps.size():
 		var lp: Vector2 = lamps[i]

@@ -9,6 +9,23 @@ const Ui = preload("res://scripts/ui/ui.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const Art = preload("res://scripts/render/art.gd")
 
+const HELP := [
+	["THE MISSION", "Recover the [b]PASSPORT, CASH, MICROFILM[/b] and [b]KEYCARD[/b] hidden in the furniture, "
+		+ "then walk out of the [b]EXIT[/b] before your clock runs out. First one out wins."],
+	["SEARCHING", "Stand next to furniture and press [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can "
+		+ "carry only one item, so you'll swap and leave the other behind."],
+	["TRAPS", "Press [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a "
+		+ "[b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs "
+		+ "20 seconds. Only you can see your own traps, but they still work on you."],
+	["GADGETS", "The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the "
+		+ "[b]WIRE CUTTERS[/b] beat tripwires. Each is used up when it saves you."],
+	["AIR VENTS", "Some walls hide a vent. Stand by it and press [b]CRAWL[/b] to shuffle through the ducts "
+		+ "to a room further away. The same vents link up every time, so remember the shortcuts."],
+	["FIGHTING", "[b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: "
+		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
+	["KEYBOARD", "WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart · V crawl. "
+		+ "Gamepads work too."],
+]
 const TAGLINE := "Two agents. One way out."
 var _status: Label
 var _hosts_box: VBoxContainer
@@ -173,6 +190,14 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ widgets
 
+## The field manual, as BBCode.
+static func _help_text() -> String:
+	var out := ""
+	for i in HELP.size():
+		out += "[b][color=#b3141f]%d. %s.[/color][/b] %s\n\n" % [i + 1, HELP[i][0], HELP[i][1]]
+	return out + "[i]This manual will not self-destruct. Please return it to the file.[/i]"
+
+
 func _small_button(text: String, on_press: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -298,7 +323,8 @@ func _draw_dossier() -> void:
 	Style.draw_paper(a, Rect2(660, 92, 530, 646), Style.PAPER, 0.01)
 
 	# Left page: classification line, title, tagline.
-	a.draw_string(Style.mono_bold(), Vector2(118, 136), "CLASSIFIED  //  OPERATION", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Style.RED_INK)
+	a.draw_string(Style.mono_bold(), Vector2(118, 136), "CLASSIFIED  //  OPERATION",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Style.RED_INK)
 	a.draw_string(Style.stencil(), Vector2(112, 238), "DOUBLE", HORIZONTAL_ALIGNMENT_LEFT, -1, 104, Style.INK)
 	a.draw_string(Style.stencil(), Vector2(112, 346), "CROSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 122, Style.RED_INK)
 	var shown := TAGLINE.left(int(_tag_chars))
@@ -325,7 +351,8 @@ func _draw_dossier() -> void:
 	for x in range(696, 1150, 14):
 		a.draw_line(Vector2(x, 455), Vector2(x + 7, 455), Color(Style.INK, 0.5), 1.5)
 	Style.draw_stamp(a, "EYES ONLY", Vector2(1080, 720), 0.12, Color("1f4f9a"), 22, 0.7)
-	a.draw_string(Style.mono_bold(), Vector2(910, 758), "BUILD v" + Net.version, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(Style.INK, 0.55))
+	a.draw_string(Style.mono_bold(), Vector2(910, 758), "BUILD v" + Net.version,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(Style.INK, 0.55))
 
 
 func _draw() -> void:
@@ -480,19 +507,7 @@ func _show_help() -> void:
 	text.add_theme_font_size_override("bold_font_size", 19)
 	text.add_theme_font_size_override("italics_font_size", 19)
 	text.add_theme_font_override("italics_font", Style.typewriter())
-	text.text = """[b][color=#b3141f]1. THE MISSION.[/color][/b] Recover the [b]PASSPORT, CASH, MICROFILM[/b] and [b]KEYCARD[/b] hidden in the furniture, then walk out of the [b]EXIT[/b] before your clock runs out. First one out wins.
-
-[b][color=#b3141f]2. SEARCHING.[/color][/b] Stand next to furniture and press [b]SEARCH[/b]. Without the [b]BRIEFCASE[/b] you can carry only one item, so you'll swap and leave the other behind.
-
-[b][color=#b3141f]3. TRAPS.[/color][/b] Press [b]TRAP[/b] to hide a [b]BOMB[/b] or [b]SPRING[/b] in furniture, or string a [b]TRIPWIRE[/b] across a doorway. Getting caught knocks you out, scatters your intel and costs 20 seconds. Only you can see your own traps, but they still work on you.
-
-[b][color=#b3141f]4. GADGETS.[/color][/b] The [b]EXTINGUISHER[/b] beats bombs, the [b]TOOLKIT[/b] beats springs and the [b]WIRE CUTTERS[/b] beat tripwires. Each is used up when it saves you.
-
-[b][color=#b3141f]5. FIGHTING.[/color][/b] [b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: they drop their intel, lose 30 seconds and wake up back at the start.
-
-[b][color=#b3141f]6. KEYBOARD.[/color][/b] WASD/arrows move · E search · 1/2/3 traps · F cosh · G dart
-
-[i]This manual will not self-destruct. Please return it to the file.[/i]"""
+	text.text = _help_text()
 	box.add_child(text)
 	_done_button(box)
 

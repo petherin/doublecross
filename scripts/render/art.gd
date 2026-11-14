@@ -140,7 +140,9 @@ static func _wall_image() -> Image:
 			elif y == 56 or y == 57:
 				v = 0.11 if y == 56 else 0.27
 			# Bolts.
-			for b in [Vector2(8, 8), Vector2(w - 9, 8), Vector2(8, h - 9), Vector2(w - 9, h - 9), Vector2(8, 50), Vector2(w - 9, 50)]:
+			for b in [
+					Vector2(8, 8), Vector2(w - 9, 8), Vector2(8, h - 9),
+					Vector2(w - 9, h - 9), Vector2(8, 50), Vector2(w - 9, 50)]:
 				var dist := Vector2(x, y).distance_to(b)
 				if dist < 2.0:
 					v = 0.36

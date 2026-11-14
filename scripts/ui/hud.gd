@@ -250,7 +250,8 @@ func _draw_status() -> void:
 	_status.draw_line(c, c + Vector2(0, -7), col, 2.0)
 	_status.draw_line(c, c + Vector2(5, 2), col, 2.0)
 	_status.draw_rect(Rect2(c.x - 3, c.y - 16, 6, 3), col)
-	_status.draw_string(font, Vector2(46, 32), _fmt(_clock_mine), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(col, 0.35) if blink else col)
+	var clock_col := Color(col, 0.35) if blink else col
+	_status.draw_string(font, Vector2(46, 32), _fmt(_clock_mine), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, clock_col)
 	# Health pips
 	for i in _max_hp:
 		var p := Vector2(132 + i * 22, 23)
@@ -263,7 +264,8 @@ func _draw_status() -> void:
 		var txt := "RIVAL  %s" % _fmt(_clock_rival)
 		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
 		_status.draw_rect(Rect2(_status.size.x - w - 28, 4, w + 20, 38), Color(0, 0, 0, 0.45))
-		_status.draw_string(font, Vector2(_status.size.x - w - 18, 31), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.75))
+		_status.draw_string(
+				font, Vector2(_status.size.x - w - 18, 31), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.75))
 
 
 ## Size of this layer in its own (scaled) units.
@@ -407,7 +409,9 @@ func _draw_duct() -> void:
 	# Slatted light from grilles in the duct roof drifting past.
 	x = -fmod(scroll * 1.0, 520.0) + 120.0
 	while x < L.x + 200.0:
-		var pts := PackedVector2Array([Vector2(x - 40, top), Vector2(x + 40, top), Vector2(x + 110, top + h), Vector2(x - 110, top + h)])
+		var pts := PackedVector2Array([
+			Vector2(x - 40, top), Vector2(x + 40, top), Vector2(x + 110, top + h), Vector2(x - 110, top + h),
+		])
 		d.draw_colored_polygon(pts, Color(1.0, 0.92, 0.7, 0.07))
 		for k in 4:
 			d.draw_line(Vector2(x - 34 + k * 22, top + 2), Vector2(x - 26 + k * 22, top + 2), Color(1.0, 0.95, 0.75, 0.6), 3.0)
@@ -431,7 +435,8 @@ func _draw_duct() -> void:
 	var caption := "…crawling through the air ducts…"
 	var f2 := Style.typewriter()
 	var w := f2.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-	d.draw_string(f2, Vector2((L.x - w) / 2.0, top + h + 80), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.92, 0.88, 0.78))
+	d.draw_string(
+			f2, Vector2((L.x - w) / 2.0, top + h + 80), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0.92, 0.88, 0.78))
 
 
 ## Sizes the room-name plate to the name, centred in the space in the top bar.
@@ -515,7 +520,9 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 	create_tween().tween_property(dim, "color:a", 0.65, 0.4)
 
 	var stamp_text := "MISSION ACCOMPLISHED" if won else "DOUBLE-CROSSED"
-	var sub_text := "Escaped with the intel. Drinks are on you." if won else "%s got out with the intel. Awkward." % winner_name
+	var sub_text := "Escaped with the intel. Drinks are on you."
+	if not won:
+		sub_text = "%s got out with the intel. Awkward." % winner_name
 	if reason == "time":
 		if winner == 0:
 			stamp_text = "TIME EXPIRED"
@@ -537,7 +544,8 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 	card.draw.connect(func():
 		Style.draw_paper(card, Rect2(Vector2.ZERO, card.size), Style.PAPER, -0.01)
 		card.draw_string(Style.stencil(), Vector2(40, 70), "CASE FILE", HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Style.INK)
-		card.draw_string(Style.mono_bold(), Vector2(44, 104), "OPERATION DOUBLE CROSS  //  DEBRIEF", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Style.RED_INK)
+		card.draw_string(Style.mono_bold(), Vector2(44, 104), "OPERATION DOUBLE CROSS  //  DEBRIEF",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Style.RED_INK)
 		card.draw_line(Vector2(40, 120), Vector2(720, 120), Style.INK, 2.0)
 		card.draw_string(Style.mono_bold(), Vector2(44, 168), "OUTCOME:", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Style.INK)
 		card.draw_string(Style.typewriter(), Vector2(44, 204), sub_text, HORIZONTAL_ALIGNMENT_LEFT, 680, 23, Style.INK)
@@ -563,7 +571,8 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 			for i in 4:
 				shake.tween_property(card, "position", card.position + Vector2(randf_range(-7, 7), randf_range(-5, 5)), 0.03)
 			shake.tween_property(card, "position", card.position, 0.04)
-		Style.draw_stamp(_stamp, stamp_text, Vector2(380, 300), -0.08, stamp_col, 40, 0.9 * k, Style.PAPER, lerpf(2.6, 1.0, k)))
+		Style.draw_stamp(_stamp, stamp_text, Vector2(380, 300), -0.08, stamp_col, 40,
+				0.9 * k, Style.PAPER, lerpf(2.6, 1.0, k)))
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 30)

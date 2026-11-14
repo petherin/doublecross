@@ -134,7 +134,7 @@ func _draw() -> void:
 		if t.has("agent"):
 			t["agent"].paint(self)
 		else:
-			_draw_furniture(t["f"], tint)
+			_draw_furniture(t["f"])
 			if t["i"] == highlight:
 				_draw_highlight(t["f"])
 			var tk := World.furniture_key(room, t["i"])
@@ -181,7 +181,8 @@ func _draw_floor(area: Rect2, tint: Color) -> void:
 	draw_texture_rect(Art.floor_tex(), area, true, Color(0.95, 0.97, 1.0).lerp(tint, 0.08))
 	# Room name stencilled on the floor.
 	var name_text: String = world.rooms[room]["name"].to_upper()
-	draw_string(Style.stencil(), Vector2(x0 + 70, y1 - 70), name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 64, Color(1, 1, 1, 0.05))
+	draw_string(Style.stencil(), Vector2(x0 + 70, y1 - 70), name_text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 64, Color(1, 1, 1, 0.05))
 	# Hazard stripes on the threshold of each doorway.
 	var rc := area.get_center()
 	var door_half := World.DOOR_HALF
@@ -264,10 +265,12 @@ func _draw_back_walls(area: Rect2, tint: Color) -> void:
 	_textured_wall(_left_wall_xf(), left_spans, Color(0.72, 0.74, 0.8).lerp(tint, 0.05))
 	# Lintels and doorways
 	if up_door:
-		_quad(_iso(c.x - dh, y0, DOOR_TOP), _iso(c.x + dh, y0, DOOR_TOP), _iso(c.x + dh, y0, h), _iso(c.x - dh, y0, h), col_up.darkened(0.1))
+		_quad(_iso(c.x - dh, y0, DOOR_TOP), _iso(c.x + dh, y0, DOOR_TOP),
+				_iso(c.x + dh, y0, h), _iso(c.x - dh, y0, h), col_up.darkened(0.1))
 		_doorway(_iso(c.x - dh, y0), _iso(c.x + dh, y0), up_kind == 2)
 	if left_door:
-		_quad(_iso(x0, c.y - dh, DOOR_TOP), _iso(x0, c.y + dh, DOOR_TOP), _iso(x0, c.y + dh, h), _iso(x0, c.y - dh, h), col_left.darkened(0.1))
+		_quad(_iso(x0, c.y - dh, DOOR_TOP), _iso(x0, c.y + dh, DOOR_TOP),
+				_iso(x0, c.y + dh, h), _iso(x0, c.y - dh, h), col_left.darkened(0.1))
 		_doorway(_iso(x0, c.y - dh), _iso(x0, c.y + dh), left_kind == 2)
 	# Wall panels, light strips and skirting
 	var pulse := 0.75 + 0.25 * sin(_t * 2.0)
@@ -295,7 +298,8 @@ func _textured_wall(xf: Transform2D, spans: Array, modulate_col: Color) -> void:
 		var r := Rect2(sp[0], -h, sp[1] - sp[0], h)
 		draw_texture_rect(Art.wall_tex(), r, true, modulate_col)
 		# Grime and shadow at the base, a little light at the top.
-		draw_polygon(PackedVector2Array([Vector2(r.position.x, -34), Vector2(r.end.x, -34), Vector2(r.end.x, 0), Vector2(r.position.x, 0)]),
+		draw_polygon(PackedVector2Array([
+					Vector2(r.position.x, -34), Vector2(r.end.x, -34), Vector2(r.end.x, 0), Vector2(r.position.x, 0)]),
 			PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0.45)]))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
@@ -352,9 +356,12 @@ func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> flo
 			draw_rect(r, Color("0d2236"))
 			draw_rect(r, Color("8a6a3a"), false, 3.0)
 			for i in 5:
-				draw_line(Vector2(r.position.x + i * r.size.x / 4.0, r.position.y), Vector2(r.position.x + i * r.size.x / 4.0, r.end.y), Color(1, 1, 1, 0.06), 1.0)
+				var gx := r.position.x + i * r.size.x / 4.0
+				draw_line(Vector2(gx, r.position.y), Vector2(gx, r.end.y), Color(1, 1, 1, 0.06), 1.0)
 			var land := Color("2e6b57")
-			for blob in [[-38, -58, 10], [-30, -50, 8], [-20, -40, 6], [-2, -60, 9], [4, -50, 8], [10, -40, 7], [30, -58, 11], [40, -50, 9], [44, -34, 6]]:
+			for blob in [
+					[-38, -58, 10], [-30, -50, 8], [-20, -40, 6], [-2, -60, 9], [4, -50, 8],
+					[10, -40, 7], [30, -58, 11], [40, -50, 9], [44, -34, 6]]:
 				draw_circle(Vector2(a + blob[0], blob[1]), blob[2], land)
 			for i in 3:
 				var dot := Vector2(a - 40 + ((seed_v >> (i * 4)) % 80), -64 + ((seed_v >> (i * 3)) % 30))
@@ -366,7 +373,8 @@ func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> flo
 			draw_circle(cc, 18, Color("2b2f36"))
 			draw_circle(cc, 15, Color("e6e2d3"))
 			for i in 12:
-				draw_line(cc + Vector2.from_angle(i * TAU / 12.0) * 12, cc + Vector2.from_angle(i * TAU / 12.0) * 14, Color("2b2f36"), 1.0)
+				var tick := Vector2.from_angle(i * TAU / 12.0)
+				draw_line(cc + tick * 12, cc + tick * 14, Color("2b2f36"), 1.0)
 			var tm := Time.get_time_dict_from_system()
 			var mins: float = tm["minute"] + tm["second"] / 60.0
 			var hrs: float = (tm["hour"] % 12) + mins / 60.0
@@ -400,11 +408,14 @@ func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> flo
 			draw_circle(cc, 8, Color("15151a"))
 			draw_rect(Rect2(cc.x - 13, cc.y - 9, 26, 3), Color("15151a"))
 			draw_rect(Rect2(cc.x - 7, cc.y - 17, 14, 9), Color("15151a"))
-			draw_colored_polygon(PackedVector2Array([cc + Vector2(-14, 22), cc + Vector2(14, 22), cc + Vector2(8, 6), cc + Vector2(-8, 6)]), Color("15151a"))
+			var base := PackedVector2Array([Vector2(-14, 22), Vector2(14, 22), Vector2(8, 6), Vector2(-8, 6)])
+			base = Transform2D(0.0, cc) * base
+			draw_colored_polygon(base, Color("15151a"))
 			var words := txt.split(" ")
 			for i in mini(words.size(), 3):
 				var ww := font.get_string_size(words[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-				draw_string(font, Vector2(a - ww / 2, r.position.y + 10 + (i * 0)), "" if i > 0 else words[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+				draw_string(font, Vector2(a - ww / 2, r.position.y + 10), "" if i > 0 else words[0],
+						HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
 			var rest := " ".join(words.slice(1))
 			var rw := font.get_string_size(rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 			draw_string(font, Vector2(a - rw / 2, r.end.y - 4), rest, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("b3262e"))
@@ -415,7 +426,8 @@ func _decor(kind: String, a: float, tint: Color, seed_v: int, font: Font) -> flo
 			draw_rect(r, Color("2b3038"), false, 2.0)
 			for i in 6:
 				var on := int(_t * 2.5 + i * 1.3 + seed_v) % 3 != 0
-				draw_circle(Vector2(r.position.x + 9 + (i % 3) * 13, r.position.y + 12 + (i / 3) * 10), 2.5, (Color("4dff9a") if i % 2 == 0 else Color("ff4d4d")) if on else Color("1c2026"))
+				var led := (Color("4dff9a") if i % 2 == 0 else Color("ff4d4d")) if on else Color("1c2026")
+				draw_circle(Vector2(r.position.x + 9 + (i % 3) * 13, r.position.y + 12 + (i / 3) * 10), 2.5, led)
 			draw_rect(Rect2(r.position.x + 8, r.end.y - 18, 28, 8), Color("e0b10b"))
 			return 44.0
 	return 60.0
@@ -445,7 +457,8 @@ func _draw_vent(i: int) -> void:
 		draw_rect(outer.grow(4), Color(1.0, 0.86, 0.15, pulse), false, 3.0)
 		# A little arrow pointing in.
 		var tip := Vector2(a, outer.position.y - 10)
-		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-9, -14), tip + Vector2(9, -14)]), Color(1.0, 0.86, 0.15, pulse))
+		var arrow := PackedVector2Array([tip, tip + Vector2(-9, -14), tip + Vector2(9, -14)])
+		draw_colored_polygon(arrow, Color(1.0, 0.86, 0.15, pulse))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
@@ -551,7 +564,8 @@ func _draw_effect(e: Dictionary) -> void:
 			var k := t / 0.5
 			for i in 8:
 				var a := i * TAU / 8.0
-				draw_line(p + Vector2.from_angle(a) * (12.0 + 30.0 * k), p + Vector2.from_angle(a) * (20.0 + 44.0 * k), Color(1, 0.9, 0.4, 1.0 - k), 3.0, true)
+				var ray := Vector2.from_angle(a)
+				draw_line(p + ray * (12.0 + 30.0 * k), p + ray * (20.0 + 44.0 * k), Color(1, 0.9, 0.4, 1.0 - k), 3.0, true)
 			return
 		"DOWN":
 			word = "WHAM!"
@@ -664,7 +678,9 @@ func _draw_highlight(f: Dictionary) -> void:
 		_iso(r.position.x, r.position.y, h), _iso(r.end.x, r.position.y, h),
 		_iso(r.end.x, r.end.y, h), _iso(r.position.x, r.end.y, h), _iso(r.position.x, r.position.y, h)])
 	draw_polyline(top, col, 3.0, true)
-	draw_polyline(PackedVector2Array([_iso(r.position.x, r.end.y, 0), _iso(r.end.x, r.end.y, 0), _iso(r.end.x, r.position.y, 0)]), col, 3.0, true)
+	var edge := PackedVector2Array([
+		_iso(r.position.x, r.end.y, 0), _iso(r.end.x, r.end.y, 0), _iso(r.end.x, r.position.y, 0)])
+	draw_polyline(edge, col, 3.0, true)
 	draw_line(_iso(r.position.x, r.end.y, 0), _iso(r.position.x, r.end.y, h), col, 3.0)
 	draw_line(_iso(r.end.x, r.end.y, 0), _iso(r.end.x, r.end.y, h), col, 3.0)
 	draw_line(_iso(r.end.x, r.position.y, 0), _iso(r.end.x, r.position.y, h), col, 3.0)
@@ -702,13 +718,15 @@ func _draw_front_ledges(area: Rect2) -> void:
 	for s in down_spans:
 		_quad(_iso(s[0], y1, 0), _iso(s[1], y1, 0), _iso(s[1], y1, h), _iso(s[0], y1, h), face)
 		_quad(_iso(s[0], y1, h), _iso(s[1], y1, h), _iso(s[1], y1 + 14, h), _iso(s[0], y1 + 14, h), top)
-		_quad(_iso(s[0], y1 + 14, 0), _iso(s[1], y1 + 14, 0), _iso(s[1], y1 + 14, h), _iso(s[0], y1 + 14, h), face.darkened(0.25))
+		_quad(_iso(s[0], y1 + 14, 0), _iso(s[1], y1 + 14, 0),
+				_iso(s[1], y1 + 14, h), _iso(s[0], y1 + 14, h), face.darkened(0.25))
 	# RIGHT ledge along y at x = x1
 	var right_spans := [[y0, c.y - dh], [c.y + dh, y1 + 14]] if world.has_door(room, World.Dir.RIGHT) else [[y0, y1 + 14]]
 	for s in right_spans:
 		_quad(_iso(x1, s[0], 0), _iso(x1, s[1], 0), _iso(x1, s[1], h), _iso(x1, s[0], h), face.darkened(0.15))
 		_quad(_iso(x1, s[0], h), _iso(x1, s[1], h), _iso(x1 + 14, s[1], h), _iso(x1 + 14, s[0], h), top)
-		_quad(_iso(x1 + 14, s[0], 0), _iso(x1 + 14, s[1], 0), _iso(x1 + 14, s[1], h), _iso(x1 + 14, s[0], h), face.darkened(0.4))
+		_quad(_iso(x1 + 14, s[0], 0), _iso(x1 + 14, s[1], 0),
+				_iso(x1 + 14, s[1], h), _iso(x1 + 14, s[0], h), face.darkened(0.4))
 	# Hazard markings on front doorways
 	if world.has_door(room, World.Dir.DOWN):
 		for x in [c.x - dh, c.x + dh]:
@@ -741,10 +759,11 @@ static func _furniture_sprite(kind: String, wall: String) -> Array:
 		_furn_tex[key] = tex
 	if _furn_tex[key] == null:
 		return []
-	return [_furn_tex[key], Vector2(_furn_meta["sprites"][key]["anchor"][0], _furn_meta["sprites"][key]["anchor"][1]), float(_furn_meta.get("scale", 1.0))]
+	var anchor: Array = _furn_meta["sprites"][key]["anchor"]
+	return [_furn_tex[key], Vector2(anchor[0], anchor[1]), float(_furn_meta.get("scale", 1.0))]
 
 
-func _draw_furniture(f: Dictionary, tint: Color) -> void:
+func _draw_furniture(f: Dictionary) -> void:
 	var sprite := _furniture_sprite(f["type"], f["wall"])
 	if not sprite.is_empty():
 		var at := World.iso((f["rect"] as Rect2).get_center())
