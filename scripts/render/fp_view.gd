@@ -43,6 +43,9 @@ var _vents := {}                  # vent index -> grille MeshInstance3D
 var _vent_mat: StandardMaterial3D
 var _markers := {}                # trap key -> Node3D
 var _cam_drop := 0.0              # eye lowered while knocked down
+var _painters: Array = []         # wall-decor painters, refreshed for animated screens
+var _decor_t := 0.0
+var _darts: Array = []            # MeshInstance3D pool for darts in flight
 var _cam_roll := 0.0
 
 
@@ -95,6 +98,8 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	_fx.clear()
 	_vents.clear()
 	_markers.clear()
+	_painters.clear()
+	_darts.clear()
 	var tint: Color = world.rooms[room]["tint"]
 	_env.environment.ambient_light_color = Color(0.32, 0.33, 0.38).lerp(tint, 0.2)
 	_env.environment.ambient_light_energy = 0.9
@@ -225,7 +230,9 @@ func _decor(a: Vector2, b: Vector2, yaw: float, spans: Array, tint: Color, dir: 
 	var length := a.distance_to(b)
 	# Overhead, the back walls are walls 0 and 1; the front walls get their own.
 	var wall: int = {World.Dir.UP: 0, World.Dir.LEFT: 1, World.Dir.DOWN: 2, World.Dir.RIGHT: 3}[dir]
-	var tex := FpDecor.paint(_room_root, length, spans, tint, wall, world.seed_value, room)
+	var painter := FpDecor.paint(_room_root, length, spans, tint, wall, world.seed_value, room)
+	_painters.append(painter)
+	var tex: Texture2D = painter.texture()
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = tex
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
@@ -344,15 +351,51 @@ func _place_furniture(f: Dictionary) -> Node3D:
 	return node
 
 
-## Effects, your trap markers and the vent you're at (from the overhead view).
-func show_extras(effects: Array, my_traps: Dictionary, vent_highlight: int) -> void:
+## Effects, your trap markers, the vent you're at and darts in flight (all
+## from the overhead view).
+func show_extras(effects: Array, my_traps: Dictionary, vent_highlight: int, darts: Array) -> void:
 	_fx.sync(effects)
+	_show_darts(darts)
+	# Screens on the walls scroll and sweep, a few times a second.
+	_decor_t += get_process_delta_time()
+	if _decor_t > 0.12:
+		_decor_t = 0.0
+		for p in _painters:
+			if is_instance_valid(p):
+				p.refresh(_t)
 	for i in _vents:
 		var on: bool = i == vent_highlight
 		var a := (0.25 + 0.2 * sin(_t * 6.0)) if on else 0.0
 		_highlight_mat.albedo_color = Color(1.0, 0.86, 0.15, a)
 		(_vents[i] as MeshInstance3D).material_overlay = _highlight_mat if on else null
 	_sync_markers(my_traps)
+
+
+## Darts in this room as small glinting needles, from a reused pool.
+func _show_darts(darts: Array) -> void:
+	var here := darts.filter(func(d): return d["room"] == room)
+	while _darts.size() < here.size():
+		var mi := MeshInstance3D.new()
+		var b := BoxMesh.new()
+		b.size = Vector3(26.0, 2.5, 2.5)
+		mi.mesh = b
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.85, 0.88, 0.95)
+		m.metallic = 0.8
+		m.emission_enabled = true
+		m.emission = Color(1.0, 0.35, 0.35)
+		m.emission_energy_multiplier = 0.6
+		mi.material_override = m
+		_room_root.add_child(mi)
+		_darts.append(mi)
+	for i in _darts.size():
+		var mi: MeshInstance3D = _darts[i]
+		mi.visible = i < here.size()
+		if mi.visible:
+			var p: Vector2 = here[i]["pos"]
+			var v: Vector2 = here[i]["vel"]
+			mi.position = Vector3(p.x, 70.0, p.y)
+			mi.rotation = Vector3(0.0, -v.angle(), 0.0)
 
 
 ## A crawl-through vent: a slatted grille at floor level in a back wall.
