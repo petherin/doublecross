@@ -125,7 +125,8 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   switches to seeing the room through your agent's eyes: real 3D walls,
   floor and Blender-modelled furniture, with the other agents as *Doom*-style
   cut-outs from their sprite sheets. Through each doorway you see the next
-  room (though not who's in it, which stays hidden as it does overhead).
+  room (though not who's in it, which stays hidden as it does overhead), and
+  the walls carry the same screens, maps, clocks and posters as overhead.
   W/S walk, ←/→ turn, A/D sidestep; on a touch screen the stick walks and
   turns, and you can swipe the right half to look around.
   Explosions, shocks, flying paperwork and the comic-book words happen in 3D
@@ -261,9 +262,9 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
-- **First person, finished:** wall decorations (screens, maps, posters) on
-  the 3D walls, a sense of the whole base (lit corridors beyond the
-  neighbouring rooms), and a frame-rate check on older phones.
+- **First person, finished:** a sense of the whole base (lit corridors
+  beyond the neighbouring rooms), animated screens on the 3D walls, and a
+  frame-rate check on older phones.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.

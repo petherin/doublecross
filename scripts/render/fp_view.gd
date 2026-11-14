@@ -11,6 +11,7 @@ const Agent = preload("res://scripts/game/agent.gd")
 const FpEffects = preload("res://scripts/render/fp_effects.gd")
 const RoomView = preload("res://scripts/render/room_view.gd")
 const Style = preload("res://scripts/ui/style.gd")
+const FpDecor = preload("res://scripts/render/fp_decor.gd")
 
 ## Taller than the isometric cut-away walls, so the room feels enclosed.
 const WALL_H := 210.0
@@ -18,6 +19,8 @@ const DOOR_H := 150.0
 const EYE_H := 104.0
 ## The room textures cover 128 units each way (the wall is 110 high).
 const TEX_UNITS := 128.0
+## How high off the floor the band of wall decorations starts.
+const DECOR_Y := 22.0
 ## The short passage between neighbouring rooms, seen through doorways.
 const GAP := 60.0
 const WALL_ROT := {"top": 0.0, "bottom": 180.0, "left": 90.0, "right": -90.0, "free": 0.0}
@@ -196,6 +199,8 @@ func _build_shell(r_room: Vector2i, tint: Color, from_dir: int) -> void:
 		var spans := [[0.0, length]] if opening == 0 else [[0.0, mid_t - dh], [mid_t + dh, length]]
 		for sp in spans:
 			_wall(a + along * sp[0], a + along * sp[1], 0.0, WALL_H, w[2], tint)
+		if from_dir == -1:
+			_decor(a, b, w[2], spans, tint, dir)
 		if opening != 0:
 			_wall(a + along * (mid_t - dh), a + along * (mid_t + dh), DOOR_H, WALL_H, w[2], tint)
 			# Doors from the room we're in lead to rooms we've built; others are dark.
@@ -212,6 +217,28 @@ func _wall(a: Vector2, b: Vector2, bottom: float, top: float, yaw: float, tint: 
 	mat.uv1_scale = Vector3(length / TEX_UNITS, h / 110.0, 1.0)
 	var mid := (a + b) / 2.0
 	_quad(Vector2(length, h), Vector3(mid.x, bottom + h / 2.0, mid.y), Vector3(0.0, yaw, 0.0), mat)
+
+
+## The decorations on one wall of the room we're in, as a picture hung just
+## in front of it (painted by the same code as the overhead view).
+func _decor(a: Vector2, b: Vector2, yaw: float, spans: Array, tint: Color, dir: int) -> void:
+	var length := a.distance_to(b)
+	# Overhead, the back walls are walls 0 and 1; the front walls get their own.
+	var wall: int = {World.Dir.UP: 0, World.Dir.LEFT: 1, World.Dir.DOWN: 2, World.Dir.RIGHT: 3}[dir]
+	var tex := FpDecor.paint(_room_root, length, spans, tint, wall, world.seed_value, room)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.3
+	m.emission_enabled = true
+	m.emission_texture = tex
+	m.emission_energy_multiplier = 0.35
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var mid := (a + b) / 2.0
+	# Just in front of the wall, so it doesn't flicker against it.
+	var inward := Vector3(sin(yaw), 0.0, cos(yaw)) * 0.8
+	_quad(Vector2(length, FpDecor.BAND_H), Vector3(mid.x, DECOR_Y + FpDecor.BAND_H / 2.0, mid.y) + inward,
+			Vector3(0.0, yaw, 0.0), m)
 
 
 ## A dark passage beyond a doorway, or daylight beyond the exit.
