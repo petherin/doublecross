@@ -60,6 +60,8 @@ var _held: Array = []
 var _bar: ColorRect
 var _leave: Button
 var _view_button: Button
+## In first person, the way you're looking (an arrow on the mini-map); NAN when overhead.
+var _facing := NAN
 var _has_case := false
 
 
@@ -384,6 +386,14 @@ func _close_trap_menu() -> void:
 		_trap_options[k].visible = false
 
 
+## Shows which way you're looking on the mini-map (NAN to hide it).
+func set_facing(angle: float) -> void:
+	if is_nan(angle) and is_nan(_facing):
+		return
+	_facing = angle
+	_minimap.queue_redraw()
+
+
 ## Updates the view switch to offer the other view.
 func set_first_person(on: bool) -> void:
 	_view_button.text = "OVERHEAD" if on else "1ST PERSON"
@@ -520,6 +530,14 @@ func _draw_minimap() -> void:
 			if not here and Vector2i(x, y) == world.exit_room:
 				col = Color("5dff8a", 0.55)
 			_minimap.draw_colored_polygon(pts, col)
+	# First person: an arrow in your room pointing the way you're looking.
+	if not is_nan(_facing):
+		var c := origin + Vector2((_room.x - _room.y) * a, (_room.x + _room.y) * a * 0.5 + a * 0.5)
+		var d := World.floor_to_screen_dir(Vector2.from_angle(_facing)).normalized()
+		var side := Vector2(-d.y, d.x)
+		var tip := c + d * a * 0.9
+		_minimap.draw_colored_polygon(PackedVector2Array([tip, c - d * a * 0.3 + side * a * 0.45,
+				c - d * a * 0.3 - side * a * 0.45]), Color.WHITE)
 	# Vent shortcuts you've found: dashed yellow links.
 	for pair in _known_vents:
 		var ra: Vector2i = world.vents[pair[0]]["room"]

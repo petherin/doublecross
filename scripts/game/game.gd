@@ -285,7 +285,8 @@ func _process(delta: float) -> void:
 		var ahead := Vector2.from_angle(local_agent.facing)
 		local_agent.move_input = (ahead * forward + ahead.orthogonal() * -strafe).limit_length(1.0)
 		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
-		fp.show_extras(view.effects.in_room(local_agent.room), view.my_traps, view.vent_highlight)
+		fp.show_extras(view.effects.in_room(local_agent.room), view.my_traps, view.vent_highlight, darts)
+		hud.set_facing(local_agent.facing)
 	else:
 		# Controls are screen-relative: up on the stick = up the screen.
 		local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
@@ -360,6 +361,8 @@ func toggle_view() -> void:
 		add_child(fp)
 	view.visible = not first_person
 	local_agent.face_lock = first_person
+	if not first_person:
+		hud.set_facing(NAN)
 	fp.set_active(first_person)
 	if first_person:
 		fp.rebuild(world, local_agent.room)

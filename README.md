@@ -263,8 +263,7 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
 - **First person, finished:** a sense of the whole base (lit corridors
-  beyond the neighbouring rooms), animated screens on the 3D walls, and a
-  frame-rate check on older phones.
+  beyond the neighbouring rooms), and a frame-rate check on older phones.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.
