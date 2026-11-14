@@ -71,6 +71,11 @@ func _draw() -> void:
 			var door := R.get_center() + v * R.size / 2.0
 			draw_texture_rect(soft, Rect2(door - Vector2(220, 220), Vector2(440, 440)), false, Color(1.0, 0.95, 0.75, 0.25))
 
+	# The alarm: a red wash beating through the room.
+	if view.lights.alarm:
+		var beat := 0.5 + 0.5 * sin(t * 7.0)
+		draw_texture_rect(soft, Rect2(R.position - R.size * 0.3, R.size * 1.6), false, Color(1.0, 0.1, 0.05, 0.16 * beat))
+
 	# Explosions light up the room.
 	for e in view.effects.in_room(room):
 		if e["kind"] == "BOMB":
