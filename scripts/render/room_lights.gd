@@ -6,7 +6,7 @@ extends Node2D
 ## Positions are in the room view's screen space; `height` is how high the
 ## light hangs above the floor (in pixels), which sets the shading angle.
 
-const World = preload("res://scripts/world.gd")
+const World = preload("res://scripts/core/world.gd")
 
 var _light_tex: Texture2D
 var _flashes: Array = []     # [light, age]

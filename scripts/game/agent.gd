@@ -12,9 +12,9 @@ signal recovered(kind: String)
 ## Emitted when the agent ducks into a vent (true) or pops out of one (false).
 signal vent_moved(entering: bool)
 
-const World = preload("res://scripts/world.gd")
-const Ui = preload("res://scripts/ui.gd")
-const Art = preload("res://scripts/art.gd")
+const World = preload("res://scripts/core/world.gd")
+const Ui = preload("res://scripts/ui/ui.gd")
+const Art = preload("res://scripts/render/art.gd")
 const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0

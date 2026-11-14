@@ -2,8 +2,8 @@ extends Node
 ## Top-level flow: menu <-> match. The host starts the match as soon as a
 ## rival joins by sending everyone the same world seed.
 
-const Menu = preload("res://scripts/menu.gd")
-const Game = preload("res://scripts/game.gd")
+const Menu = preload("res://scripts/ui/menu.gd")
+const Game = preload("res://scripts/game/game.gd")
 
 var _menu: Menu
 var _game: Game

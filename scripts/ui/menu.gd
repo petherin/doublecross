@@ -5,9 +5,9 @@ extends Control
 signal practice_requested
 signal bot_requested(level: String)
 
-const Ui = preload("res://scripts/ui.gd")
-const Style = preload("res://scripts/style.gd")
-const Art = preload("res://scripts/art.gd")
+const Ui = preload("res://scripts/ui/ui.gd")
+const Style = preload("res://scripts/ui/style.gd")
+const Art = preload("res://scripts/render/art.gd")
 
 var _status: Label
 var _hosts_box: VBoxContainer

@@ -3,12 +3,12 @@ extends Node2D
 ## Draw order: floor -> back walls -> furniture & agents (depth sorted) -> front ledges.
 ## Everything is drawn in code for now; real art can replace each piece later.
 
-const World = preload("res://scripts/world.gd")
-const Icons = preload("res://scripts/icons.gd")
-const Art = preload("res://scripts/art.gd")
-const Style = preload("res://scripts/style.gd")
-const LightLayer = preload("res://scripts/light_layer.gd")
-const RoomLights = preload("res://scripts/room_lights.gd")
+const World = preload("res://scripts/core/world.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
+const Art = preload("res://scripts/render/art.gd")
+const Style = preload("res://scripts/ui/style.gd")
+const LightLayer = preload("res://scripts/render/light_layer.gd")
+const RoomLights = preload("res://scripts/render/room_lights.gd")
 const POSTERS := ["TRUST NO ONE", "WALLS HAVE EARS", "SHRED AFTER READING", "LOOK BUSY"]
 const SIGNS := ["RESTRICTED", "AUTHORISED ONLY", "NO ENTRY", "DANGER: HIGH VOLTAGE"]
 

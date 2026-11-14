@@ -11,12 +11,12 @@ signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
 
-const World = preload("res://scripts/world.gd")
-const Joystick = preload("res://scripts/joystick.gd")
-const ActionButton = preload("res://scripts/action_button.gd")
-const Icons = preload("res://scripts/icons.gd")
-const Style = preload("res://scripts/style.gd")
-const Ui = preload("res://scripts/ui.gd")
+const World = preload("res://scripts/core/world.gd")
+const Joystick = preload("res://scripts/ui/joystick.gd")
+const ActionButton = preload("res://scripts/ui/action_button.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
+const Style = preload("res://scripts/ui/style.gd")
+const Ui = preload("res://scripts/ui/ui.gd")
 
 var world: World
 var joystick: Joystick

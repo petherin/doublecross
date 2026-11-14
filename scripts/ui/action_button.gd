@@ -4,7 +4,7 @@ extends Control
 
 signal pressed
 
-const Icons = preload("res://scripts/icons.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 
 var label := "ACTION"
 ## "search" draws a magnifier; anything else is an item/trap icon name.

@@ -6,8 +6,8 @@ extends Node
 ## briefcase, and it has to walk to the exit. It remembers what it has
 ## searched and where it left things.
 
-const World = preload("res://scripts/world.gd")
-const Agent = preload("res://scripts/agent.gd")
+const World = preload("res://scripts/core/world.gd")
+const Agent = preload("res://scripts/game/agent.gd")
 
 const CELL := 40.0
 ## How each difficulty plays.

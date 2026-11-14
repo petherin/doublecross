@@ -13,12 +13,12 @@ signal rematch_requested
 ## Every match event, after it's been applied (handy for tests and effects).
 signal event_happened(event: Dictionary)
 
-const World = preload("res://scripts/world.gd")
-const Agent = preload("res://scripts/agent.gd")
-const RoomView = preload("res://scripts/room_view.gd")
-const Hud = preload("res://scripts/hud.gd")
-const Ui = preload("res://scripts/ui.gd")
-const Bot = preload("res://scripts/bot.gd")
+const World = preload("res://scripts/core/world.gd")
+const Agent = preload("res://scripts/game/agent.gd")
+const RoomView = preload("res://scripts/render/room_view.gd")
+const Hud = preload("res://scripts/ui/hud.gd")
+const Ui = preload("res://scripts/ui/ui.gd")
+const Bot = preload("res://scripts/game/bot.gd")
 
 ## Peer id used for the computer-controlled rival in one-player games.
 const BOT_ID := 2
@@ -153,7 +153,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	vig_layer.layer = 1
 	add_child(vig_layer)
 	var vig := TextureRect.new()
-	vig.texture = preload("res://scripts/art.gd").vignette()
+	vig.texture = preload("res://scripts/render/art.gd").vignette()
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vig_layer.add_child(vig)

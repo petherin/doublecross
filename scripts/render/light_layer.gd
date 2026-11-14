@@ -2,8 +2,8 @@ extends Node2D
 ## Additive light drawn over the room: ceiling-lamp pools and shafts, dust in
 ## the light, screen and exit glows, and the flash from explosions.
 
-const World = preload("res://scripts/world.gd")
-const Art = preload("res://scripts/art.gd")
+const World = preload("res://scripts/core/world.gd")
+const Art = preload("res://scripts/render/art.gd")
 
 var view: Node2D   # the RoomView this belongs to
 
