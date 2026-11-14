@@ -4,3 +4,5 @@ max-file-lines: 1200
 max-returns: 8
 # Short loop/geometry names are fine in drawing code.
 function-variable-name: (_on_[a-z0-9_]+|[a-z][a-z0-9_]*|[A-Z])
+# game.gd is the network surface of a match: its @rpc endpoints are public by nature.
+max-public-methods: 26

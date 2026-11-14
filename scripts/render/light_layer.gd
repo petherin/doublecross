@@ -72,8 +72,8 @@ func _draw() -> void:
 			draw_texture_rect(soft, Rect2(door - Vector2(220, 220), Vector2(440, 440)), false, Color(1.0, 0.95, 0.75, 0.25))
 
 	# Explosions light up the room.
-	for e in view._effects:
-		if e["room"] == room and e["kind"] == "BOMB":
+	for e in view.effects.in_room(room):
+		if e["kind"] == "BOMB":
 			var a := clampf(1.0 - e["t"] / 0.9, 0.0, 1.0)
 			var p: Vector2 = e["pos"]
 			draw_texture_rect(soft, Rect2(p - Vector2(500, 500), Vector2(1000, 1000)), false, Color(1.0, 0.55, 0.2, 0.55 * a))
