@@ -12,7 +12,6 @@ on:
       - "docs/**"
       - "LICENSE"
   pull_request:
-    paths-ignore: *docs
   workflow_dispatch:
 
 env:
