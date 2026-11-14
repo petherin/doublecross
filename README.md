@@ -223,10 +223,6 @@ is the field manual.
 
 Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
-**In progress:** new agent animations (crouching to set a trap, a dizzy sway
-after a trap, a two-way flinch when hit, falling before lying flat), being
-rendered in Blender.
-
 ### Top five
 
 1. **Spectate when you're out.** Once your clock runs out you're left
@@ -366,7 +362,8 @@ python3.11 -m venv .blendenv
 around a jointed skeleton (so knees and elbows really bend), a head with a big
 spy nose, brows, smirk and shades, a snap-brim fedora, a belted trench coat,
 gloves and polished shoes. `build_agents.py` poses it and renders 8 directions
-of every animation (idle, walk, run, search, cosh swing, hurt, knocked down,
+of every animation (idle, walk, run, search, crouching to set a trap, cosh
+swing, a two-way flinch, a dizzy sway after a trap, falling and lying flat,
 victory) with ink outlines from an orthographic camera at the game's isometric
 angle, plus a normal map for every frame, then `pack_sprites.py` trims and packs
 the frames into compact atlases. Add `--preview` for small, quick renders.

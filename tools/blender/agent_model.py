@@ -568,15 +568,33 @@ def _pose_angles(anim, i, n):
         a["hip_r"] = rot(fwd=-14)
         a["knee_l"] = rot(fwd=-12)
     elif anim == "hurt":
-        a["spine"] = rot(fwd=-12)
-        a["chest"] = rot(fwd=-10)
-        a["head"] = rot(fwd=-22, twist=12)
-        a["shoulder_l"] = rot(fwd=35, side=55)
-        a["shoulder_r"] = rot(fwd=35, side=-55)
+        # Two flinches: thrown back to one side, then the other.
+        f = 1 if i % 2 == 0 else -1
+        a["spine"] = rot(fwd=-12, twist=6 * f)
+        a["chest"] = rot(fwd=-10, twist=8 * f)
+        a["head"] = rot(fwd=-22, twist=12 * f)
+        a["shoulder_l"] = rot(fwd=35 + 10 * f, side=55)
+        a["shoulder_r"] = rot(fwd=35 - 10 * f, side=-55)
         a["elbow_l"] = rot(fwd=40)
         a["elbow_r"] = rot(fwd=40)
-        a["hip_l"] = rot(fwd=14)
-        a["knee_l"] = rot(fwd=-18)
+        if f > 0:
+            a["hip_l"] = rot(fwd=14)
+            a["knee_l"] = rot(fwd=-18)
+        else:
+            a["hip_r"] = rot(fwd=14)
+            a["knee_r"] = rot(fwd=-18)
+    elif anim == "down" and i == 0:
+        # Going over backwards: half fallen, arms thrown up, knees buckling.
+        root = Matrix.Translation((0.42, 0, 0.1)) @ Matrix.Rotation(math.radians(-48), 4, "Y")
+        a["shoulder_l"] = rot(fwd=120, side=40)
+        a["shoulder_r"] = rot(fwd=125, side=-45)
+        a["elbow_l"] = rot(fwd=35)
+        a["elbow_r"] = rot(fwd=30)
+        a["hip_l"] = rot(fwd=40)
+        a["hip_r"] = rot(fwd=20)
+        a["knee_l"] = rot(fwd=-45)
+        a["knee_r"] = rot(fwd=-30)
+        a["head"] = rot(fwd=-25, twist=10)
     elif anim == "down":
         # Flat on the back, arms flung wide, one knee up.
         root = Matrix.Translation((0.88, 0, 0.17)) @ Matrix.Rotation(math.radians(-88), 4, "Y")
@@ -588,4 +606,37 @@ def _pose_angles(anim, i, n):
         a["knee_l"] = rot(fwd=-60)
         a["hip_r"] = rot(side=-8)
         a["head"] = rot(twist=30)
+    elif anim == "trap":
+        # Crouched at the furniture, fiddling with the mechanism: a deep
+        # squat, head down, hands working low in front.
+        wig = math.sin(ph)
+        root = Matrix.Translation((0.05, 0, -0.38))
+        a["spine"] = rot(fwd=30)
+        a["chest"] = rot(fwd=14)
+        a["head"] = rot(fwd=24, twist=6 * wig)
+        a["hip_l"] = rot(fwd=86, side=10)
+        a["hip_r"] = rot(fwd=86, side=-10)
+        a["knee_l"] = rot(fwd=-122)
+        a["knee_r"] = rot(fwd=-122)
+        a["ankle_l"] = rot(fwd=38)
+        a["ankle_r"] = rot(fwd=38)
+        a["shoulder_l"] = rot(fwd=58 + 10 * wig, side=4)
+        a["shoulder_r"] = rot(fwd=62 - 14 * wig, side=-4)
+        a["elbow_l"] = rot(fwd=62 - 10 * wig)
+        a["elbow_r"] = rot(fwd=70 + 14 * wig)
+    elif anim == "dizzy":
+        # Knocked silly: swaying on bent knees, arms dangling, head lolling.
+        f = 1 if i % 2 == 0 else -1
+        a["spine"] = rot(fwd=8, twist=10 * f)
+        a["chest"] = rot(twist=-6 * f, fwd=4)
+        a["head"] = rot(fwd=12, twist=-28 * f)
+        a["shoulder_l"] = rot(fwd=4, side=14 + 6 * f)
+        a["shoulder_r"] = rot(fwd=4, side=-14 + 6 * f)
+        a["elbow_l"] = rot(fwd=8)
+        a["elbow_r"] = rot(fwd=8)
+        a["hip_l"] = rot(fwd=10 + 6 * f)
+        a["hip_r"] = rot(fwd=10 - 6 * f)
+        a["knee_l"] = rot(fwd=-20)
+        a["knee_r"] = rot(fwd=-20)
+        a["pelvis"] = Matrix.Translation((0, 0.03 * f, -0.04)) @ rot(twist=6 * f)
     return a, root, cosh
