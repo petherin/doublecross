@@ -31,7 +31,8 @@ var fire_button: ActionButton
 var _known_vents: Array = []
 var _status: Control
 var _clock_mine := 0.0
-var _clock_rival := -1.0
+## Rivals' clocks, top-right: [{ "clock": float, "accent": Color, "out": bool }].
+var _rivals: Array = []
 var _hp := 3
 var _max_hp := 3
 var _darts := 3
@@ -211,12 +212,12 @@ func _place(b: Control, centre: Vector2) -> void:
 	b.position = centre - b.size / 2.0
 
 
-## Clock, health and darts (top-left) and the rival's clock (top-right).
-func set_status(mine: float, rival: float, hp: int, max_hp: int, darts: int) -> void:
-	if absf(mine - _clock_mine) < 0.05 and absf(rival - _clock_rival) < 0.05 and hp == _hp and darts == _darts:
+## Clock, health and darts (top-left) and the rivals' clocks (top-right).
+func set_status(mine: float, rivals: Array, hp: int, max_hp: int, darts: int) -> void:
+	if absf(mine - _clock_mine) < 0.05 and rivals == _rivals and hp == _hp and darts == _darts:
 		return
 	_clock_mine = mine
-	_clock_rival = rival
+	_rivals = rivals
 	_hp = hp
 	_max_hp = max_hp
 	_darts = darts
@@ -253,12 +254,29 @@ func _draw_status() -> void:
 	# Darts left
 	Icons.draw(_status, "DART", Vector2(210, 23), 22.0, _darts > 0)
 	_status.draw_string(font, Vector2(224, 31), "%d" % _darts, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
-	if _clock_rival >= 0.0:
-		var txt := "RIVAL  %s" % _fmt(_clock_rival)
-		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-		_status.draw_rect(Rect2(_status.size.x - w - 28, 4, w + 20, 38), Color(0, 0, 0, 0.45))
-		_status.draw_string(
-				font, Vector2(_status.size.x - w - 18, 31), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.75))
+	_draw_rival_clocks(font)
+
+
+## One "● 5:53" per rival, in their colour, right-aligned; "OUT" once eliminated.
+func _draw_rival_clocks(font: Font) -> void:
+	if _rivals.is_empty():
+		return
+	var texts := []
+	var width := 12.0
+	for r in _rivals:
+		var txt: String = "OUT" if r["out"] else _fmt(r["clock"])
+		texts.append(txt)
+		width += 22.0 + font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + 14.0
+	var x := _status.size.x - width - 8.0
+	_status.draw_rect(Rect2(x, 4, width, 38), Color(0, 0, 0, 0.45))
+	x += 12.0
+	for i in _rivals.size():
+		var r: Dictionary = _rivals[i]
+		var a := 0.35 if r["out"] else 0.85
+		_status.draw_circle(Vector2(x + 7, 23), 7, Color(r["accent"], a))
+		x += 22.0
+		_status.draw_string(font, Vector2(x, 31), texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, a))
+		x += font.get_string_size(texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + 14.0
 
 
 ## Size of this layer in its own (scaled) units.
@@ -426,8 +444,8 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 
 ## The mission briefing typed out at the start of a match, then it
 ## self-destructs. Any tap or key skips it.
-func show_briefing(agent_name: String, rival_name: String, minutes: int) -> void:
-	var b := Briefing.new(_area(), agent_name, rival_name, minutes)
+func show_briefing(agent_name: String, rivals: String, minutes: int) -> void:
+	var b := Briefing.new(_area(), agent_name, rivals, minutes)
 	b.finished.connect(briefing_done.emit)
 	add_child(b)
 
@@ -459,10 +477,11 @@ func _draw_inventory() -> void:
 
 func _draw_minimap() -> void:
 	# Isometric mini-map matching the room view's orientation; the exit room is green.
-	var a := 9.0
-	var origin := Vector2(28, 8)
-	for y in World.ROWS:
-		for x in World.COLS:
+	# Room size shrinks so bigger bases still fit the 56px map.
+	var a := 9.0 * 6.0 / float(world.cols + world.rows)
+	var origin := Vector2(28 - (world.cols - world.rows) * a * 0.5, 8 + (6 - world.cols - world.rows) * a * 0.25)
+	for y in world.rows:
+		for x in world.cols:
 			var c := origin + Vector2((x - y) * a, (x + y) * a * 0.5 + a * 0.5)
 			var pts := PackedVector2Array([
 				c + Vector2(0, -a * 0.5 + 1), c + Vector2(a - 1.5, 0), c + Vector2(0, a * 0.5 - 1), c + Vector2(-a + 1.5, 0)])

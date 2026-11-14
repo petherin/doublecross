@@ -171,8 +171,9 @@ func _physics_process(delta: float) -> void:
 
 ## Returns true while the bot is busy fighting (and not exploring).
 func _fight(delta: float) -> bool:
-	var rival: Agent = game.local_agent
-	if rival == null or rival == agent or rival.room != agent.room:
+	# The nearest other agent in the room, human or bot.
+	var rival: Agent = game.rival_near(agent, 1.0e9)
+	if rival == null:
 		_met_in = Vector2i(-1, -1)
 		_engaged = false
 		return false
@@ -184,7 +185,7 @@ func _fight(delta: float) -> bool:
 		_attack_cd = _rng.randf_range(_f["react"][0], _f["react"][1])
 	# Carrying everything? Ignore the rival and run for it. Also leave a rival
 	# who's down or just back on their feet alone.
-	if not _engaged or game._missing(id).is_empty() or rival.ko_time > 0.0 or rival.protect_time > 0.0:
+	if not _engaged or game.missing_intel(id).is_empty() or rival.ko_time > 0.0 or rival.protect_time > 0.0:
 		return false
 	var to := rival.position - agent.position
 	var dist := to.length()
@@ -232,7 +233,7 @@ func _can_take_more() -> bool:
 
 func _think() -> void:
 	var inv := _inv()
-	if game._missing(id).is_empty():
+	if game.missing_intel(id).is_empty():
 		_head_for_room(world().exit_room, {"type": "exit"})
 		return
 

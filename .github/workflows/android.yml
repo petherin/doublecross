@@ -49,8 +49,11 @@ jobs:
           ~/godot/godot --headless --import || true
           ~/godot/godot --headless -s res://tests/smoke.gd
 
-      - name: Bot match
+      - name: Bot match (2 agents)
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd
+
+      - name: Bot match (4 agents)
+        run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=3
 
   android:
     # Never export or upload downloadable build artifacts for pull requests.

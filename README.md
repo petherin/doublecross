@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Two rival agents. One secret base. Only one gets out.</b><br>
-  A two-player, one-tablet-each game of sneaking, booby traps and very bad manners.
+  A two-to-four-player, one-tablet-each game of sneaking, booby traps and very bad manners.
 </p>
 
 <p align="center">
@@ -60,7 +60,8 @@ characters, artwork, music and code. See [Acknowledgements](#acknowledgements).
 What works today:
 
 - Host a game on one tablet. The other tablet finds it automatically, or you can type the host's IP address.
-- A seeded 3×3 secret base. Both tablets build the identical map from one shared number.
+- A seeded secret base that grows with the party: 3×3 rooms for two agents, 4×3 for three, 4×4 for four. Every device builds the identical map from one shared number.
+- **Up to four agents:** Crimson, Cobalt, Amber and Jade. There's still only one of each piece of intel, but one briefcase fewer than there are agents, so somebody always goes without. The host opens a lobby, rivals join, and the host presses START once two to four are in. If an agent's clock runs out (or they leave) they're out and their intel scatters; the last one in, or the first one out of the exit, wins.
 - Isometric rooms with depth-sorted furniture, doors and a mini-map.
 - Touch joystick (left half of the screen), plus WASD or arrow keys on a computer.
 - Works on phones as well as tablets: wide screens get a wider view, and on small screens the controls and text are scaled up. You can mix a phone and a tablet in one match.
@@ -78,7 +79,7 @@ What works today:
 - **Air-vent shortcuts:** some rooms have a crawl-through vent at floor level that joins up with a room two or more rooms away. Stand at one and press **CRAWL** to scramble through the ducts and pop out the other end. Vents are always in the same places for a match, and the ones you've used show up on your mini-map.
 - **Codenames:** type your own agent name on the title screen. It's saved, and in a two-player game it's sent to your rival.
 - **Settings and How to Play** on the title screen: music and effects volume, vibration, and the clock length (4–10 minutes).
-- **PLAY VS BOT**: a one-player mode against a computer agent that plays by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, a bit forgetful, and now and then sets off its own traps), MEDIUM or HARD.
+- **TAKE ON THE BOTS**: a one-player mode against one, two or three computer agents that play by the same rules. It has to search to find things, can only carry one item until it finds the briefcase, and sets traps of its own. Pick EASY (slow, a bit forgetful, and now and then sets off its own traps), MEDIUM or HARD.
 
 ## Playing it
 
@@ -99,13 +100,14 @@ Not sure which Mac you have? **Apple menu → About This Mac** shows *Chip: Appl
 Older builds are on the [releases page](https://github.com/petherin/doublecross/releases).
 Each build has a higher version number, so a new APK installs over the old one.
 
-### On two Android tablets (or phones)
+### On two to four Android tablets (or phones)
 
 1. On each device, download [**DoubleCross.apk**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross.apk)
    and open it. Android will ask you to allow installs from that source the first time.
-2. Put both devices on **the same Wi-Fi network**.
-3. On one, choose **HOST A MISSION**. On the other, pick the game under
-   **INTERCEPTED TRANSMISSIONS**, or type the IP address shown on the host's screen.
+2. Put all the devices on **the same Wi-Fi network**.
+3. On one, choose **HOST A MISSION**. On the others, tap the host's name under
+   **INTERCEPTED TRANSMISSIONS** (or **FIND HOST** to look again; **TYPE IP** is the fallback).
+4. Once everyone's in the lobby, the host presses **START MISSION**.
 
 > Some routers (guest networks, many office and hotel Wi-Fi networks) block
 > devices from seeing each other. If the game doesn't show up, use the IP
@@ -138,7 +140,7 @@ against itself.
 1. Install **Godot 4.3** from [godotengine.org](https://godotengine.org/download/archive/4.3-stable/)
    (the standard version, not .NET). It runs natively on Apple Silicon.
 2. In Godot, choose **Import** and pick this folder's `project.godot`.
-3. **Solo:** press ▶ (or <kbd>⌘</kbd>+<kbd>B</kbd>) and choose **PLAY VS BOT** (or **PRACTICE SOLO** to explore alone). Move with WASD/arrows or drag with the mouse.
+3. **Solo:** press ▶ (or <kbd>⌘</kbd>+<kbd>B</kbd>) and choose **TAKE ON THE BOTS** (or **SOLO TRAINING** to explore alone). Move with WASD/arrows or drag with the mouse.
 4. **Two players on one Mac:** go to **Debug → Customize Run Instances…**, tick
    **Enable Multiple Instances**, set it to **2** and press ▶. In one window click
    **HOST GAME**. In the other, type `127.0.0.1` and click **JOIN**.

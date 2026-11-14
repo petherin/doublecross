@@ -3,7 +3,10 @@ extends Control
 ## join one found on the network (or by IP), play the bot or practise solo.
 
 signal practice_requested
-signal bot_requested(level: String)
+signal bot_requested(level: String, count: int)
+## Hosting: a lobby has opened; the host wants the match to begin.
+signal host_requested
+signal start_requested
 
 const Ui = preload("res://scripts/ui/ui.gd")
 const Style = preload("res://scripts/ui/style.gd")
@@ -36,10 +39,12 @@ var _ip_row: HBoxContainer
 var _name_edit: LineEdit
 var _main_buttons: Control
 var _cancel: Button
+var _start: Button
 var _content: Control
 var _art: Control
 var _overlay: Control
 var _bot_level := "medium"
+var _bot_count := 1
 var _t := 0.0
 var _lift := 0.0
 # Typewriter effect for the status line and the tagline.
@@ -54,6 +59,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = Style.paper_theme()
 	_bot_level = Settings.bot_level
+	_bot_count = Settings.bot_count
 	# Everything lives in a 1280x800 panel, centred (and lifted above the
 	# on-screen keyboard) in _process.
 	_content = Control.new()
@@ -90,11 +96,11 @@ func _ready() -> void:
 	_content.add_child(orders)
 	_main_buttons = orders
 	orders.add_child(_order_button("HOST A MISSION", _on_host))
-	orders.add_child(_order_button("TAKE ON THE BOT", func(): bot_requested.emit(_bot_level)))
+	orders.add_child(_order_button("TAKE ON THE BOTS", func(): bot_requested.emit(_bot_level, _bot_count)))
 	var levels := HBoxContainer.new()
 	levels.add_theme_constant_override("separation", 6)
 	var lpad := Control.new()
-	lpad.custom_minimum_size = Vector2(36, 0)
+	lpad.custom_minimum_size = Vector2(20, 0)
 	levels.add_child(lpad)
 	var group := ButtonGroup.new()
 	for lv in ["easy", "medium", "hard"]:
@@ -103,13 +109,32 @@ func _ready() -> void:
 		b.toggle_mode = true
 		b.button_group = group
 		b.button_pressed = lv == _bot_level
-		b.custom_minimum_size = Vector2(118, 40)
-		b.add_theme_font_size_override("font_size", 19)
+		b.custom_minimum_size = Vector2(88, 40)
+		b.add_theme_font_size_override("font_size", 17)
 		b.pressed.connect(func():
 			_bot_level = lv
 			Settings.bot_level = lv
 			Settings.save())
 		levels.add_child(b)
+	# How many computer rivals (the base grows to fit them).
+	var sep := Control.new()
+	sep.custom_minimum_size = Vector2(10, 0)
+	levels.add_child(sep)
+	var counts := ButtonGroup.new()
+	for n in [1, 2, 3]:
+		var cb := Button.new()
+		cb.text = "×%d" % n
+		cb.toggle_mode = true
+		cb.button_group = counts
+		cb.button_pressed = n == _bot_count
+		cb.custom_minimum_size = Vector2(46, 40)
+		cb.add_theme_font_size_override("font_size", 17)
+		cb.tooltip_text = "%d rival%s" % [n, "" if n == 1 else "s"]
+		cb.pressed.connect(func():
+			_bot_count = n
+			Settings.bot_count = n
+			Settings.save())
+		levels.add_child(cb)
 	orders.add_child(levels)
 	orders.add_child(_order_button("SOLO TRAINING", func(): practice_requested.emit()))
 
@@ -163,7 +188,7 @@ func _ready() -> void:
 
 	_cancel = Button.new()
 	_cancel.text = "✕ ABORT"
-	_cancel.position = Vector2(1040, 700)
+	_cancel.position = Vector2(960, 648)
 	_cancel.add_theme_font_size_override("font_size", 22)
 	_cancel.visible = false
 	_cancel.pressed.connect(func():
@@ -171,6 +196,13 @@ func _ready() -> void:
 		_set_waiting(false)
 		set_status(""))
 	_content.add_child(_cancel)
+	_start = Button.new()
+	_start.text = "▶ START MISSION"
+	_start.position = Vector2(700, 648)
+	_start.add_theme_font_size_override("font_size", 22)
+	_start.visible = false
+	_start.pressed.connect(func(): start_requested.emit())
+	_content.add_child(_start)
 
 	# ---- Index tabs poking out of the bottom of the folder.
 	_content.add_child(_tab_button("HOW TO PLAY", Vector2(120, 744), _show_help))
@@ -565,7 +597,22 @@ func _on_host() -> void:
 		set_status("Couldn't open a channel (error %d)." % err)
 		return
 	_set_waiting(true)
-	set_status("Waiting for a rival… They'll see you under FIND HOST. (IP %s)" % Net.local_ip())
+	host_requested.emit()
+
+
+## Who has joined so far. The host may start with 2-4 agents.
+func set_lobby(names: Array, is_host: bool) -> void:
+	var listed := []
+	for n in names:
+		listed.append(str(n).strip_edges().to_upper() if str(n).strip_edges() != "" else "AGENT ?")
+	var who := ", ".join(PackedStringArray(listed))
+	if names.size() < 2:
+		set_status("Waiting for rivals… They'll see you under FIND HOST. (IP %s)" % Net.local_ip())
+	elif is_host:
+		set_status("In the lobby: %s. Start now, or wait for more (up to %d)." % [who, Net.MAX_PLAYERS])
+	else:
+		set_status("In the lobby: %s. Waiting for the host to start…" % who)
+	_start.visible = is_host and names.size() >= 2
 
 
 func _join(ip: String) -> void:
@@ -593,6 +640,7 @@ func _set_waiting(on: bool) -> void:
 		if b is Button:
 			(b as Button).disabled = on
 	_cancel.visible = on
+	_start.visible = false
 	_find_row.visible = not on
 	_ip_row.visible = false
 	_ip_edit.release_focus()
@@ -601,7 +649,7 @@ func _set_waiting(on: bool) -> void:
 func _refresh_hosts() -> void:
 	for c in _hosts_box.get_children():
 		c.queue_free()
-	# Room for two on the page (there's only ever one rival anyway).
+	# Room for two on the page.
 	for ip in Net.discovered.keys().slice(0, 2):
 		var b := Button.new()
 		var their: String = Net.discovered[ip].get("version", "?")

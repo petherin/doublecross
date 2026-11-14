@@ -1,8 +1,8 @@
 extends SceneTree
 ## Fast headless checks, run in CI:
 ## - every script compiles and every input action is mapped,
-## - generated bases obey the rules (all items hidden, vents link distant
-##   rooms, every piece of furniture has a sprite) for many seeds,
+## - generated bases for 2, 3 and 4 agents obey the rules (all items hidden,
+##   vents link distant rooms, every piece of furniture has a sprite),
 ## - the menu and a match can be built and run for a few frames.
 ##   godot --headless -s res://tests/smoke.gd
 
@@ -56,11 +56,19 @@ func _check_worlds() -> void:
 	var sprites: Dictionary = JSON.parse_string(
 			FileAccess.get_file_as_string("res://assets/sprites/furniture.json"))["sprites"]
 	for seed_value in 300:
-		var w = World.new(seed_value)
-		var tag := " (seed %d)" % seed_value
+		var players: int = 2 + seed_value % 3
+		var w = World.new(seed_value, players)
+		var tag := " (seed %d, %d players)" % [seed_value, players]
+		var starts: Array = w.start_rooms()
+		_check(starts.size() == players, "one start room per agent" + tag)
+		_check(w.rooms.size() == World.SIZES[players].x * World.SIZES[players].y, "base size" + tag)
+		_check(not w.exit_room in starts, "exit not in a start room" + tag)
 		var items: Array = w.hidden.values()
 		for item in World.INTEL + [World.BRIEFCASE] + World.GADGETS:
 			_check(item in items, item + " hidden" + tag)
+		_check(items.count(World.BRIEFCASE) == players - 1, "one briefcase fewer than agents" + tag)
+		for item in World.INTEL:
+			_check(items.count(item) == 1, "exactly one " + item + tag)
 		_check(w.opening(w.exit_room, w.exit_dir) == 2, "exit on an outer wall" + tag)
 		_check(w.vents.size() >= 2 and w.vents.size() % 2 == 0, "vents come in pairs" + tag)
 		for i in w.vents.size():

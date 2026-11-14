@@ -10,6 +10,8 @@ var sfx_volume := 0.9
 var vibration := true
 var clock_minutes := 6
 var bot_level := "medium"
+## Computer rivals in a one-player game (1-3).
+var bot_count := 1
 var last_ip := ""
 ## Codename shown on your agent (blank = AGENT CRIMSON / COBALT).
 var player_name := ""
@@ -23,6 +25,7 @@ func _ready() -> void:
 		vibration = cfg.get_value("game", "vibration", vibration)
 		clock_minutes = cfg.get_value("game", "clock_minutes", clock_minutes)
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
+		bot_count = cfg.get_value("game", "bot_count", bot_count)
 		last_ip = cfg.get_value("net", "last_ip", last_ip)
 		player_name = cfg.get_value("game", "player_name", player_name)
 	changed.emit()
@@ -35,6 +38,7 @@ func save() -> void:
 	cfg.set_value("game", "vibration", vibration)
 	cfg.set_value("game", "clock_minutes", clock_minutes)
 	cfg.set_value("game", "bot_level", bot_level)
+	cfg.set_value("game", "bot_count", bot_count)
 	cfg.set_value("net", "last_ip", last_ip)
 	cfg.set_value("game", "player_name", player_name)
 	cfg.save(PATH)

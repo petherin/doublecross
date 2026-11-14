@@ -80,10 +80,17 @@ func _describe(won: bool, winner: int, winner_name: String, reason: String) -> v
 			_sub_text = "Nobody got out. The base goes into lockdown."
 		elif won:
 			_stamp_text = "LAST AGENT STANDING"
-			_sub_text = "Your rival's clock ran out. A win's a win."
+			_sub_text = "Every rival's clock ran out. A win's a win."
 		else:
 			_stamp_text = "OUT OF TIME"
 			_sub_text = "Your clock ran out. %s wins by default." % winner_name
+	elif reason == "left":
+		if winner == 0:
+			_stamp_text = "MISSION ABORTED"
+			_sub_text = "Everyone left the base."
+		else:
+			_stamp_text = "LAST AGENT STANDING"
+			_sub_text = "The other agents left the base. A win's a win."
 	_stamp_col = Style.GREEN_INK if won else Style.RED_INK
 
 

@@ -1,11 +1,13 @@
 extends RefCounted
 ## The secret base: a grid of rooms with furniture, generated from a seed.
-## Both tablets generate the same base from the same seed, so only the seed
-## needs to be sent over the network.
+## Every device generates the same base from the same seed and player
+## count, so only those need to be sent over the network. The base grows
+## with the number of agents: 3x3 rooms for two, 4x3 for three, 4x4 for four.
 
 enum Dir { UP, DOWN, LEFT, RIGHT }
-const COLS := 3
-const ROWS := 3
+const MAX_PLAYERS := 4
+## Base size (columns, rows) by number of agents.
+const SIZES := {2: Vector2i(3, 3), 3: Vector2i(4, 3), 4: Vector2i(4, 4)}
 ## Walkable floor area of a room, in screen pixels (viewport is 1280x800).
 const ROOM := Rect2(100, 110, 1080, 640)
 const WALL := 40.0
@@ -29,10 +31,14 @@ const OPPOSITE := {Dir.UP: Dir.DOWN, Dir.DOWN: Dir.UP, Dir.LEFT: Dir.RIGHT, Dir.
 const ROOM_NAMES := [
 	"Command Centre", "Comms Array", "Armoury", "Laboratory", "Reactor Core",
 	"Server Vault", "Hangar Bay", "Briefing Room", "Detention Block",
+	"Archives", "Cipher Room", "Motor Pool", "Infirmary", "Situation Room",
+	"Cryo Lab", "Mess Hall",
 ]
 const ROOM_TINTS := [
 	Color("3fd0ff"), Color("ff6b3d"), Color("7dff6b"), Color("c86bff"),
 	Color("ffd23f"), Color("3dffc8"), Color("ff3f8e"), Color("6b8cff"), Color("ff9f3f"),
+	Color("b4ff3f"), Color("3f8eff"), Color("ff5ad2"), Color("5affe6"), Color("ffb36b"),
+	Color("9a7dff"), Color("ff7d7d"),
 ]
 
 ## Furniture footprint when standing against the top or bottom wall.
@@ -64,6 +70,9 @@ const TRAP_NAMES := {"BOMB": "BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"
 
 const VENT_HALF := 34.0
 var seed_value := 0
+var players := 2
+var cols := 3
+var rows := 3
 ## The one room with a way out, and which (outer, back) wall it's on.
 var exit_room := Vector2i(1, 0)
 var exit_dir: int = Dir.UP
@@ -76,15 +85,18 @@ var vents: Array = []
 var rooms := {}
 
 
-func _init(seed_in: int) -> void:
+func _init(seed_in: int, player_count := 2) -> void:
 	seed_value = seed_in
+	players = clampi(player_count, 2, MAX_PLAYERS)
+	cols = SIZES[players].x
+	rows = SIZES[players].y
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_in
 	var names := _shuffled(ROOM_NAMES, rng)
 	var tints := _shuffled(ROOM_TINTS, rng)
 	var i := 0
-	for y in ROWS:
-		for x in COLS:
+	for y in rows:
+		for x in cols:
 			rooms[Vector2i(x, y)] = {
 				"name": names[i],
 				"tint": tints[i],
@@ -93,10 +105,14 @@ func _init(seed_in: int) -> void:
 			i += 1
 	# The exit is on a back (upper) outer wall so it's always in view,
 	# and never in a starting room.
-	var exits := [
-		[Vector2i(1, 0), Dir.UP], [Vector2i(2, 0), Dir.UP],
-		[Vector2i(0, 1), Dir.LEFT], [Vector2i(0, 2), Dir.LEFT],
-	]
+	var starts := start_rooms()
+	var exits := []
+	for x in range(1, cols):
+		if not Vector2i(x, 0) in starts:
+			exits.append([Vector2i(x, 0), Dir.UP])
+	for y in range(1, rows):
+		if not Vector2i(0, y) in starts:
+			exits.append([Vector2i(0, y), Dir.LEFT])
 	var e: Array = exits[rng.randi_range(0, exits.size() - 1)]
 	exit_room = e[0]
 	exit_dir = e[1]
@@ -104,9 +120,15 @@ func _init(seed_in: int) -> void:
 	_place_vents(rng)
 
 
+## Where each agent starts: opposite corners first, then the other two.
+func start_rooms() -> Array:
+	var corners := [Vector2i(0, 0), Vector2i(cols - 1, rows - 1), Vector2i(cols - 1, 0), Vector2i(0, rows - 1)]
+	return corners.slice(0, players)
+
+
 func has_door(room: Vector2i, dir: int) -> bool:
 	var n: Vector2i = room + DIR_VEC[dir]
-	return n.x >= 0 and n.y >= 0 and n.x < COLS and n.y < ROWS
+	return n.x >= 0 and n.y >= 0 and n.x < cols and n.y < rows
 
 
 func is_exit(room: Vector2i, dir: int) -> bool:
@@ -217,7 +239,7 @@ func _place_vents(rng: RandomNumberGenerator) -> void:
 	var used := {}
 	var pairs := 0
 	for a in all_rooms:
-		if pairs >= 3:
+		if pairs >= rooms.size() / 3:
 			break
 		if used.has(a):
 			continue
@@ -282,7 +304,16 @@ func _hide_items(rng: RandomNumberGenerator) -> void:
 			spots.append([r, i])
 	spots = _shuffled(spots, rng)
 	var used_rooms := {}
-	for item in INTEL + [BRIEFCASE] + GADGETS:
+	# One of each piece of intel, however many agents: that's what the
+	# fighting is for. Always one briefcase fewer than there are agents, so
+	# somebody goes without. Bigger games get a second set of gadgets.
+	var items: Array = INTEL.duplicate()
+	for b in players - 1:
+		items.append(BRIEFCASE)
+	items += GADGETS
+	if players > 2:
+		items += GADGETS
+	for item in items:
 		for spot in spots:
 			var key := furniture_key(spot[0], spot[1])
 			if hidden.has(key) or used_rooms.has(spot[0]):

@@ -1,5 +1,5 @@
 extends Node
-## Networking: hosting/joining a 2-player game over the local network,
+## Networking: hosting/joining a 2-4 player game over the local network,
 ## plus LAN discovery so nobody has to type IP addresses.
 ##
 ## Discovery works two ways, because many Android phones silently drop
@@ -9,12 +9,16 @@ extends Node
 ##   host answers each probe directly (unicast), which phones always receive.
 
 signal opponent_joined(peer_id: int)
+## A peer left the lobby before the match started.
+signal opponent_left(peer_id: int)
 signal joined_host
 signal join_failed
 signal session_ended(reason: String)
 signal hosts_changed
 
 const GAME_PORT := 47810
+## Players per match, host included.
+const MAX_PLAYERS := 4
 const DISCOVERY_PORT := 47811
 const PROBE_PORT := 47812
 const PROBE := "DBLX1?"
@@ -59,7 +63,7 @@ func _ready() -> void:
 func host() -> Error:
 	end_session("")
 	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(GAME_PORT, 1)
+	var err := peer.create_server(GAME_PORT, MAX_PLAYERS - 1)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer
@@ -210,16 +214,19 @@ func _process(delta: float) -> void:
 
 func _on_peer_connected(id: int) -> void:
 	if is_hosting:
-		stop_broadcasting()
+		if multiplayer.get_peers().size() >= MAX_PLAYERS - 1:
+			stop_broadcasting()   # full house: stop advertising
 		opponent_joined.emit(id)
 
 
-func _on_peer_disconnected(_id: int) -> void:
+func _on_peer_disconnected(id: int) -> void:
 	if is_hosting and not in_game:
 		# A joiner left (or was turned away) before the match: keep waiting.
 		_start_broadcasting()
+		opponent_left.emit(id)
 		return
-	end_session("Your opponent disconnected.")
+	# Mid-match the host drops that agent and the game carries on; a client
+	# only cares about the host leaving (server_disconnected handles that).
 
 
 ## Disconnects a joining device (e.g. one running a different version).

@@ -16,7 +16,8 @@ var _t := 0.0
 var _done := false
 
 
-func _init(area: Vector2, agent_name: String, rival_name: String, minutes: int) -> void:
+## `rivals` reads like "AGENT X is" or "3 rival agents are".
+func _init(area: Vector2, agent_name: String, rivals: String, minutes: int) -> void:
 	size = area
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.82)
@@ -32,7 +33,7 @@ func _init(area: Vector2, agent_name: String, rival_name: String, minutes: int) 
 		["TO: " + agent_name, Style.mono_bold(), 22, Style.INK],
 		["Recover the PASSPORT, CASH, MICROFILM and KEYCARD,", Style.mono(), 22, Style.INK],
 		["then get to the EXIT. You have %d minutes." % minutes, Style.mono(), 22, Style.INK],
-		["Beware: %s is already inside. Trust no one." % rival_name, Style.mono_bold(), 22, Style.RED_INK],
+		["Beware: %s already inside. Trust no one." % rivals, Style.mono_bold(), 22, Style.RED_INK],
 		["This message will self-destruct in 3… 2… 1…", Style.typewriter(), 22, Style.INK],
 	]
 

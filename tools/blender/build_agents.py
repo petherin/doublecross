@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds, poses and renders the two spy agents as isometric sprite sheets.
+"""Builds, poses and renders the four spy agents as isometric sprite sheets.
 
 Everything is made from scratch in code with Blender's Python API (bpy):
 the model, materials, lighting, camera, poses and the final sprite sheets.
@@ -9,9 +9,11 @@ Run it with a Python that has the `bpy` module (Blender 4.2 as a module):
     .blendenv/bin/pip install bpy==4.2.0 pillow
     .blendenv/bin/python tools/blender/build_agents.py            # full render
     .blendenv/bin/python tools/blender/build_agents.py --preview  # quick test
+    .blendenv/bin/python tools/blender/build_agents.py --only amber,jade
+                                    # re-render some agents, keep the rest
 
 Output (in assets/sprites/):
-    agent_crimson.png, agent_cobalt.png   colour sprite sheets
+    agent_<name>.png                      colour sprite sheets (one per agent)
     agent_*_n.png                         matching normal maps
     agents.json                           frame size, foot anchor, animations
 
@@ -51,7 +53,11 @@ ANIMS = [("idle", 2), ("walk", 12), ("run", 8), ("search", 4), ("swing", 4), ("h
 AGENTS = {
     "crimson": {"coat": (0.5, 0.025, 0.04), "band": (1.0, 0.18, 0.2), "hat": (0.05, 0.02, 0.02)},
     "cobalt": {"coat": (0.03, 0.14, 0.5), "band": (0.2, 0.55, 1.0), "hat": (0.015, 0.03, 0.08)},
+    "amber": {"coat": (0.55, 0.3, 0.02), "band": (1.0, 0.7, 0.12), "hat": (0.07, 0.04, 0.01)},
+    "jade": {"coat": (0.02, 0.3, 0.12), "band": (0.25, 0.95, 0.5), "hat": (0.01, 0.05, 0.03)},
 }
+ONLY = next((a.split("=", 1)[1] if "=" in a else sys.argv[sys.argv.index(a) + 1]
+             for a in sys.argv if a.startswith("--only")), "")
 
 
 # ------------------------------------------------------------------ scene setup
@@ -483,13 +489,20 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="agents_")
     meta = {"frame": FRAME, "directions": DIRECTIONS, "anims": {}, "sheets": {}, "normals": {}}
+    meta_path = os.path.join(OUT_DIR, "agents.json")
+    wanted = AGENTS
+    if ONLY:
+        # Keep the agents already rendered; add or replace just these.
+        with open(meta_path) as f:
+            meta = json.load(f)
+        wanted = {k: v for k, v in AGENTS.items() if k in ONLY.split(",")}
     col = 0
     for anim, n in ANIMS:
         meta["anims"][anim] = {"start": col, "count": n}
         col += n
     meta["frames_per_direction"] = col
     try:
-        for name, colors in AGENTS.items():
+        for name, colors in wanted.items():
             print("Rendering", name, flush=True)
             frames, (ax, ay, ppm) = render_agent(name, colors, tmp)
             from PIL import Image
@@ -505,7 +518,7 @@ def main():
             meta["pixels_per_metre"] = round(ppm, 3)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    with open(os.path.join(OUT_DIR, "agents.json"), "w") as f:
+    with open(meta_path, "w") as f:
         json.dump(meta, f, indent=1)
     print("done:", os.path.join(OUT_DIR, "agents.json"))
 

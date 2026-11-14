@@ -28,6 +28,8 @@ def main():
     from PIL import Image
     out_dir = os.path.join(BA.ROOT, "assets", "sprites")
     for name, colors in BA.AGENTS.items():
+        if BA.ONLY and name not in BA.ONLY.split(","):
+            continue
         scene = BA.reset_scene()
         BA.add_lights()
         scene.render.resolution_x = W
