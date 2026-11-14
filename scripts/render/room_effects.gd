@@ -5,13 +5,17 @@ extends RefCounted
 
 const World = preload("res://scripts/core/world.gd")
 const Style = preload("res://scripts/ui/style.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 
 ## { kind, room, pos, t }
 var _effects: Array = []
 
 
-func add(kind: String, room: Vector2i, pos: Vector2) -> void:
-	_effects.append({"kind": kind, "room": room, "pos": pos, "t": 0.0})
+## `extra` adds fields some effects need ("z" height, "seed", "item").
+func add(kind: String, room: Vector2i, pos: Vector2, extra := {}) -> void:
+	var e := {"kind": kind, "room": room, "pos": pos, "t": 0.0}
+	e.merge(extra)
+	_effects.append(e)
 
 
 ## Ages every effect and drops the finished ones.
@@ -30,6 +34,8 @@ static func life(kind: String) -> float:
 		"BOMB": return 3.2
 		"HIT": return 0.5
 		"PUFF": return 0.7
+		"PAPER": return 0.9
+		"FOUND": return 1.6
 		_: return 1.6
 
 
@@ -40,6 +46,12 @@ func draw(ci: CanvasItem, e: Dictionary) -> void:
 	var word := "TWANG!"
 	var col := Color("eef1f5")
 	match e["kind"]:
+		"PAPER":
+			_draw_paper(ci, e)
+			return
+		"FOUND":
+			_draw_found(ci, e)
+			return
 		"PUFF":
 			# Dust kicked out of a vent.
 			var k := t / 0.7
@@ -92,6 +104,41 @@ func draw(ci: CanvasItem, e: Dictionary) -> void:
 	var at := p + Vector2(-w / 2, -60 - t * 40)
 	ci.draw_string_outline(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 10, Color(0, 0, 0, a))
 	ci.draw_string(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col, a))
+
+
+## A sheet of paper flung out of furniture being searched, tumbling down.
+func _draw_paper(ci: CanvasItem, e: Dictionary) -> void:
+	var t: float = e["t"]
+	var sd: int = e.get("seed", 0)
+	var ang := float(sd % 628) / 100.0
+	var speed := 50.0 + float((sd / 7) % 60)
+	var drift := Vector2(cos(ang), sin(ang) * 0.5) * speed * t
+	var rise := 90.0 * t - 160.0 * t * t
+	var at := World.iso(e["pos"], float(e.get("z", 50.0)) + 8.0) + drift - Vector2(0, rise)
+	var a := clampf((0.9 - t) / 0.3, 0.0, 1.0)
+	var spin := t * (6.0 if sd % 2 == 0 else -6.0) + ang
+	ci.draw_set_transform(at, spin, Vector2(1.0, 0.55 + 0.45 * absf(sin(t * 9.0))))
+	ci.draw_rect(Rect2(-9, -6.5, 18, 13), Color(0.94, 0.92, 0.84, a))
+	for k in 3:
+		ci.draw_line(Vector2(-6, -3.5 + k * 3.5), Vector2(5, -3.5 + k * 3.5), Color(0.2, 0.2, 0.25, 0.6 * a), 1.2)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## What you just found pops up out of the furniture, glowing, and floats away.
+func _draw_found(ci: CanvasItem, e: Dictionary) -> void:
+	var t: float = e["t"]
+	var pop := minf(1.0, t / 0.18)
+	var s := 34.0 * (pop * 1.25 if t < 0.18 else lerpf(1.25, 1.0, minf(1.0, (t - 0.18) / 0.15)))
+	var a := clampf((1.6 - t) / 0.5, 0.0, 1.0)
+	var at := World.iso(e["pos"], float(e.get("z", 50.0)) + 34.0 + 46.0 * minf(1.0, t / 0.5) + 14.0 * t)
+	ci.draw_circle(at, s * 0.9, Color(1.0, 0.92, 0.55, 0.28 * a))
+	ci.draw_circle(at, s * 0.62, Color(0.08, 0.08, 0.1, 0.7 * a))
+	for i in 8:
+		var ray := Vector2.from_angle(i * TAU / 8.0 + t * 1.5)
+		var tip := at + ray * s * (0.95 + 0.15 * sin(t * 12.0 + i))
+		ci.draw_line(at + ray * s * 0.75, tip, Color(1.0, 0.9, 0.5, 0.7 * a), 2.0, true)
+	if a > 0.0:
+		Icons.draw(ci, e.get("item", ""), at, s * 0.85, true)
 
 
 ## Jagged electric arcs crackling out from a shocked agent, re-drawn 30

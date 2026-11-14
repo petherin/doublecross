@@ -15,6 +15,7 @@ signal vent_moved(entering: bool)
 const World = preload("res://scripts/core/world.gd")
 const Ui = preload("res://scripts/ui/ui.gd")
 const Art = preload("res://scripts/render/art.gd")
+const Icons = preload("res://scripts/ui/icons.gd")
 const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
@@ -43,6 +44,10 @@ var display_name := "Agent"
 ## Which sprite sheet to draw ("crimson" / "cobalt").
 var sheet_name := ""
 var accent := Color("ff5a5f")
+## Shape that tells agents apart without relying on colour.
+var mark := "circle"
+## Pitch of this agent's grunts and cries.
+var voice := 1.0
 
 ## Set by the game: no movement at all (e.g. after the match ends).
 var frozen := false
@@ -92,6 +97,8 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	_target = position
 	display_name = style["name"]
 	accent = style["accent"]
+	mark = style.get("mark", "circle")
+	voice = style.get("voice", 1.0)
 	sheet_name = style.get("sheet", "")
 
 
@@ -191,6 +198,25 @@ func start_trap(info: Dictionary, duration: float) -> void:
 	start_search(-1, duration)
 	_busy_kind = "trap"
 	_trap_info = info
+
+
+## The furniture (index in this room) the agent is busy at, or -1. Other
+## devices only know the agent is busy, so it's the nearest piece in reach.
+func busy_furniture() -> int:
+	if not searching:
+		return -1
+	if is_local and _search_idx >= 0:
+		return _search_idx
+	var best := -1
+	var best_d := RADIUS + 70.0
+	var items: Array = world.furniture(room)
+	for i in items.size():
+		var r: Rect2 = items[i]["rect"]
+		var q := Vector2(clampf(position.x, r.position.x, r.end.x), clampf(position.y, r.position.y, r.end.y))
+		if position.distance_to(q) < best_d:
+			best_d = position.distance_to(q)
+			best = i
+	return best
 
 
 func start_search(idx: int, duration: float) -> void:
@@ -520,7 +546,8 @@ func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> v
 	var font := ThemeDB.fallback_font
 	var size := int(16 * Ui.scale())
 	var w := font.get_string_size(display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	ci.draw_string(font, foot + Vector2(-w / 2, -top), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	ci.draw_string(font, foot + Vector2(-w / 2 + 9, -top), display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, accent)
+	Icons.mark(ci, mark, foot + Vector2(-w / 2 - 5, -top - size * 0.33), 6.0 * Ui.scale(), accent)
 	for i in max_hp:
 		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -top + 6.0)
 		ci.draw_circle(pip, 4.0, Color(0, 0, 0, 0.6))

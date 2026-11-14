@@ -22,6 +22,7 @@ const Bot = preload("res://scripts/game/bot.gd")
 const Art = preload("res://scripts/render/art.gd")
 const Grain = preload("res://scripts/render/grain.gd")
 const Referee = preload("res://scripts/game/referee.gd")
+const Tips = preload("res://scripts/game/tips.gd")
 const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 
 ## Seconds left on your clock when the room's alarm light starts.
@@ -52,10 +53,10 @@ const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 const STYLES := [
-	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson"},
-	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt"},
-	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber"},
-	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade"},
+	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson", "mark": "circle", "voice": 1.0},
+	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt", "mark": "triangle", "voice": 0.84},
+	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber", "mark": "square", "voice": 1.18},
+	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade", "mark": "diamond", "voice": 0.93},
 ]
 
 var world: World
@@ -165,6 +166,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 
 	for bid in bot_ids:
 		_add_bot(bid, bot_level)
+	add_child(Tips.new(self))
 
 	var vig_layer := CanvasLayer.new()
 	vig_layer.layer = 1
@@ -307,9 +309,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	view.room = room
 	view.lights.rebuild(world, room)
-	hud.show_room(room, animate)
+	hud.show_room(room, animate, view.base_position + World.iso(local_agent.position, 60.0))
+	Sound.ambience(room_tone(world.rooms[room]["name"]))
 	if animate:
 		Sound.play("door", -6.0)
+
+
+## Which room-tone loop suits a room: humming machines, dripping pipes, or
+## the air-conditioning everywhere else.
+static func room_tone(room_name: String) -> String:
+	for word in ["Server", "Comms", "Command", "Reactor", "Cipher", "Situation", "Laboratory"]:
+		if room_name.contains(word):
+			return "amb_machines"
+	for word in ["Detention", "Hangar", "Motor", "Cryo", "Mess", "Infirmary"]:
+		if room_name.contains(word):
+			return "amb_pipes"
+	return "amb_hvac"
 
 
 ## Footsteps, rummaging, the low-time tick and music tempo.
@@ -501,7 +516,8 @@ func _update_hud_status() -> void:
 		if id != my_id:
 			var out: bool = eliminated.has(id)
 			var left := ceilf(clocks.get(id, 0.0))
-			rivals.append({"clock": left, "accent": _agent_by_id[id].accent, "out": out})
+			var ra: Agent = _agent_by_id[id]
+			rivals.append({"clock": left, "accent": ra.accent, "mark": ra.mark, "out": out})
 	hud.set_status(clocks.get(my_id, 0.0), rivals,
 		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"])
 
@@ -739,6 +755,11 @@ func game_over(winner: int, reason := "escape") -> void:
 	if _agent_by_id.has(winner):
 		name = _agent_by_id[winner].display_name
 	Sound.music(false)
+	Sound.ambience("", 1.5)
 	Sound.music_tempo(1.0)
 	Sound.play("win" if winner == my_id else "lose")
+	if _agent_by_id.has(winner):
+		var w: Agent = _agent_by_id[winner]
+		if winner == my_id or w.room == local_agent.room:
+			Sound.play("haha", -2.0, false, 0.03, w.voice)
 	hud.show_end(winner, my_id, name, reason, multiplayer.is_server())

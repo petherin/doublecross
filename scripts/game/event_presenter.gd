@@ -25,6 +25,9 @@ func present(e: Dictionary) -> void:
 			if not me:
 				return
 			var found: String = e["found"]
+			var idx := int(str(e["key"]).get_slice(",", 2))
+			if found != "" and not e.get("spare", false):
+				game.view.show_found(idx, found)
 			var msg := ""
 			if e["disarmed"] != "":
 				msg = "Defused a %s with your %s!  " % [World.TRAP_NAMES[e["disarmed"]], World.TRAPS[e["disarmed"]]]
@@ -135,17 +138,22 @@ func _sound(e: Dictionary, me: bool) -> void:
 			# A bomb is loud enough to hear through the walls.
 			if here or me or e["kind"] == "BOMB":
 				Sound.play(sound_name, 0.0, not (here or me), 0.03)
+			if here or me:
+				var who: Agent = game.agent_of(e["pid"])
+				Sound.play("yell" if e["kind"] == "SHOCK" else "argh", -3.0, false, 0.04, who.voice)
 			if me:
 				Settings.buzz(600 if e["kind"] == "SHOCK" else 350 if e["kind"] == "BOMB" else 200)
 		"hit":
 			var v: Agent = game.agent_of(e["pid"])
 			if v.room == game.local_agent.room:
 				Sound.play("hit", -1.0)
+				Sound.play("oof", -4.0, false, 0.06, v.voice)
 			if me:
 				Settings.buzz(80)
 		"down":
 			if here or me:
 				Sound.play("down")
+				Sound.play("argh", -2.0, false, 0.04, game.agent_of(e["pid"]).voice)
 			if me:
 				Settings.buzz(300)
 
