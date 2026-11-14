@@ -22,6 +22,7 @@ const Bot = preload("res://scripts/game/bot.gd")
 const Art = preload("res://scripts/render/art.gd")
 const Grain = preload("res://scripts/render/grain.gd")
 const Referee = preload("res://scripts/game/referee.gd")
+const Tips = preload("res://scripts/game/tips.gd")
 const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 
 ## Seconds left on your clock when the room's alarm light starts.
@@ -165,6 +166,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 
 	for bid in bot_ids:
 		_add_bot(bid, bot_level)
+	add_child(Tips.new(self))
 
 	var vig_layer := CanvasLayer.new()
 	vig_layer.layer = 1
@@ -307,7 +309,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	view.room = room
 	view.lights.rebuild(world, room)
-	hud.show_room(room, animate)
+	hud.show_room(room, animate, view.base_position + World.iso(local_agent.position, 60.0))
 	if animate:
 		Sound.play("door", -6.0)
 
