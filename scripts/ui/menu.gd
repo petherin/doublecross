@@ -9,7 +9,7 @@ const Ui = preload("res://scripts/ui/ui.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const Art = preload("res://scripts/render/art.gd")
 
-const TAGLINE := "Two agents. One secret base. Only one gets out."
+const TAGLINE := "Two agents. One way out."
 var _status: Label
 var _hosts_box: VBoxContainer
 var _searching: Label
