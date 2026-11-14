@@ -106,26 +106,6 @@ static func paper_theme() -> Theme:
 	return t
 
 
-## Theme for the in-game HUD: light typewriter text on dark plates.
-static func hud_theme() -> Theme:
-	var t := Theme.new()
-	t.default_font = mono_bold()
-	var plate := StyleBoxFlat.new()
-	plate.bg_color = Color(0.06, 0.06, 0.07, 0.85)
-	plate.border_color = Color(1, 1, 1, 0.25)
-	plate.set_border_width_all(1)
-	plate.set_corner_radius_all(3)
-	plate.set_content_margin_all(8)
-	var plate_hover := plate.duplicate()
-	plate_hover.border_color = Color(1, 0.86, 0.15, 0.8)
-	t.set_stylebox("normal", "Button", plate)
-	t.set_stylebox("hover", "Button", plate_hover)
-	t.set_stylebox("pressed", "Button", plate_hover)
-	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
-	t.set_font("font", "Button", mono_bold())
-	return t
-
-
 # ------------------------------------------------------------------ drawing props
 
 ## A sheet of paper with a soft shadow, a slightly darker edge and a fold.

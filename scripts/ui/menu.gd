@@ -9,6 +9,7 @@ const Ui = preload("res://scripts/ui/ui.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const Art = preload("res://scripts/render/art.gd")
 
+const TAGLINE := "Two agents. One secret base. Only one gets out."
 var _status: Label
 var _hosts_box: VBoxContainer
 var _searching: Label
@@ -26,7 +27,6 @@ var _lift := 0.0
 var _status_full := ""
 var _status_chars := 0.0
 var _tag_chars := 0.0
-const TAGLINE := "Two agents. One secret base. Only one gets out."
 # Polaroid photos of the agents, cut from the Blender sprite sheets.
 var _photos := {}
 
@@ -229,19 +229,13 @@ func _load_photos() -> void:
 	var fsize: float = m["frame"]
 	# Facing the camera: direction 1, first idle frame.
 	var fid: int = 1 * int(m["frames_per_direction"]) + int(m["anims"]["idle"]["start"])
-	var regions := {}
-	for name in m["sheets"]:
-		if m.get("packed", false):
-			# Packed frames are trimmed: rebuild the full frame box around the trim.
-			var r: Array = m["rects"][name][fid]
-			regions[name] = [Rect2(r[0] - r[4], r[1] - r[5], fsize, fsize), Rect2(r[0], r[1], r[2], r[3])]
-		else:
-			var cols: int = m["cols"]
-			var box := Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
-			regions[name] = [box, box]
-	for name in m["sheets"]:
-		if ResourceLoader.exists(m["sheets"][name]):
-			_photos[name] = [load(m["sheets"][name]), regions[name][0], regions[name][1]]
+	for sheet in m["sheets"]:
+		if not ResourceLoader.exists(m["sheets"][sheet]):
+			continue
+		# Packed frames are trimmed: rebuild the full frame box around the trim.
+		var r: Array = m["rects"][sheet][fid]
+		var box := Rect2(r[0] - r[4], r[1] - r[5], fsize, fsize)
+		_photos[sheet] = [load(m["sheets"][sheet]), box, Rect2(r[0], r[1], r[2], r[3])]
 
 
 func _photo(ci: CanvasItem, r: Rect2, who: String) -> void:
@@ -441,7 +435,10 @@ func _slider_row(label_text: String, value: float, on_change: Callable) -> HBoxC
 	sl.custom_minimum_size = Vector2(320, 40)
 	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sl.drag_ended.connect(func(_c): on_change.call(sl.value))
-	sl.value_changed.connect(func(v): if not sl.has_focus(): on_change.call(v))
+	sl.value_changed.connect(func(v):
+		# Keyboard/gamepad changes apply at once; drags apply on release.
+		if not sl.has_focus():
+			on_change.call(v))
 	row.add_child(sl)
 	return row
 

@@ -46,8 +46,8 @@ const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 const STYLES := [
-	{"name": "AGENT CRIMSON", "coat": Color("b3262e"), "hat": Color("2a0d10"), "accent": Color("ff5a5f"), "sheet": "crimson"},
-	{"name": "AGENT COBALT", "coat": Color("1f5fae"), "hat": Color("0b1a33"), "accent": Color("5ab0ff"), "sheet": "cobalt"},
+	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson"},
+	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt"},
 ]
 
 var world: World
@@ -67,6 +67,11 @@ var over := false
 var clocks := {}
 
 var bot: Bot
+## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
+var darts: Array = []
+var time_limit := TIME_LIMIT
+## Vent shortcuts the local player has been through: [vent index, partner].
+var known_vents: Array = []
 var _agent_by_id := {}
 var _view: RoomView
 var _hud: Hud
@@ -76,14 +81,9 @@ var _start_room := {}
 var _melee_cd := 0.0
 var _dart_cd := 0.0
 var _clock_sync := 0.0
-## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
-var darts: Array = []
-var time_limit := TIME_LIMIT
 var _step_t := {}
 var _was_searching := {}
 var _last_tick := -1
-## Vent shortcuts the local player has been through: [vent index, partner].
-var known_vents: Array = []
 
 
 ## `ids` holds every peer id in the match; the host (lowest id, 1) is Crimson.
@@ -172,9 +172,9 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	_hud.crawl_pressed.connect(_try_vent)
 	_hud.fire_pressed.connect(_try_fire)
 	local_agent.room_changed.connect(_on_room_changed)
-	local_agent.search_finished.connect(func(r, i): if not over: request_search.rpc_id(1, r, i))
-	local_agent.trap_finished.connect(func(info): if not over: request_trap.rpc_id(1, info))
-	local_agent.door_passed.connect(func(r, d): if not over: request_door.rpc_id(1, r, d))
+	local_agent.search_finished.connect(_on_local_search_finished)
+	local_agent.trap_finished.connect(_on_local_trap_finished)
+	local_agent.door_passed.connect(_on_local_door_passed)
 	local_agent.exit_touched.connect(_on_exit_touched)
 	_on_room_changed(local_agent.room, false)
 	# The briefing: everyone waits until it self-destructs (or is skipped).
@@ -192,6 +192,22 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 				_agent_by_id[BOT_ID].frozen = false)
 	_hud.show_briefing(local_agent.display_name, rival_name, int(time_limit / 60.0))
 	_update_hud_status()
+
+
+# The local player's agent finished an action: ask the referee to apply it.
+func _on_local_search_finished(room: Vector2i, idx: int) -> void:
+	if not over:
+		request_search.rpc_id(1, room, idx)
+
+
+func _on_local_trap_finished(info: Dictionary) -> void:
+	if not over:
+		request_trap.rpc_id(1, info)
+
+
+func _on_local_door_passed(from_room: Vector2i, dir: int) -> void:
+	if not over:
+		request_door.rpc_id(1, from_room, dir)
 
 
 func _process(delta: float) -> void:

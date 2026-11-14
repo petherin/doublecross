@@ -19,6 +19,11 @@ const SPEED := 340.0
 const RADIUS := 26.0
 const SEND_RATE := 1.0 / 20.0
 
+## Agent height on screen, in pixels, at normal size.
+const SPRITE_HEIGHT := 120.0
+const SPRITE_METRES := 1.95
+static var _meta := {}
+static var _sheets := {}
 var world: World
 var room := Vector2i.ZERO
 var facing := 0.0
@@ -31,10 +36,8 @@ var is_local := false
 var move_input := Vector2.ZERO
 
 var display_name := "Agent"
-## Which sprite sheet to draw ("crimson" / "cobalt"); empty = drawn fallback.
+## Which sprite sheet to draw ("crimson" / "cobalt").
 var sheet_name := ""
-var coat := Color("b3262e")
-var hat := Color("2a0d10")
 var accent := Color("ff5a5f")
 
 ## Set by the game: no movement at all (e.g. after the match ends).
@@ -47,7 +50,6 @@ var search_progress := 0.0
 ## Knocked out by a trap: can't move while this counts down.
 var ko_time := 0.0
 var ko_kind := ""
-var _ko_total := 1.0
 ## 1.0 right after a bomb, fading to 0: blackened with soot and smouldering.
 var soot := 0.0
 ## Combat. hp/darts mirror the host's match state (for drawing).
@@ -59,6 +61,7 @@ var hurt_time := 0.0         # red flash after being hit
 var protect_time := 0.0
 ## Index (world.vents) of the vent this agent is crawling through, or -1.
 var vent := -1
+var _ko_total := 1.0
 var _vent_fx := 0.0   # ducking-in animation
 var _pop_fx := 0.0    # popping-out animation
 var _last_vent := -1
@@ -71,7 +74,6 @@ var _search_left := 0.0
 var _search_room := Vector2i.ZERO
 var _search_idx := -1
 var _target := Vector2.ZERO
-var _frame_offset := Vector2.ZERO
 var _walk := 0.0
 var _send_timer := 0.0
 
@@ -83,8 +85,6 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	position = World.ROOM.get_center()
 	_target = position
 	display_name = style["name"]
-	coat = style["coat"]
-	hat = style["hat"]
 	accent = style["accent"]
 	sheet_name = style.get("sheet", "")
 
@@ -324,17 +324,9 @@ func net_state(r: Vector2i, pos: Vector2, f: float, m: int, s: bool, v := -1) ->
 func paint(ci: CanvasItem) -> void:
 	if _sheet() != null:
 		_paint_sprite(ci)
-	else:
-		_paint_vector(ci)
 
 
 # ---------------------------------------------------------------- sprites
-
-static var _meta := {}
-static var _sheets := {}
-## Agent height on screen, in pixels, at normal size.
-const SPRITE_HEIGHT := 120.0
-const SPRITE_METRES := 1.95
 
 
 static func _load_meta() -> Dictionary:
@@ -389,7 +381,6 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		return
 	var m := _load_meta()
 	var tex := _sheet()
-	var fsize: float = m["frame"]
 	var dirs: int = m["directions"]
 	var anchor := Vector2(m["anchor"][0], m["anchor"][1])
 	var scale_f := SPRITE_HEIGHT / (SPRITE_METRES * float(m["pixels_per_metre"]))
@@ -417,20 +408,11 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var fr := _sprite_frame()
 	var anim: Dictionary = m["anims"][fr[0]]
 	var d := posmod(int(round(facing / (TAU / dirs))), dirs)
-	var region: Rect2
-	if m.get("packed", false):
-		# Tightly packed atlas: each frame is trimmed, so draw it at its offset.
-		var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
-		var r: Array = m["rects"][sheet_name][fid]
-		region = Rect2(r[0], r[1], r[2], r[3])
-		_frame_offset = Vector2(r[4], r[5])
-	elif m.has("cols"):
-		var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
-		var cols: int = m["cols"]
-		region = Rect2((fid % cols) * fsize, (fid / cols) * fsize, fsize, fsize)
-	else:
-		var col: int = int(anim["start"]) + int(fr[1])
-		region = Rect2(col * fsize, d * fsize, fsize, fsize)
+	# Tightly packed atlas: each frame is trimmed, so draw it at its offset.
+	var fid: int = d * int(m["frames_per_direction"]) + int(anim["start"]) + int(fr[1])
+	var r: Array = m["rects"][sheet_name][fid]
+	var region := Rect2(r[0], r[1], r[2], r[3])
+	var offset := Vector2(r[4], r[5])
 	# Dizzy wobble while knocked out by a trap.
 	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" else 0.0
 	var tint := Color.WHITE
@@ -441,10 +423,7 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	if protect_time > 0.0 and ko_time <= 0.0:
 		tint.a = 0.35 if int(Time.get_ticks_msec() / 90) % 2 == 0 else 0.85
 	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f * squash))
-	if m.get("packed", false):
-		ci.draw_texture_rect_region(tex, Rect2(-anchor + _frame_offset, region.size), region, tint)
-	else:
-		ci.draw_texture_rect_region(tex, Rect2(-anchor, Vector2(fsize, fsize)), region, tint)
+	ci.draw_texture_rect_region(tex, Rect2(-anchor + offset, region.size), region, tint)
 	if has_case and not searching and attack_anim <= 0.0 and not ko:
 		# The briefcase, carried at the side.
 		var side := Vector2.from_angle(facing + PI / 2)
@@ -458,130 +437,6 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	if vent >= 0:
 		return
 	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 24.0 if not (ko and ko_kind == "DOWN") else 50.0)
-
-
-# ---------------------------------------------------------------- drawn fallback
-
-## The original drawn-in-code spy (used if the sprite sheets are missing).
-func _paint_vector(ci: CanvasItem) -> void:
-	var foot := World.iso(position)
-	var ko := ko_time > 0.0
-	var ko_age := _ko_total - ko_time
-	if ko and ko_kind == "SPRING" and ko_age < 0.9:
-		# Launched into the air and back down.
-		foot.y -= sin(ko_age / 0.9 * PI) * 160.0
-	var sdir := World.floor_to_screen_dir(Vector2.from_angle(facing))
-	var flip := -1.0 if sdir.x < 0.0 else 1.0
-	var back_view := sdir.y < -0.15
-	var stride := sin(_walk) * 7.0 if moving else 0.0
-	var bob := absf(sin(_walk)) * 2.0 if moving else 0.0
-	var skin := Color("e0b48f")
-	var coat := self.coat
-	var hat := self.hat
-	var sooty := minf(1.0, soot * 1.4)
-	if sooty > 0.0:
-		# Blackened by the blast.
-		coat = coat.lerp(Color("2b2622"), 0.8 * sooty)
-		hat = hat.lerp(Color("141210"), 0.8 * sooty)
-		skin = skin.lerp(Color("3d3632"), 0.85 * sooty)
-	if hurt_time > 0.0:
-		coat = coat.lerp(Color(1, 0.25, 0.25), hurt_time / 0.3 * 0.7)
-		skin = skin.lerp(Color(1, 0.3, 0.3), hurt_time / 0.3 * 0.5)
-	var dark := coat.darkened(0.4)
-	var trousers := Color("1b1e25")
-
-	# Shadow and team ring on the floor
-	ci.draw_set_transform(foot, 0.0, Vector2(1.0, 0.5))
-	ci.draw_texture_rect(Art.soft(), Rect2(-40, -40, 80, 80), false, Color(0, 0, 0, 0.7))
-	ci.draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 40, Color(accent, 0.6), 3.0, true)
-
-	var tilt := sin(_walk * 1.3) * 0.25 if ko else 0.0
-	if ko and ko_kind == "DOWN":
-		tilt = -PI / 2.0 * 0.92 * flip
-	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
-	# Legs and shoes
-	ci.draw_line(Vector2(-5, -30), Vector2(-5 + stride, -3), trousers, 7.0, true)
-	ci.draw_line(Vector2(5, -30), Vector2(5 - stride, -3), trousers, 7.0, true)
-	ci.draw_circle(Vector2(-3 + stride, -2), 4.5, Color("0c0d10"))
-	ci.draw_circle(Vector2(7 - stride, -2), 4.5, Color("0c0d10"))
-	# Back arm (behind the coat)
-	ci.draw_line(Vector2(-11, -60), Vector2(-13 - stride * 0.8, -36), dark, 7.0, true)
-	# Trench coat: dark outline, flared hem, belt, lapels, rim light
-	ci.draw_colored_polygon(PackedVector2Array([
-		Vector2(-18, -24), Vector2(18, -24), Vector2(15, -66), Vector2(-15, -66)]), Color(0, 0, 0, 0.55))
-	ci.draw_polygon(PackedVector2Array([
-		Vector2(-16, -26), Vector2(16, -26), Vector2(13, -64), Vector2(-13, -64)]),
-		PackedColorArray([coat.darkened(0.25), coat.darkened(0.25), coat.lightened(0.08), coat.lightened(0.08)]))
-	ci.draw_line(Vector2(13, -63), Vector2(16, -27), Color(coat.lightened(0.45), 0.8), 1.5, true)
-	ci.draw_colored_polygon(PackedVector2Array([
-		Vector2(-16, -26), Vector2(-4, -26), Vector2(-3, -64), Vector2(-13, -64)]), dark.lightened(0.1))
-	ci.draw_line(Vector2(-15, -44), Vector2(15, -44), dark, 4.0)
-	ci.draw_rect(Rect2(-3, -46, 6, 5), accent)
-	if not back_view:
-		ci.draw_line(Vector2(0, -64), Vector2(6, -50), coat.lightened(0.25), 2.5, true)
-		ci.draw_line(Vector2(9, -64), Vector2(6, -50), coat.lightened(0.25), 2.5, true)
-	# Head
-	ci.draw_circle(Vector2(1, -72), 9.5, skin)
-	if back_view:
-		ci.draw_circle(Vector2(0, -73), 9.0, Color("2a1d16"))
-	else:
-		ci.draw_rect(Rect2(2, -76, 9, 4), Color("0c0c10"))
-	if sooty > 0.0 and not back_view:
-		# Wide white eyes peering out of the soot.
-		ci.draw_circle(Vector2(4, -73), 2.2, Color(1, 1, 1, sooty))
-		ci.draw_circle(Vector2(9, -73), 2.2, Color(1, 1, 1, sooty))
-		ci.draw_circle(Vector2(4.6, -73), 1.0, Color(0, 0, 0, sooty))
-		ci.draw_circle(Vector2(9.6, -73), 1.0, Color(0, 0, 0, sooty))
-		# Hair blown up into spikes.
-		for i in 5:
-			var hx := -7.0 + i * 3.5
-			ci.draw_line(Vector2(hx, -79), Vector2(hx + (i - 2) * 2.0, -86), Color(0.1, 0.09, 0.08, sooty), 2.0)
-	# Fedora: brim, crown, band (blown askew by a bomb)
-	var hat_off := Vector2.ZERO
-	var hat_tilt := tilt
-	if sooty > 0.0:
-		hat_off = Vector2(-3, -6) * sooty
-		hat_tilt += -0.4 * sooty
-	# Everything for the hat is drawn around the top of the head, so it
-	# tilts about the head rather than the feet.
-	var hat_at := foot - Vector2(0, bob) + (Vector2(0, -80) + hat_off).rotated(tilt)
-	ci.draw_set_transform(hat_at, hat_tilt, Vector2(flip, 0.28))
-	ci.draw_circle(Vector2.ZERO, 17.0, hat.lightened(0.1))
-	ci.draw_set_transform(hat_at, hat_tilt, Vector2(flip, 1.0))
-	ci.draw_colored_polygon(PackedVector2Array([
-		Vector2(-10, -1), Vector2(10, -1), Vector2(8, -15), Vector2(-8, -15)]), hat)
-	ci.draw_rect(Rect2(-10, -5, 20, 4), accent.lerp(Color("2b2622"), 0.7 * sooty))
-	if sooty > 0.0:
-		# Singed holes in the crown.
-		ci.draw_circle(Vector2(-3, -10), 2.0, Color(1.0, 0.45, 0.1, 0.8 * sooty))
-		ci.draw_circle(Vector2(4, -8), 1.5, Color(1.0, 0.6, 0.2, 0.7 * sooty))
-	ci.draw_set_transform(foot - Vector2(0, bob), tilt, Vector2(flip, 1.0))
-	# Front arm with hand (rummaging while searching), maybe holding the briefcase
-	var hand := Vector2(12 + stride * 0.8, -35)
-	if searching:
-		hand = Vector2(18, -40 + sin(_walk * 3.0) * 4.0)
-	var swinging := attack_anim > 0.0
-	if swinging:
-		# Overarm swing with a cosh: from raised behind the head to down in front.
-		var k := 1.0 - attack_anim / 0.3
-		var ang := lerpf(-2.4, 0.5, k)
-		hand = Vector2(6, -58) + Vector2.from_angle(ang) * 22.0
-	ci.draw_line(Vector2(8, -60), hand, dark, 7.0, true)
-	if swinging:
-		var k2 := 1.0 - attack_anim / 0.3
-		var cosh_dir := Vector2.from_angle(lerpf(-2.4, 0.5, k2) - 0.3)
-		ci.draw_line(hand, hand + cosh_dir * 20.0, Color("3b2a1c"), 5.0, true)
-		ci.draw_circle(hand + cosh_dir * 20.0, 4.0, Color("2a1d14"))
-		# Motion streak
-		ci.draw_arc(Vector2(6, -58), 40.0, -2.2, lerpf(-2.2, 0.6, k2), 12, Color(1, 1, 1, 0.35 * (1.0 - k2)), 3.0, true)
-	if has_case and not searching:
-		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 14)), Color("7a5238"))
-		ci.draw_rect(Rect2(hand + Vector2(-9, 2), Vector2(20, 3)), Color("946645"))
-		ci.draw_rect(Rect2(hand + Vector2(-1, 4), Vector2(4, 3)), Color("e8c25a"))
-	ci.draw_circle(hand, 4.0, skin)
-
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	_paint_overlays(ci, foot, ko)
 
 
 ## Name tag, health pips, smoke, dizzy stars and the search bubble.

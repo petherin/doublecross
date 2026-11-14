@@ -1,0 +1,6 @@
+# gdtoolkit (gdlint) settings. Defaults otherwise.
+max-line-length: 120
+max-file-lines: 1200
+max-returns: 8
+# Short loop/geometry names are fine in drawing code.
+function-variable-name: (_on_[a-z0-9_]+|[a-z][a-z0-9_]*|[A-Z])

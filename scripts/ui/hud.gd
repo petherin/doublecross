@@ -24,12 +24,12 @@ var search_button: ActionButton
 var trap_button: ActionButton
 var attack_button: ActionButton
 var crawl_button: ActionButton
+var fire_button: ActionButton
 var _known_vents: Array = []
 var _duct: Control
 var _duct_t := 0.0
 var _duct_len := 1.0
 var _duct_tex: Texture2D
-var fire_button: ActionButton
 var _status: Control
 var _clock_mine := 0.0
 var _clock_rival := -1.0

@@ -3,6 +3,7 @@ extends RefCounted
 ## Both tablets generate the same base from the same seed, so only the seed
 ## needs to be sent over the network.
 
+enum Dir { UP, DOWN, LEFT, RIGHT }
 const COLS := 3
 const ROWS := 3
 ## Walkable floor area of a room, in screen pixels (viewport is 1280x800).
@@ -17,7 +18,6 @@ const ISO_K := 0.68
 const WALL_H := 110.0
 const ISO_ORIGIN := Vector2(640.0 - (1080.0 - 640.0) * 0.68 * 0.5, 60.0 + 110.0 + 20.0)
 
-enum Dir { UP, DOWN, LEFT, RIGHT }
 const DIR_VEC := {
 	Dir.UP: Vector2i(0, -1),
 	Dir.DOWN: Vector2i(0, 1),
@@ -62,6 +62,7 @@ const GADGETS := ["WIRE CUTTERS", "EXTINGUISHER", "TOOLKIT"]
 const TRAPS := {"BOMB": "EXTINGUISHER", "SPRING": "TOOLKIT", "WIRE": "WIRE CUTTERS"}
 const TRAP_NAMES := {"BOMB": "BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"}
 
+const VENT_HALF := 34.0
 var seed_value := 0
 ## The one room with a way out, and which (outer, back) wall it's on.
 var exit_room := Vector2i(1, 0)
@@ -71,7 +72,6 @@ var hidden := {}
 ## Air-vent shortcuts: { room, dir (UP/LEFT wall), along (x or y on that
 ## wall), front (floor point to stand at), link (index of the partner vent) }.
 var vents: Array = []
-const VENT_HALF := 34.0
 ## Vector2i -> { "name": String, "tint": Color, "furniture": Array[Dictionary] }
 var rooms := {}
 
@@ -124,15 +124,6 @@ func opening(room: Vector2i, dir: int) -> int:
 
 static func furniture_key(room: Vector2i, idx: int) -> String:
 	return "%d,%d,%d" % [room.x, room.y, idx]
-
-
-static func key_room(key: String) -> Vector2i:
-	var p := key.split(",")
-	return Vector2i(int(p[0]), int(p[1]))
-
-
-static func key_index(key: String) -> int:
-	return int(key.split(",")[2])
 
 
 ## One key per doorway, the same from both sides of it.
