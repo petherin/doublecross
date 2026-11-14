@@ -24,7 +24,7 @@ func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
 	get_tree().set_quit_on_go_back(false)
 	Net.opponent_joined.connect(_on_opponent_joined)
-	Net.joined_host.connect(func(): register_name.rpc_id(1, Settings.player_name))
+	Net.joined_host.connect(func(): hello.rpc_id(1, Settings.player_name, Net.version))
 	Net.session_ended.connect(_show_menu)
 	_show_menu("")
 	Sound.music(true)
@@ -60,25 +60,47 @@ func _leave() -> void:
 
 
 func _on_opponent_joined(id: int) -> void:
-	# Wait for the joiner to tell us their codename (or give up after 3s).
+	# Wait for the joiner's hello (codename and version) before starting.
 	_names = {1: Settings.player_name}
 	var waited := 0.0
-	while Net.in_session and not _names.has(id) and waited < 3.0:
+	while Net.in_session and not _names.has(id) and waited < 5.0 and multiplayer.get_peers().has(id):
 		await get_tree().create_timer(0.1).timeout
 		waited += 0.1
-	if Net.in_session:
-		start_game.rpc(randi(), Settings.clock_minutes, _names)
+	if not Net.in_session or not _names.has(id):
+		if multiplayer.get_peers().has(id):
+			Net.kick(id)
+		return
+	Net.in_game = true
+	start_game.rpc(randi(), Settings.clock_minutes, _names)
 
 
-## A joining player tells the host their codename.
+## A joining player introduces themselves: codename and app version. Both
+## devices must run the same version, or the host turns the joiner away.
 @rpc("any_peer", "call_remote", "reliable")
-func register_name(player_name: String) -> void:
-	if multiplayer.is_server():
-		_names[multiplayer.get_remote_sender_id()] = player_name.strip_edges().left(14)
+func hello(player_name: String, their_version: String) -> void:
+	if not multiplayer.is_server():
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if their_version != Net.version:
+		wrong_version.rpc_id(id, Net.version)
+		if _menu:
+			_menu.set_status("A rival tried to join with version %s, but this device has %s. Update both to the latest version. Still waiting…" % [their_version, Net.version])
+		await get_tree().create_timer(0.5).timeout
+		Net.kick(id)
+		return
+	_names[id] = player_name.strip_edges().left(14)
+
+
+## Sent to a joiner whose version doesn't match the host's.
+@rpc("authority", "call_remote", "reliable")
+func wrong_version(host_version: String) -> void:
+	Net.end_session("")
+	_show_menu("Can't join: that game is version %s and this device has %s. Update both devices to the latest version from the Download page." % [host_version, Net.version])
 
 
 @rpc("authority", "call_local", "reliable")
 func start_game(seed_value: int, minutes := 6, names := {}) -> void:
+	Net.in_game = true
 	_minutes = minutes
 	_names = names
 	_offline_mode = ""

@@ -305,6 +305,7 @@ func _draw_dossier() -> void:
 	for x in range(696, 1150, 14):
 		a.draw_line(Vector2(x, 455), Vector2(x + 7, 455), Color(Style.INK, 0.5), 1.5)
 	Style.draw_stamp(a, "EYES ONLY", Vector2(1080, 720), 0.12, Color("1f4f9a"), 22, 0.7)
+	a.draw_string(Style.mono_bold(), Vector2(910, 758), "BUILD v" + Net.version, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(Style.INK, 0.55))
 
 
 func _draw() -> void:
@@ -555,7 +556,12 @@ func _refresh_hosts() -> void:
 		c.queue_free()
 	for ip in Net.discovered.keys():
 		var b := Button.new()
-		b.text = "▸ %s  [%s]" % [Net.discovered[ip]["name"], ip]
+		var their: String = Net.discovered[ip].get("version", "?")
+		b.text = "▸ %s  [%s]  v%s" % [Net.discovered[ip]["name"], ip, their]
+		if their != Net.version:
+			# Different app version: can't play together.
+			b.text = "✕ %s  v%s: UPDATE NEEDED (you have v%s)" % [Net.discovered[ip]["name"], their, Net.version]
+			b.disabled = true
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.custom_minimum_size = Vector2(440, 40)
 		b.add_theme_font_size_override("font_size", 21)

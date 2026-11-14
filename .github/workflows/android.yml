@@ -78,6 +78,8 @@ jobs:
           sed -i "s/^version\/name=.*/version\/name=\"0.${{ github.run_number }}\"/" export_presets.cfg
           sed -i "s/^application\/short_version=.*/application\/short_version=\"0.${{ github.run_number }}\"/" export_presets.cfg
           sed -i "s/^application\/version=.*/application\/version=\"${{ github.run_number }}\"/" export_presets.cfg
+          sed -i "s/^config\/version=.*/config\/version=\"0.${{ github.run_number }}\"/" project.godot
+          grep "^config/version" project.godot
           grep -E "^(version/|application/(short_)?version)" export_presets.cfg
 
       - name: Export APK

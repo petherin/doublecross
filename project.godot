@@ -4,6 +4,7 @@ config_version=5
 [application]
 
 config/name="Double Cross"
+config/version="dev"
 config/description="Two rival agents. One secret base. Hide traps, grab the intel, get out."
 run/main_scene="res://scenes/main.tscn"
 config/icon="res://icon.svg"

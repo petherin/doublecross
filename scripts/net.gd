@@ -13,6 +13,13 @@ const DISCOVERY_PORT := 47811
 const MAGIC := "DBLX1"
 const HOST_TIMEOUT := 3.5
 
+## This build's version ("0.27" on released builds, "dev" from the editor).
+## Both devices must run the same version to play together.
+var version: String = str(ProjectSettings.get_setting("application/config/version", "dev"))
+## True once a two-player match has started (before that, a host keeps its
+## lobby open if a joiner is turned away).
+var in_game := false
+
 var is_hosting := false
 var in_session := false
 ## ip -> { "name": String, "seen": float }
@@ -68,6 +75,7 @@ func stop_broadcasting() -> void:
 func end_session(reason: String) -> void:
 	stop_broadcasting()
 	var was_in_session := in_session
+	in_game = false
 	is_hosting = false
 	in_session = false
 	if multiplayer.multiplayer_peer and not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
@@ -111,7 +119,7 @@ func _process(delta: float) -> void:
 		_broadcast_timer -= delta
 		if _broadcast_timer <= 0.0:
 			_broadcast_timer = 1.0
-			var msg := "%s|%s" % [MAGIC, OS.get_model_name()]
+			var msg := "%s|%s|%s" % [MAGIC, OS.get_model_name(), version]
 			_broadcaster.put_packet(msg.to_utf8_buffer())
 	if _listener:
 		var changed := false
@@ -122,7 +130,7 @@ func _process(delta: float) -> void:
 			if parts.size() >= 2 and parts[0] == MAGIC and ip != "":
 				if not discovered.has(ip):
 					changed = true
-				discovered[ip] = {"name": parts[1], "seen": _clock}
+				discovered[ip] = {"name": parts[1], "version": parts[2] if parts.size() > 2 else "?", "seen": _clock}
 		for ip in discovered.keys():
 			if _clock - discovered[ip]["seen"] > HOST_TIMEOUT:
 				discovered.erase(ip)
@@ -138,7 +146,25 @@ func _on_peer_connected(id: int) -> void:
 
 
 func _on_peer_disconnected(_id: int) -> void:
+	if is_hosting and not in_game:
+		# A joiner left (or was turned away) before the match: keep waiting.
+		_start_broadcasting()
+		return
 	end_session("Your opponent disconnected.")
+
+
+## Disconnects a joining device (e.g. one running a different version).
+func kick(id: int) -> void:
+	if multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+		(multiplayer.multiplayer_peer as ENetMultiplayerPeer).disconnect_peer(id)
+
+
+func _start_broadcasting() -> void:
+	if _broadcaster:
+		return
+	_broadcaster = PacketPeerUDP.new()
+	_broadcaster.set_broadcast_enabled(true)
+	_broadcaster.set_dest_address("255.255.255.255", DISCOVERY_PORT)
 
 
 func _on_connection_failed() -> void:
