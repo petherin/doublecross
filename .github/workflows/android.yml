@@ -1,5 +1,9 @@
 name: Build Android APK and Mac app
 
+# Every push to main (including merged pull requests) that changes the game
+# builds both apps and publishes them as a GitHub Release, which anyone can
+# download without a GitHub account. Pull requests just build.
+
 on:
   push:
     branches: [main]
@@ -17,6 +21,8 @@ env:
 jobs:
   android:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # to publish releases
     steps:
       - uses: actions/checkout@v4
 
@@ -65,6 +71,15 @@ jobs:
           EOF
           cat ~/.config/godot/editor_settings-${GODOT_VERSION}.tres
 
+      - name: Stamp the version number
+        # Each build gets a higher version so the APK installs over the last one.
+        run: |
+          sed -i "s/^version\/code=.*/version\/code=${{ github.run_number }}/" export_presets.cfg
+          sed -i "s/^version\/name=.*/version\/name=\"0.${{ github.run_number }}\"/" export_presets.cfg
+          sed -i "s/^application\/short_version=.*/application\/short_version=\"0.${{ github.run_number }}\"/" export_presets.cfg
+          sed -i "s/^application\/version=.*/application\/version=\"${{ github.run_number }}\"/" export_presets.cfg
+          grep -E "^(version/|application/(short_)?version)" export_presets.cfg
+
       - name: Export APK
         run: |
           mkdir -p build
@@ -90,3 +105,24 @@ jobs:
           # Godot's zip keeps the app's executable permissions; GitHub's own
           # artifact zipping would not, so upload the zip as-is.
           path: build/DoubleCross-macOS.zip
+
+      - name: Publish a release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          TAG="v0.${{ github.run_number }}"
+          cp build/double-cross.apk build/DoubleCross.apk
+          {
+            echo "## What's new"
+            echo
+            echo "$COMMIT_MESSAGE" | grep -v -E "^(Co-Authored-By|Claude-Session):"
+            echo
+            echo "## Download"
+            echo
+            echo "- **Android (phones and tablets):** \`DoubleCross.apk\`. Open it on the device and allow installs from that source the first time."
+            echo "- **Mac (Apple Silicon and Intel):** \`DoubleCross-macOS.zip\`. Unzip, move *Double Cross.app* to Applications, then see the README for getting past macOS's unidentified-developer warning."
+          } > notes.md
+          gh release create "$TAG" build/DoubleCross.apk build/DoubleCross-macOS.zip \
+            --title "Double Cross $TAG" --notes-file notes.md --target "$GITHUB_SHA" --latest

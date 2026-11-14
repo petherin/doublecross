@@ -81,15 +81,27 @@ What works today:
 
 ## Playing it
 
+### Download
+
+No GitHub account needed. Every update to `main` publishes a new
+[**release**](https://github.com/petherin/doublecross/releases/latest), and these links
+always fetch the newest one:
+
+| | |
+|---|---|
+| **Android** phones and tablets | [⬇ DoubleCross.apk](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross.apk) |
+| **Mac** (Apple Silicon and Intel) | [⬇ DoubleCross-macOS.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS.zip) |
+
+Older builds are on the [releases page](https://github.com/petherin/doublecross/releases).
+Each build has a higher version number, so a new APK installs over the old one.
+
 ### On two Android tablets (or phones)
 
-1. Open the [**Actions** tab](../../actions/workflows/android.yml), click the latest green run,
-   and download the **double-cross-apk** artifact (it's a zip with the APK inside).
-2. Copy `double-cross.apk` to each tablet and open it. Android will ask you to allow
-   installs from that source the first time.
-3. Put both tablets on **the same Wi-Fi network**.
-4. On one tablet tap **HOST GAME**. On the other, tap the game that appears under
-   **GAMES ON YOUR NETWORK**, or type the IP address shown on the host's screen.
+1. On each device, download [**DoubleCross.apk**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross.apk)
+   and open it. Android will ask you to allow installs from that source the first time.
+2. Put both devices on **the same Wi-Fi network**.
+3. On one, choose **HOST A MISSION**. On the other, pick the game under
+   **INTERCEPTED TRANSMISSIONS**, or type the IP address shown on the host's screen.
 
 > Some routers (guest networks, many office and hotel Wi-Fi networks) block
 > devices from seeing each other. If the game doesn't show up, use the IP
@@ -97,9 +109,8 @@ What works today:
 
 ### As a Mac app
 
-1. Open the [**Actions** tab](../../actions/workflows/android.yml), click the latest green run and
-   download **double-cross-mac**. Unzip it, then unzip `DoubleCross-macOS.zip` inside to get **Double Cross.app**.
-   It runs natively on Apple Silicon and Intel Macs.
+1. Download [**DoubleCross-macOS.zip**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS.zip)
+   and unzip it to get **Double Cross.app**. It runs natively on Apple Silicon and Intel Macs.
 2. Drag it into **Applications**.
 3. The app isn't signed with an Apple developer certificate, so the first time you open it macOS will
    refuse. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the
@@ -214,7 +225,8 @@ are missing, the game falls back to the original drawn-in-code agents.
 
 ### Building the APK yourself
 
-Every push to `main` builds a debug APK and a Mac app automatically with GitHub Actions. To
+Every push to `main` builds a debug APK and a Mac app with GitHub Actions and
+publishes them as a release (pull requests just build, without releasing). To
 build locally instead, install the Android SDK and OpenJDK 17, set their paths in
 **Editor → Editor Settings → Export → Android**, then use **Project → Export… → Android**.
 
