@@ -330,6 +330,12 @@ func _sounds(delta: float) -> void:
 		return
 	var left: float = clocks.get(my_id, 999.0)
 	Sound.music_tempo(1.08 if left < 60.0 else 1.0)
+	# The music tightens up with a rival in the room and when time is short.
+	var danger := 0.0
+	for a in agents:
+		if a != local_agent and not a.out and a.room == local_agent.room and a.ko_time <= 0.0:
+			danger = 1.0
+	Sound.music_layers(danger, 1.0 if left < 60.0 else 0.0)
 	if left < 30.0 and int(left) != _last_tick:
 		_last_tick = int(left)
 		Sound.play("tick", -4.0, false, 0.0)
