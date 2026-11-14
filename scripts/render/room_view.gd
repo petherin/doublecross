@@ -88,6 +88,8 @@ func add_effect(kind: String, effect_room: Vector2i, pos: Vector2) -> void:
 			lights.flash(pos, Color(1.0, 0.55, 0.2), 2.2)
 		elif kind == "DOWN":
 			lights.flash(pos, Color(1.0, 0.9, 0.6), 1.0)
+		elif kind == "SHOCK":
+			lights.flash(pos, Color(0.6, 0.9, 1.0), 1.4)
 
 
 static func _iso(x: float, y: float, z := 0.0) -> Vector2:

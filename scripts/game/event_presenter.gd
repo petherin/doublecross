@@ -93,11 +93,11 @@ func present(e: Dictionary) -> void:
 			var trap_name: String = World.TRAP_NAMES[e["kind"]]
 			if me and e["owner"] == game.my_id:
 				game.hud.toast("Caught in your own %s! Nice one. -%ds.%s" % [trap_name, int(game.TRAP_PENALTY), dropped], warn, 3.5)
-				game.hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
+				game.hud.flash(_flash_colour(e["kind"]))
 			elif me:
 				var args := [_exclamation(e["kind"]), trap_name, int(game.TRAP_PENALTY), dropped]
 				game.hud.toast("%s! You walked into a %s. -%ds.%s" % args, warn, 3.5)
-				game.hud.flash(Color("ff7a1a") if e["kind"] == "BOMB" else Color("ffd23f"))
+				game.hud.flash(_flash_colour(e["kind"]))
 			elif e["owner"] == game.my_id:
 				game.hud.toast("Your %s got %s!" % [trap_name, victim.display_name], col, 3.0)
 
@@ -121,12 +121,12 @@ func _sound(e: Dictionary, me: bool) -> void:
 			if me:
 				Sound.play("gadget")
 		"ko":
-			var sound_name: String = {"BOMB": "boom", "SPRING": "boing", "WIRE": "twang"}[e["kind"]]
+			var sound_name: String = {"BOMB": "boom", "SPRING": "boing", "WIRE": "twang", "SHOCK": "zap"}[e["kind"]]
 			# A bomb is loud enough to hear through the walls.
 			if here or me or e["kind"] == "BOMB":
 				Sound.play(sound_name, 0.0, not (here or me), 0.03)
 			if me:
-				Settings.buzz(350 if e["kind"] == "BOMB" else 200)
+				Settings.buzz(600 if e["kind"] == "SHOCK" else 350 if e["kind"] == "BOMB" else 200)
 		"hit":
 			var v: Agent = game.agent_of(e["pid"])
 			if v.room == game.local_agent.room:
@@ -140,6 +140,13 @@ func _sound(e: Dictionary, me: bool) -> void:
 				Settings.buzz(300)
 
 
+static func _flash_colour(kind: String) -> Color:
+	match kind:
+		"BOMB": return Color("ff7a1a")
+		"SHOCK": return Color("9df4ff")
+		_: return Color("ffd23f")
+
+
 static func _trap_for(gadget: String) -> String:
 	for t in World.TRAPS:
 		if World.TRAPS[t] == gadget:
@@ -151,4 +158,5 @@ static func _exclamation(kind: String) -> String:
 	match kind:
 		"BOMB": return "KABOOM"
 		"SPRING": return "BOING"
+		"SHOCK": return "BZZZT"
 		_: return "TWANG"

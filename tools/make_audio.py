@@ -15,6 +15,7 @@ bodies, explosions layer a crack, a punch, sub-bass, a closing-down noise body,
 rumble and falling debris, with saturation and a synthetic room reverb.
 """
 import os
+import sys
 import subprocess
 import wave
 
@@ -104,7 +105,12 @@ def normalise(x, peak=0.9):
     return x if m == 0 else x / m * peak
 
 
+ONLY = set(a for a in sys.argv[1:] if not a.startswith("-"))
+
+
 def save_wav(name, x, peak=0.9):
+    if ONLY and name not in ONLY:
+        return
     os.makedirs(OUT, exist_ok=True)
     data = (np.clip(normalise(x, peak), -1, 1) * 32767).astype(np.int16)
     with wave.open(os.path.join(OUT, name + ".wav"), "wb") as w:
@@ -327,6 +333,21 @@ def sfx():
     wire = biquad(wire, "peak", 1800, 2.0, 8) * env(len(wire), 0.001, 0.8, 0.2)
     save_wav("twang", reverb(mix(wire, click(0.01, 2500) * 1.5, thud(120, 0.2, 0.6)), 0.8, 0.2), 0.8)
 
+    # Shock trap: a snap, then a harsh mains buzz stuttering on and off,
+    # crackling sparks and a thin whine, all frying for about a second.
+    L = 1.5
+    n = int(SR * L)
+    t = t_axis(L)
+    buzz = sum(sine(55.0 * k, L) / k for k in range(1, 18))
+    stutter = 0.55 + 0.45 * np.sign(np.sin(2 * np.pi * 21.0 * t + 0.9 * np.sin(2 * np.pi * 6.0 * t)))
+    buzz = saturate(buzz * stutter, 3.0)
+    gate = np.clip(lowpass(np.random.rand(n) * 2.0 - 1.0, 90.0) * 7.0, 0.0, 1.0)
+    crackle = bandpass(noise(L), 1800, 7500) * gate
+    whine = np.sin(2 * np.pi * np.cumsum(np.linspace(3400.0, 1500.0, n)) / SR) * (0.5 + 0.5 * stutter)
+    fry = (buzz * 0.7 + crackle * 0.6 + whine * 0.12) * env(n, 0.01, None, 0.3, 1.0)
+    snap = mix(click(0.006, 1500) * 3.0, thud(60, 0.12, 0.8))
+    save_wav("zap", reverb(mix(snap, fry), 0.6, 0.15), 0.85)
+
     # Cosh swing: a resonant doppler whoosh.
     L = 0.32
     t = t_axis(L)
@@ -529,5 +550,6 @@ def music():
 
 if __name__ == "__main__":
     sfx()
-    music()
+    if not ONLY:
+        music()
     print("audio written to", os.path.abspath(OUT))

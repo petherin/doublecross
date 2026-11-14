@@ -70,6 +70,28 @@ static func draw(ci: CanvasItem, item: String, c: Vector2, s: float, lit := true
 			ci.draw_polyline(pts, k.call(Color("c7ccd6")), 0.07 * s, true)
 			ci.draw_rect(Rect2(c + Vector2(-0.38, 0.36) * s, Vector2(0.76, 0.1) * s), k.call(Color("50575f")))
 			ci.draw_rect(Rect2(c + Vector2(-0.3, -0.4) * s, Vector2(0.6, 0.1) * s), k.call(Color("ff5a5f")))
+		"SHOCK":
+			# A lightning bolt on a little junction box.
+			ci.draw_rect(Rect2(c + Vector2(-0.34, -0.3) * s, Vector2(0.68, 0.64) * s), k.call(Color("2b2f36")))
+			ci.draw_rect(Rect2(c + Vector2(-0.34, -0.3) * s, Vector2(0.68, 0.64) * s), k.call(Color("596273")), false, 0.05 * s)
+			ci.draw_line(c + Vector2(-0.2, 0.34) * s, c + Vector2(-0.2, 0.46) * s, k.call(Color("9aa3b0")), 0.07 * s)
+			ci.draw_line(c + Vector2(0.2, 0.34) * s, c + Vector2(0.2, 0.46) * s, k.call(Color("9aa3b0")), 0.07 * s)
+			var bolt := PackedVector2Array([
+				c + Vector2(0.08, -0.26) * s, c + Vector2(-0.14, 0.02) * s, c + Vector2(0.02, 0.02) * s,
+				c + Vector2(-0.08, 0.3) * s, c + Vector2(0.16, -0.04) * s, c + Vector2(0.0, -0.04) * s,
+			])
+			ci.draw_colored_polygon(bolt, k.call(Color("ffe14d")))
+		"RUBBER GLOVES":
+			# A thick orange rubber glove, cuff at the bottom.
+			var glove := PackedVector2Array([
+				c + Vector2(-0.22, 0.42) * s, c + Vector2(-0.24, -0.04) * s, c + Vector2(-0.42, -0.2) * s,
+				c + Vector2(-0.3, -0.3) * s, c + Vector2(-0.14, -0.14) * s, c + Vector2(-0.1, -0.44) * s,
+				c + Vector2(0.16, -0.44) * s, c + Vector2(0.24, -0.1) * s, c + Vector2(0.24, 0.42) * s,
+			])
+			ci.draw_colored_polygon(glove, k.call(Color("ff8c1a")))
+			ci.draw_rect(Rect2(c + Vector2(-0.22, 0.3) * s, Vector2(0.46, 0.14) * s), k.call(Color("d96a00")))
+			ci.draw_line(c + Vector2(-0.03, -0.42) * s, c + Vector2(-0.03, -0.1) * s, k.call(Color("d96a00")), 0.03 * s)
+			ci.draw_line(c + Vector2(0.1, -0.42) * s, c + Vector2(0.1, -0.1) * s, k.call(Color("d96a00")), 0.03 * s)
 		"WIRE":
 			ci.draw_rect(Rect2(c + Vector2(-0.44, -0.3) * s, Vector2(0.1, 0.6) * s), k.call(Color("e0b10b")))
 			ci.draw_rect(Rect2(c + Vector2(0.34, -0.3) * s, Vector2(0.1, 0.6) * s), k.call(Color("e0b10b")))

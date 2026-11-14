@@ -7,7 +7,7 @@ signal exit_touched
 signal search_finished(room: Vector2i, idx: int)
 signal trap_finished(info: Dictionary)
 signal door_passed(from_room: Vector2i, dir: int)
-## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE" or "DOWN").
+## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE", "SHOCK" or "DOWN").
 signal recovered(kind: String)
 ## Emitted when the agent ducks into a vent (true) or pops out of one (false).
 signal vent_moved(entering: bool)
@@ -21,6 +21,8 @@ const SEND_RATE := 1.0 / 20.0
 
 ## Agent height on screen, in pixels, at normal size.
 const SPRITE_HEIGHT := 120.0
+## How long the x-ray flicker and sparks last after a shock trap goes off.
+const SHOCK_FRY_TIME := 1.3
 const SPRITE_METRES := 1.95
 static var _meta := {}
 static var _sheets := {}
@@ -403,6 +405,14 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var ko_age := _ko_total - ko_time
 	if ko and ko_kind == "SPRING" and ko_age < 0.9:
 		foot.y -= sin(ko_age / 0.9 * PI) * 160.0
+	# Electrocuted: the agent judders about and every other instant shows as
+	# an x-ray, skeleton and all.
+	var zapped := ko and ko_kind == "SHOCK" and ko_age < SHOCK_FRY_TIME
+	var xray := false
+	if zapped:
+		var now := Time.get_ticks_msec() / 1000.0
+		foot += Vector2(sin(now * 97.0) * 4.0, cos(now * 83.0) * 3.0)
+		xray = int(now * 16.0) % 2 == 0
 
 	# Shadow and team ring on the floor.
 	ci.draw_set_transform(World.iso(position), 0.0, Vector2(1.0, 0.5))
@@ -418,8 +428,10 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var region := Rect2(r[0], r[1], r[2], r[3])
 	var offset := Vector2(r[4], r[5])
 	# Dizzy wobble while knocked out by a trap.
-	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" else 0.0
+	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" and not zapped else 0.0
 	var tint := Color.WHITE
+	if zapped:
+		tint = Color(0.02, 0.03, 0.05) if xray else Color(0.8, 0.97, 1.0)
 	if soot > 0.0:
 		tint = tint.lerp(Color(0.28, 0.25, 0.23), minf(1.0, soot * 1.4))
 	if hurt_time > 0.0:
@@ -428,6 +440,8 @@ func _paint_sprite(ci: CanvasItem) -> void:
 		tint.a = 0.35 if int(Time.get_ticks_msec() / 90) % 2 == 0 else 0.85
 	ci.draw_set_transform(foot, tilt, Vector2(scale_f, scale_f * squash))
 	ci.draw_texture_rect_region(tex, Rect2(-anchor + offset, region.size), region, tint)
+	if xray:
+		_paint_skeleton(ci)
 	if has_case and not searching and attack_anim <= 0.0 and not ko:
 		# The briefcase, carried at the side.
 		var side := Vector2.from_angle(facing + PI / 2)
@@ -444,6 +458,44 @@ func _paint_sprite(ci: CanvasItem) -> void:
 
 
 ## Name tag, health pips, smoke, dizzy stars and the search bubble.
+## The cartoon x-ray: bones drawn over the blacked-out sprite, in sprite
+## units (the caller has set the transform so 0,0 is the feet).
+func _paint_skeleton(ci: CanvasItem) -> void:
+	var bone := Color(0.95, 1.0, 1.0)
+	var glow := Color(0.6, 0.9, 1.0, 0.45)
+	var w := 4.0
+	# Skull: dome, sockets, grin.
+	var skull := Vector2(0, -124)
+	ci.draw_circle(skull, 19.0, glow)
+	ci.draw_circle(skull, 15.0, bone)
+	ci.draw_rect(Rect2(skull + Vector2(-9, 8), Vector2(18, 10)), bone)
+	ci.draw_circle(skull + Vector2(-6, -2), 4.0, Color(0.02, 0.03, 0.05))
+	ci.draw_circle(skull + Vector2(6, -2), 4.0, Color(0.02, 0.03, 0.05))
+	for i in 4:
+		ci.draw_line(skull + Vector2(-7 + i * 4.5, 11), skull + Vector2(-7 + i * 4.5, 18), Color(0.02, 0.03, 0.05), 1.5)
+	# Spine and ribs.
+	ci.draw_line(Vector2(0, -106), Vector2(0, -52), bone, w)
+	for i in 4:
+		var y := -98.0 + i * 11.0
+		ci.draw_arc(Vector2(0, y + 10), 15.0 - i * 1.5, PI * 1.1, PI * 1.9, 10, bone, 3.0, true)
+	# Pelvis.
+	ci.draw_arc(Vector2(0, -46), 12.0, PI, TAU, 10, bone, w, true)
+	# Arms (out to the sides, as in the hurt pose) and legs.
+	for side in [-1.0, 1.0]:
+		var sh := Vector2(side * 14, -100)
+		var el := Vector2(side * 34, -84)
+		var hand := Vector2(side * 44, -62)
+		ci.draw_line(sh, el, bone, w)
+		ci.draw_line(el, hand, bone, w)
+		ci.draw_circle(hand, 4.0, bone)
+		var hip := Vector2(side * 8, -46)
+		var knee := Vector2(side * 12, -24)
+		var foot_b := Vector2(side * 14, -2)
+		ci.draw_line(hip, knee, bone, w)
+		ci.draw_line(knee, foot_b, bone, w)
+		ci.draw_line(foot_b, foot_b + Vector2(side * 8, 0), bone, w)
+
+
 func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> void:
 	# Name tag (unflipped)
 	var font := ThemeDB.fallback_font
@@ -465,6 +517,19 @@ func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> v
 		for i in 3:
 			var flick := 0.5 + 0.5 * sin(now * 9.0 + i * 2.3)
 			ci.draw_circle(foot + Vector2(-8 + i * 8, -40 - i * 9), 1.8, Color(1.0, 0.55, 0.1, flick * soot))
+
+	# Sparks crawling over a shocked agent.
+	if ko and ko_kind == "SHOCK" and _ko_total - ko_time < SHOCK_FRY_TIME:
+		var now := Time.get_ticks_msec() / 1000.0
+		var frame := floorf(now * 30.0)
+		for i in 5:
+			var y := -20.0 - i * 20.0
+			var pts := PackedVector2Array()
+			for k in 6:
+				pts.append(foot + Vector2(-30.0 + k * 12.0 + sin(frame * 2.1 + i + k * 7.0) * 6.0,
+						y + sin(frame * 3.3 + i * 5.0 + k * 2.0) * 7.0))
+			ci.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.85), 2.0, true)
+		return
 
 	# Dizzy stars while knocked out
 	if ko:

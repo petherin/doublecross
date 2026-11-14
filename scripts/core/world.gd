@@ -63,10 +63,12 @@ const FREE_TYPES := ["crate", "desk", "plant", "crate"]
 const INTEL := ["PASSPORT", "CASH", "MICROFILM", "KEYCARD"]
 const BRIEFCASE := "BRIEFCASE"
 ## Gadgets go on your tool belt (they don't count towards the carry limit).
-const GADGETS := ["WIRE CUTTERS", "EXTINGUISHER", "TOOLKIT"]
+const GADGETS := ["WIRE CUTTERS", "EXTINGUISHER", "TOOLKIT", "RUBBER GLOVES"]
 ## Trap -> the gadget that defuses it.
-const TRAPS := {"BOMB": "EXTINGUISHER", "SPRING": "TOOLKIT", "WIRE": "WIRE CUTTERS"}
-const TRAP_NAMES := {"BOMB": "BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE"}
+const TRAPS := {"BOMB": "EXTINGUISHER", "SPRING": "TOOLKIT", "WIRE": "WIRE CUTTERS", "SHOCK": "RUBBER GLOVES"}
+const TRAP_NAMES := {"BOMB": "BOMB", "SPRING": "SPRING TRAP", "WIRE": "TRIPWIRE", "SHOCK": "SHOCK TRAP"}
+## Traps that hide in furniture (the tripwire goes across a doorway instead).
+const FURNITURE_TRAPS := ["BOMB", "SPRING", "SHOCK"]
 
 const VENT_HALF := 34.0
 var seed_value := 0

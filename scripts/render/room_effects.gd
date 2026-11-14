@@ -69,6 +69,10 @@ func draw(ci: CanvasItem, e: Dictionary) -> void:
 			word = "KABOOM!"
 			col = Color("ffb13b")
 			_draw_explosion(ci, e)
+		"SHOCK":
+			word = "BZZZT!"
+			col = Color("9df4ff")
+			_draw_arcs(ci, e)
 		"SPRING":
 			word = "BOING!"
 			col = Color("ffd23f")
@@ -88,6 +92,28 @@ func draw(ci: CanvasItem, e: Dictionary) -> void:
 	var at := p + Vector2(-w / 2, -60 - t * 40)
 	ci.draw_string_outline(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 10, Color(0, 0, 0, a))
 	ci.draw_string(font, at, word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col, a))
+
+
+## Jagged electric arcs crackling out from a shocked agent, re-drawn 30
+## times a second so they flicker.
+func _draw_arcs(ci: CanvasItem, e: Dictionary) -> void:
+	var t: float = e["t"]
+	if t > 1.1:
+		return
+	var c := World.iso(e["pos"], 55.0)
+	var frame := floorf(t * 30.0)
+	var fade := 1.0 - t / 1.1
+	for i in 7:
+		var ang := i * TAU / 7.0 + sin(frame * 1.7 + i) * 0.4
+		var len := 40.0 + 50.0 * fposmod(sin(frame * 2.3 + i * 3.1) * 0.5 + 0.5, 1.0)
+		var pts := PackedVector2Array([c])
+		for k in range(1, 6):
+			var along := c + Vector2.from_angle(ang) * (len * k / 5.0)
+			var jag := Vector2.from_angle(ang + PI / 2) * sin(frame * 3.7 + i * 2.9 + k * 5.3) * 9.0
+			pts.append(along + jag)
+		ci.draw_polyline(pts, Color(0.75, 0.95, 1.0, 0.9 * fade), 3.0, true)
+		ci.draw_polyline(pts, Color(1, 1, 1, 0.9 * fade), 1.2, true)
+	ci.draw_circle(c, 18.0 + 6.0 * sin(frame), Color(0.7, 0.95, 1.0, 0.35 * fade))
 
 
 ## A fiery, smoky blast: flash, fireball, flying sparks, then rolling smoke.
