@@ -44,6 +44,8 @@ var sheet_name := ""
 var accent := Color("ff5a5f")
 ## Shape that tells agents apart without relying on colour.
 var mark := "circle"
+## Pitch of this agent's grunts and cries.
+var voice := 1.0
 
 ## Set by the game: no movement at all (e.g. after the match ends).
 var frozen := false
@@ -94,6 +96,7 @@ func configure(p_world: World, p_room: Vector2i, p_local: bool, style: Dictionar
 	display_name = style["name"]
 	accent = style["accent"]
 	mark = style.get("mark", "circle")
+	voice = style.get("voice", 1.0)
 	sheet_name = style.get("sheet", "")
 
 

@@ -8,6 +8,7 @@ const NAMES := [
 	"found", "gadget", "nothing", "trap_set", "boom", "boing", "twang", "swing",
 	"hit", "down", "dart", "door", "click", "locked", "tick", "win", "lose",
 	"type1", "type2", "type3", "stamp", "paper", "poof", "crawl", "vent", "zap",
+	"oof1", "oof2", "argh1", "argh2", "yell", "haha",
 ]
 const VOICES := 12
 
@@ -104,7 +105,8 @@ func _apply_volumes() -> void:
 
 
 ## Plays an effect. `distant` = it happened in another room (muffled).
-func play(sound_name: String, volume_db := 0.0, distant := false, pitch_jitter := 0.06) -> void:
+## `pitch` sets the base pitch (a voice); jitter varies it a little each time.
+func play(sound_name: String, volume_db := 0.0, distant := false, pitch_jitter := 0.06, pitch := 1.0) -> void:
 	if not _streams.has(sound_name):
 		# "step" -> one of step1, step2, ... at random.
 		var takes := []
@@ -120,7 +122,7 @@ func play(sound_name: String, volume_db := 0.0, distant := false, pitch_jitter :
 	p.stream = _streams[sound_name]
 	p.bus = "Distant" if distant else "SFX"
 	p.volume_db = volume_db
-	p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	p.pitch_scale = pitch * (1.0 + randf_range(-pitch_jitter, pitch_jitter))
 	p.play()
 
 
