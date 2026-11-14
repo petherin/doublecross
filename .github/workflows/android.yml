@@ -1,8 +1,8 @@
 name: Build Android APK and Mac app
 
-# Every push to main (including merged pull requests) that changes the game
-# builds both apps and publishes them as a GitHub Release, which anyone can
-# download without a GitHub account. Pull requests just build.
+# Pull requests run linting and headless gameplay tests only.
+# Downloadable packages and GitHub Releases are produced only after changes
+# reach main (the push event generated when a pull request is merged).
 
 on:
   push:
@@ -12,7 +12,6 @@ on:
       - "docs/**"
       - "LICENSE"
   pull_request:
-    paths-ignore: *docs
   workflow_dispatch:
 
 env:
@@ -54,6 +53,9 @@ jobs:
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd
 
   android:
+    # Never export or upload downloadable build artifacts for pull requests.
+    # This job runs only after code has reached the main branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-24.04
     permissions:
@@ -157,7 +159,6 @@ jobs:
             build/DoubleCross-macOS-Intel.zip
 
       - name: Publish a release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
