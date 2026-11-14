@@ -114,6 +114,8 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   keys and rubber stamps. Sounds from other rooms are muffled through the walls.
 - **Room tone:** each room has its own quiet background (air-conditioning,
   server racks with clicking relays, or dripping pipes), crossfading as you move.
+- **Voices:** agents grunt when hit, cry out when knocked down, shriek when
+  electrocuted and crow "ha-HAH!" when they win, each at their own pitch.
 - **Music that reacts:** the spy-jazz loop is three loops played together. A
   shaker, toms and a low swell come in while a rival is in your room; driving
   hats, brass stabs and a rising riff come in when your clock is nearly out.
