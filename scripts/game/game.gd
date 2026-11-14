@@ -53,10 +53,10 @@ const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 const STYLES := [
-	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson", "mark": "circle"},
-	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt", "mark": "triangle"},
-	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber", "mark": "square"},
-	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade", "mark": "diamond"},
+	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson", "mark": "circle", "voice": 1.0},
+	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt", "mark": "triangle", "voice": 0.84},
+	{"name": "AGENT AMBER", "accent": Color("ffbf3a"), "sheet": "amber", "mark": "square", "voice": 1.18},
+	{"name": "AGENT JADE", "accent": Color("4fe39a"), "sheet": "jade", "mark": "diamond", "voice": 0.93},
 ]
 
 var world: World
@@ -744,4 +744,8 @@ func game_over(winner: int, reason := "escape") -> void:
 	Sound.music(false)
 	Sound.music_tempo(1.0)
 	Sound.play("win" if winner == my_id else "lose")
+	if _agent_by_id.has(winner):
+		var w: Agent = _agent_by_id[winner]
+		if winner == my_id or w.room == local_agent.room:
+			Sound.play("haha", -2.0, false, 0.03, w.voice)
 	hud.show_end(winner, my_id, name, reason, multiplayer.is_server())

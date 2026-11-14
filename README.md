@@ -61,6 +61,7 @@ What works today:
 
 - Host a game on one tablet. The other tablet finds it automatically, or you can type the host's IP address.
 - A seeded secret base that grows with the party: 3×3 rooms for two agents, 4×3 for three, 4×4 for four. Every device builds the identical map from one shared number.
+- **Voices:** agents grunt when hit, cry out when knocked down, shriek when electrocuted and crow "ha-HAH!" when they win, each agent at their own pitch.
 - **Music that reacts:** the spy-jazz loop is three loops played together. A shaker, toms and a low tremolo swell fade in while a rival is in your room; driving hats, brass stabs and a rising riff come in when your clock is nearly out.
 - **Four kinds of trap:** a bomb, a spring, a tripwire across a doorway, and a shock trap that fries whoever opens the drawer, skeleton flashing and all. Each has a gadget that beats it: extinguisher, toolkit, wire cutters, rubber gloves.
 - **Up to four agents:** Crimson, Cobalt, Amber and Jade. There's still only one of each piece of intel, but one briefcase fewer than there are agents, so somebody always goes without. The clock setting is for the 3×3 base and scales up with the bigger ones. The host opens a lobby, rivals join, and the host presses START once two to four are in. If an agent's clock runs out (or they leave) they're out and their intel scatters; the last one in, or the first one out of the exit, wins.

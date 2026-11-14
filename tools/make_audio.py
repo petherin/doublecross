@@ -457,6 +457,63 @@ def sfx():
     save_wav("lose", reverb(np.concatenate(out), 1.2, 0.25), 0.7)
 
 
+# ------------------------------------------------------------------ voices
+
+def _voice(segments, breath=0.08, rough=0.0):
+    """A cartoon voice from a glottal buzz shaped by vowel formants.
+    segments: [(seconds, f0_start, f0_end, vowel, loudness_start, loudness_end)]
+    vowel is "a", "o", "u", "e", or "h" for a breathy, unvoiced sound."""
+    formants = {
+        "a": [(750, 1.0, 90), (1200, 0.55, 110), (2600, 0.22, 160)],
+        "o": [(500, 1.0, 80), (850, 0.5, 100), (2500, 0.12, 150)],
+        "u": [(330, 1.0, 70), (750, 0.32, 90), (2300, 0.08, 150)],
+        "e": [(420, 1.0, 80), (2000, 0.4, 120), (2700, 0.2, 160)],
+        "h": [(900, 0.6, 400), (1800, 0.4, 500), (3000, 0.2, 600)],
+    }
+    out = []
+    phase = 0.0
+    for dur, f0a, f0b, vowel, la, lb in segments:
+        n = int(SR * dur)
+        idx = np.arange(n) / SR
+        f0 = np.linspace(f0a, f0b, n) * (1 + 0.015 * np.sin(2 * np.pi * 5.5 * idx))
+        ph = phase + np.cumsum(f0) / SR
+        phase = ph[-1] if n else phase
+        hiss = noise(dur)[:n]
+        if vowel == "h":
+            buzz = hiss * 0.6
+        else:
+            buzz = lowpass(2 * (ph % 1.0) - 1, 3500) + hiss * breath
+            if rough > 0:
+                # Vocal fry: every other pulse louder, for a strained, gritty edge.
+                buzz = buzz * (1 + rough * np.sign(np.sin(np.pi * ph)))
+        voiced = sum(biquad(buzz, "bandpass", f, q=f / bw) * g for f, g, bw in formants[vowel])
+        out.append(voiced * np.linspace(la, lb, n))
+    x = np.concatenate(out)
+    x = x * env(len(x), 0.012, None, 0.04)
+    return saturate(x * 1.5, 1.4)
+
+
+def voices():
+    """Grunts and cries, two takes of the common ones so repeats don't sound
+    canned. The game pitches them per agent."""
+    save_wav("oof1", reverb(_voice([(0.05, 210, 230, "u", 0.4, 1.0), (0.14, 230, 150, "o", 1.0, 0.2)],
+                                   rough=0.2), 0.4, 0.12), 0.7)
+    save_wav("oof2", reverb(_voice([(0.04, 190, 240, "h", 0.3, 0.8), (0.12, 240, 170, "u", 1.0, 0.15)],
+                                   rough=0.15), 0.4, 0.12), 0.7)
+    save_wav("argh1", reverb(_voice([(0.06, 200, 260, "a", 0.5, 1.0), (0.34, 260, 160, "a", 1.0, 0.7),
+                                     (0.25, 160, 110, "o", 0.7, 0.0)], rough=0.35), 0.6, 0.18), 0.75)
+    save_wav("argh2", reverb(_voice([(0.05, 230, 290, "e", 0.5, 1.0), (0.28, 290, 200, "a", 1.0, 0.8),
+                                     (0.3, 200, 120, "o", 0.8, 0.0)], rough=0.3), 0.6, 0.18), 0.75)
+    # Electrocuted: a cry juddering on and off with the current.
+    cry = _voice([(0.9, 300, 260, "a", 1.0, 0.6)], rough=0.6)
+    judder = 0.6 + 0.4 * np.sign(np.sin(2 * np.pi * 18 * np.arange(len(cry)) / SR))
+    save_wav("yell", reverb(cry * judder, 0.5, 0.15), 0.7)
+    # Winning: "ha-HAH!"
+    save_wav("haha", reverb(_voice([(0.02, 200, 200, "h", 0.5, 0.8), (0.1, 220, 210, "a", 1.0, 0.3),
+                                    (0.08, 200, 200, "h", 0.0, 0.0), (0.03, 260, 260, "h", 0.6, 0.9),
+                                    (0.22, 280, 230, "a", 1.0, 0.0)]), 0.5, 0.15), 0.7)
+
+
 # ------------------------------------------------------------------ music
 
 def music():
@@ -601,6 +658,7 @@ def _write_loop(name, buf, loop_len):
 
 if __name__ == "__main__":
     sfx()
+    voices()
     if not ONLY or "music" in ONLY:
         music()
     print("audio written to", os.path.abspath(OUT))
