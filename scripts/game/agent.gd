@@ -21,6 +21,8 @@ const SEND_RATE := 1.0 / 20.0
 
 ## Agent height on screen, in pixels, at normal size.
 const SPRITE_HEIGHT := 120.0
+## How long a knocked-out agent takes to go over before lying flat.
+const FALL_TIME := 0.22
 ## How long the x-ray flicker and sparks last after a shock trap goes off.
 const SHOCK_FRY_TIME := 1.3
 const SPRITE_METRES := 1.95
@@ -361,18 +363,20 @@ func _sheet() -> Texture2D:
 	return _sheets[sheet_name]
 
 
-## Which animation and frame to show right now.
+## Which animation and frame to show right now. Animations a sheet doesn't
+## have fall back to older ones, so older sprite sheets still work.
 func _sprite_frame() -> Array:
-	var ko := ko_time > 0.0
-	if ko and ko_kind == "DOWN":
-		return ["down", 0]
-	if hurt_time > 0.0 or ko:
-		return ["hurt", 0]
+	var m := _load_meta()
+	var anims: Dictionary = m["anims"]
+	var knocked := _knocked_frame(anims)
+	if not knocked.is_empty():
+		return knocked
 	if attack_anim > 0.0:
 		return ["swing", int(clampf(1.0 - attack_anim / 0.3, 0.0, 0.999) * 4.0)]
+	if searching and _busy_kind == "trap" and anims.has("trap"):
+		return ["trap", int(_walk * 0.8) % int(anims["trap"]["count"])]
 	if searching:
 		return ["search", int(_walk * 0.6) % 4]
-	var m := _load_meta()
 	if celebrating and m["anims"].has("victory"):
 		return ["victory", int(Time.get_ticks_msec() / 110) % int(m["anims"]["victory"]["count"])]
 	if moving:
@@ -380,6 +384,21 @@ func _sprite_frame() -> Array:
 		var n: int = m["anims"][anim]["count"]
 		return [anim, int(fposmod(_walk, TAU) / TAU * n) % n]
 	return ["idle", int(Time.get_ticks_msec() / 700) % 2]
+
+
+## The frame while hurt or knocked out, or [] if neither.
+func _knocked_frame(anims: Dictionary) -> Array:
+	var now := Time.get_ticks_msec()
+	var ko := ko_time > 0.0
+	if ko and ko_kind == "DOWN":
+		# Going over, then flat on the floor.
+		var last := int(anims["down"]["count"]) - 1
+		return ["down", 0 if _ko_total - ko_time < FALL_TIME else last]
+	if ko and ko_kind != "SHOCK" and anims.has("dizzy"):
+		return ["dizzy", int(now / 260) % int(anims["dizzy"]["count"])]
+	if hurt_time > 0.0 or ko:
+		return ["hurt", int(now / 120) % int(anims["hurt"]["count"])]
+	return []
 
 
 func _paint_sprite(ci: CanvasItem) -> void:
