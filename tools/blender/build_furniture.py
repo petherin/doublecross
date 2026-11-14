@@ -543,6 +543,7 @@ def export_models():
     os.makedirs(out, exist_ok=True)
     BA.reset_scene()
     mats = materials()
+    _flatten_for_export(mats)
     for kind in TYPES:
         if only_types and kind not in only_types:
             continue
@@ -568,6 +569,28 @@ def export_models():
         bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True,
                                   export_apply=True, export_yup=True)
         print("  exported", kind, os.path.getsize(path) // 1024, "KB", flush=True)
+
+
+def _flatten_for_export(mats):
+    """glTF only carries plain material values, so swap procedural colours
+    for their base colour (fabric) and give the screens a flat glow."""
+    for name, m in mats.items():
+        for mat in (m if isinstance(m, list) else [m]):
+            nt = mat.node_tree
+            p = nt.nodes.get("Principled BSDF")
+            if p and p.inputs["Base Color"].is_linked:
+                for link in list(p.inputs["Base Color"].links):
+                    nt.links.remove(link)
+            if p and p.inputs["Normal"].is_linked:
+                for link in list(p.inputs["Normal"].links):
+                    nt.links.remove(link)
+    screen = mats["screen"].node_tree
+    screen.nodes.clear()
+    em = screen.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (0.08, 0.55, 0.32, 1)
+    em.inputs["Strength"].default_value = 1.5
+    out = screen.nodes.new("ShaderNodeOutputMaterial")
+    screen.links.new(em.outputs["Emission"], out.inputs["Surface"])
 
 
 only_types = None

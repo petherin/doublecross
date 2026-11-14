@@ -18,12 +18,16 @@ const DOOR_H := 150.0
 const EYE_H := 104.0
 ## The room textures cover 128 units each way (the wall is 110 high).
 const TEX_UNITS := 128.0
+## The short passage between neighbouring rooms, seen through doorways.
+const GAP := 60.0
 const WALL_ROT := {"top": 0.0, "bottom": 180.0, "left": 90.0, "right": -90.0, "free": 0.0}
 
 var world: World
 var room := Vector2i(-1, -1)
 var camera: Camera3D
 var _room_root: Node3D
+## Where new room pieces go: the room itself, or a neighbour beyond a door.
+var _target: Node3D
 var _env: WorldEnvironment
 var _furniture: Array = []        # MeshInstance3D roots, by furniture index
 var _cutouts := {}                # Agent -> Sprite3D
@@ -91,11 +95,31 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	var tint: Color = world.rooms[room]["tint"]
 	_env.environment.ambient_light_color = Color(0.32, 0.33, 0.38).lerp(tint, 0.2)
 	_env.environment.ambient_light_energy = 0.9
-	_build_shell(tint)
-	_build_lights(tint)
+	_target = _room_root
+	_build_shell(room, tint, -1)
+	_build_lights(tint, 1.0)
 	var items: Array = world.furniture(room)
 	for f in items:
 		_furniture.append(_place_furniture(f))
+	# The rooms next door, seen through the doorways (their furniture and
+	# lights, but not who's in them: that stays hidden, as it is overhead).
+	for dir in World.DIR_VEC:
+		if world.opening(room, dir) != 1:
+			continue
+		var n: Vector2i = room + World.DIR_VEC[dir]
+		var nroot := Node3D.new()
+		var v := Vector2(World.DIR_VEC[dir])
+		var r := World.ROOM
+		nroot.position = Vector3(v.x * (r.size.x + GAP), 0.0, v.y * (r.size.y + GAP))
+		_room_root.add_child(nroot)
+		_target = nroot
+		var ntint: Color = world.rooms[n]["tint"]
+		_build_shell(n, ntint, World.OPPOSITE[dir])
+		_build_lights(ntint, 0.7)
+		for f in world.furniture(n):
+			_place_furniture(f)
+		_target = _room_root
+		_passage(dir, tint)
 	for i in world.vents.size():
 		if world.vents[i]["room"] == room:
 			_vents[i] = _place_vent(world.vents[i])
@@ -139,7 +163,10 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 
 # ------------------------------------------------------------------ the room
 
-func _build_shell(tint: Color) -> void:
+## The floor, ceiling and walls of room `r_room`. `from_dir` is the door we
+## look in through when it's a neighbour (-1 for the room we're in); every
+## other doorway out of a neighbour is shown as a dark opening.
+func _build_shell(r_room: Vector2i, tint: Color, from_dir: int) -> void:
 	var r := World.ROOM
 	var floor_mat := _surface_mat("floor", Color(0.5, 0.52, 0.56).lerp(tint, 0.04))
 	floor_mat.uv1_scale = Vector3(r.size.x / TEX_UNITS, r.size.y / TEX_UNITS, 1.0)
@@ -162,7 +189,7 @@ func _build_shell(tint: Color) -> void:
 		var w: Array = walls[dir]
 		var a: Vector2 = w[0]
 		var b: Vector2 = w[1]
-		var opening := world.opening(room, dir)
+		var opening := world.opening(r_room, dir)
 		var along := (b - a).normalized()
 		var length := a.distance_to(b)
 		var mid_t := length / 2.0
@@ -171,7 +198,10 @@ func _build_shell(tint: Color) -> void:
 			_wall(a + along * sp[0], a + along * sp[1], 0.0, WALL_H, w[2], tint)
 		if opening != 0:
 			_wall(a + along * (mid_t - dh), a + along * (mid_t + dh), DOOR_H, WALL_H, w[2], tint)
-			_doorway(a + along * mid_t, w[2], opening == 2)
+			# Doors from the room we're in lead to rooms we've built; others are dark.
+			var built: bool = opening == 1 and (from_dir == -1 or dir == from_dir)
+			if not built:
+				_doorway(a + along * mid_t, w[2], opening == 2)
 
 
 func _wall(a: Vector2, b: Vector2, bottom: float, top: float, yaw: float, tint: Color) -> void:
@@ -198,26 +228,51 @@ func _doorway(at: Vector2, yaw: float, is_exit: bool) -> void:
 		glow.light_energy = 2.0
 		glow.omni_range = 380.0
 		glow.position = Vector3(at.x, DOOR_H * 0.6, at.y) - out * 0.5
-		_room_root.add_child(glow)
+		_target.add_child(glow)
 
 
-func _build_lights(tint: Color) -> void:
+## The short passage through the doorway in direction `dir`.
+func _passage(dir: int, tint: Color) -> void:
+	var r := World.ROOM
+	var v := Vector2(World.DIR_VEC[dir])
+	var dh := World.DOOR_HALF
+	var mid := r.get_center() + v * (r.size / 2.0 + Vector2(GAP, GAP) / 2.0)
+	var along_y := v.x == 0.0
+	var size := Vector2(dh * 2.0, GAP) if along_y else Vector2(GAP, dh * 2.0)
+	var floor_mat := _surface_mat("floor", Color(0.4, 0.42, 0.45))
+	floor_mat.uv1_scale = Vector3(size.x / TEX_UNITS, size.y / TEX_UNITS, 1.0)
+	_quad(size, Vector3(mid.x, 0.0, mid.y), Vector3(-PI / 2.0, 0.0, 0.0), floor_mat)
+	var top := StandardMaterial3D.new()
+	top.albedo_color = Color(0.06, 0.06, 0.07)
+	_quad(size, Vector3(mid.x, DOOR_H, mid.y), Vector3(PI / 2.0, 0.0, 0.0), top)
+	for side in [-1.0, 1.0]:
+		if along_y:
+			var x: float = mid.x + side * dh
+			_wall(Vector2(x, mid.y - GAP / 2.0), Vector2(x, mid.y + GAP / 2.0), 0.0, DOOR_H,
+					-side * PI / 2.0, tint)
+		else:
+			var z: float = mid.y + side * dh
+			_wall(Vector2(mid.x - GAP / 2.0, z), Vector2(mid.x + GAP / 2.0, z), 0.0, DOOR_H,
+					0.0 if side < 0.0 else PI, tint)
+
+
+func _build_lights(tint: Color, strength: float) -> void:
 	var r := World.ROOM
 	var warm := Color(1.0, 0.86, 0.66).lerp(tint, 0.25)
 	for fx in [0.3, 0.72]:
 		var l := OmniLight3D.new()
 		l.light_color = warm
-		l.light_energy = 1.6
+		l.light_energy = 1.6 * strength
 		l.omni_range = 620.0
 		l.omni_attenuation = 1.2
 		l.position = Vector3(r.position.x + r.size.x * fx, WALL_H - 20.0, r.get_center().y)
-		_room_root.add_child(l)
+		_target.add_child(l)
 	var spill := OmniLight3D.new()
 	spill.light_color = tint
-	spill.light_energy = 0.7
+	spill.light_energy = 0.7 * strength
 	spill.omni_range = 700.0
 	spill.position = Vector3(r.get_center().x, WALL_H * 0.5, r.position.y + 40.0)
-	_room_root.add_child(spill)
+	_target.add_child(spill)
 
 
 func _surface_mat(name: String, col: Color) -> StandardMaterial3D:
@@ -239,7 +294,7 @@ func _quad(size: Vector2, at: Vector3, rot: Vector3, mat: Material) -> MeshInsta
 	mi.material_override = mat
 	mi.position = at
 	mi.rotation = rot
-	_room_root.add_child(mi)
+	_target.add_child(mi)
 	return mi
 
 
@@ -258,7 +313,7 @@ func _place_furniture(f: Dictionary) -> Node3D:
 	var c: Vector2 = (f["rect"] as Rect2).get_center()
 	node.position = Vector3(c.x, 0.0, c.y)
 	node.rotation.y = deg_to_rad(WALL_ROT.get(f["wall"], 0.0))
-	_room_root.add_child(node)
+	_target.add_child(node)
 	return node
 
 
