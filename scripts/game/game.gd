@@ -28,6 +28,8 @@ const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 
 ## How fast left/right turns you in first person (radians a second).
 const FP_TURN_SPEED := 2.6
+## Radians turned per pixel dragged on the right half of the screen.
+const FP_LOOK_SPEED := 0.006
 ## Seconds left on your clock when the room's alarm light starts.
 const ALARM_TIME := 30.0
 ## Peer ids of computer-controlled rivals in one-player games: 2, 3, 4.
@@ -275,6 +277,7 @@ func _process(delta: float) -> void:
 			local_agent.facing = wrapf(local_agent.facing + turn * FP_TURN_SPEED * delta, -PI, PI)
 		local_agent.move_input = Vector2.from_angle(local_agent.facing) * -move.y
 		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
+		fp.show_extras(view.effects.in_room(local_agent.room), view.my_traps, view.vent_highlight)
 	else:
 		# Controls are screen-relative: up on the stick = up the screen.
 		local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
@@ -301,6 +304,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if first_person and _look_drag(event):
+		return
 	if event.is_echo():
 		return
 	if event.is_action_pressed("search"):
@@ -321,6 +326,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_fire()
 	elif event.is_action_pressed("toggle_view"):
 		toggle_view()
+
+
+## First person: dragging on the right half of the screen (a finger, or the
+## mouse with the button held) turns you. Returns true if it used the event.
+func _look_drag(event: InputEvent) -> bool:
+	var half := get_viewport().get_visible_rect().size.x / 2.0
+	var dx := 0.0
+	if event is InputEventScreenDrag and event.position.x > half:
+		dx = event.relative.x
+	elif event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_LEFT and event.position.x > half:
+		dx = event.relative.x
+	else:
+		return false
+	if not (local_agent.frozen or local_agent.ko_time > 0.0):
+		local_agent.facing = wrapf(local_agent.facing + dx * FP_LOOK_SPEED, -PI, PI)
+	return true
 
 
 ## Switches between the isometric view and first person.

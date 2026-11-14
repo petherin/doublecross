@@ -125,7 +125,10 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   switches to seeing the room through your agent's eyes: real 3D walls,
   floor and Blender-modelled furniture, with the other agents as *Doom*-style
   cut-outs from their sprite sheets. Forward and back walk, left and right
-  turn. Effects and trap markers only show in the overhead view for now.
+  turn, and on a touch screen you can swipe the right half to look around.
+  Explosions, shocks, flying paperwork and the comic-book words happen in 3D
+  too, your trap markers and tripwires show, and when you're stunned the
+  view reels (or drops to the floor when you're taken out).
 - **Readable for everyone:** each agent has a shape as well as a colour
   (● Crimson, ▲ Cobalt, ■ Amber, ◆ Jade) on their name tag and clock, and new
   players get a few one-off tips on the ticker tape.
@@ -255,9 +258,9 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
-- **First person, finished:** the first version is in (see below). Still to
-  come: the furniture's full materials in 3D, trap markers and vents, the
-  explosions and other effects, and a look-around swipe on touch screens.
+- **First person, finished:** still to come are the furniture's full
+  materials in 3D (Blender's procedural textures don't export yet), looking
+  through doorways into the next room, and strafing.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.

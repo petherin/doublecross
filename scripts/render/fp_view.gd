@@ -8,6 +8,9 @@ extends Node3D
 
 const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
+const FpEffects = preload("res://scripts/render/fp_effects.gd")
+const RoomView = preload("res://scripts/render/room_view.gd")
+const Style = preload("res://scripts/ui/style.gd")
 
 ## Taller than the isometric cut-away walls, so the room feels enclosed.
 const WALL_H := 210.0
@@ -28,6 +31,12 @@ var _labels := {}                 # Agent -> Label3D
 var _highlight_mat: StandardMaterial3D
 var _models := {}
 var _t := 0.0
+var _fx: FpEffects
+var _vents := {}                  # vent index -> grille MeshInstance3D
+var _vent_mat: StandardMaterial3D
+var _markers := {}                # trap key -> Node3D
+var _cam_drop := 0.0              # eye lowered while knocked down
+var _cam_roll := 0.0
 
 
 func _ready() -> void:
@@ -48,6 +57,12 @@ func _ready() -> void:
 	_highlight_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_highlight_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_fx = FpEffects.new()
+	add_child(_fx)
+	_vent_mat = StandardMaterial3D.new()
+	_vent_mat.albedo_color = Color(0.1, 0.11, 0.13)
+	_vent_mat.metallic = 0.6
+	_vent_mat.roughness = 0.5
 
 
 ## Turns the view on or off (the 2D isometric view is used when off).
@@ -70,6 +85,9 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 			_labels[a].queue_free()
 	_cutouts.clear()
 	_labels.clear()
+	_fx.clear()
+	_vents.clear()
+	_markers.clear()
 	var tint: Color = world.rooms[room]["tint"]
 	_env.environment.ambient_light_color = Color(0.32, 0.33, 0.38).lerp(tint, 0.2)
 	_env.environment.ambient_light_energy = 0.9
@@ -78,14 +96,32 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	var items: Array = world.furniture(room)
 	for f in items:
 		_furniture.append(_place_furniture(f))
+	for i in world.vents.size():
+		if world.vents[i]["room"] == room:
+			_vents[i] = _place_vent(world.vents[i])
 
 
 ## Follows the local agent and draws the others; `highlight` is the
 ## furniture index the player can search (or -1).
 func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void:
 	_t += delta
-	camera.position = Vector3(me.position.x, EYE_H + sin(_t * 9.0) * (2.0 if me.moving else 0.0), me.position.y)
-	camera.rotation = Vector3(0.0, -me.facing - PI / 2.0, 0.0)
+	# Your own knockouts, felt: the view reels when stunned, judders when
+	# shocked, and drops to the floor when you're taken out.
+	var ko := me.ko_time > 0.0
+	var drop := EYE_H - 26.0 if ko and me.ko_kind == "DOWN" else 0.0
+	_cam_drop = lerpf(_cam_drop, drop, minf(1.0, delta * 10.0))
+	var roll := 0.0
+	var jitter := Vector3.ZERO
+	if ko and me.ko_kind == "DOWN":
+		roll = 0.5
+	elif ko and me.ko_kind == "SHOCK":
+		jitter = Vector3(sin(_t * 97.0), cos(_t * 83.0), 0.0) * 3.0
+	elif ko:
+		roll = sin(_t * 3.0) * 0.14
+	_cam_roll = lerpf(_cam_roll, roll, minf(1.0, delta * 6.0))
+	var bob := sin(_t * 9.0) * (2.0 if me.moving else 0.0)
+	camera.position = Vector3(me.position.x, EYE_H + bob - _cam_drop, me.position.y) + jitter
+	camera.rotation = Vector3(0.0, -me.facing - PI / 2.0, _cam_roll)
 	for i in _furniture.size():
 		_set_highlight(_furniture[i], i == highlight)
 	for a: Agent in agents:
@@ -226,6 +262,100 @@ func _place_furniture(f: Dictionary) -> Node3D:
 	return node
 
 
+## Effects, your trap markers and the vent you're at (from the overhead view).
+func show_extras(effects: Array, my_traps: Dictionary, vent_highlight: int) -> void:
+	_fx.sync(effects)
+	for i in _vents:
+		var on: bool = i == vent_highlight
+		var a := (0.25 + 0.2 * sin(_t * 6.0)) if on else 0.0
+		_highlight_mat.albedo_color = Color(1.0, 0.86, 0.15, a)
+		(_vents[i] as MeshInstance3D).material_overlay = _highlight_mat if on else null
+	_sync_markers(my_traps)
+
+
+## A crawl-through vent: a slatted grille at floor level in a back wall.
+func _place_vent(v: Dictionary) -> MeshInstance3D:
+	var r := World.ROOM
+	var w := World.VENT_HALF * 2.0
+	var q := BoxMesh.new()
+	q.size = Vector3(w, 46.0, 3.0)
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	mi.material_override = _vent_mat
+	if v["dir"] == World.Dir.UP:
+		mi.position = Vector3(v["along"], 27.0, r.position.y + 1.0)
+	else:
+		mi.position = Vector3(r.position.x + 1.0, 27.0, v["along"])
+		mi.rotation.y = PI / 2.0
+	_room_root.add_child(mi)
+	# Slats.
+	for k in 5:
+		var s := MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		sm.size = Vector3(w - 6.0, 2.0, 2.0)
+		s.mesh = sm
+		var lm := StandardMaterial3D.new()
+		lm.albedo_color = Color(0.36, 0.4, 0.46)
+		s.material_override = lm
+		s.position = Vector3(0, -18.0 + k * 9.0, 2.0)
+		mi.add_child(s)
+	return mi
+
+
+## Your own traps: a small warning sign over trapped furniture, and a
+## glowing wire across trapped doorways. Only you see them.
+func _sync_markers(my_traps: Dictionary) -> void:
+	var want := {}
+	for key: String in my_traps:
+		if key.begins_with("D"):
+			for dir in World.DIR_VEC:
+				if world.opening(room, dir) == 1 and World.door_key(room, dir) == key:
+					want[key] = [dir, my_traps[key]]
+		elif key.begins_with("%d,%d," % [room.x, room.y]):
+			want[key] = [int(key.get_slice(",", 2)), my_traps[key]]
+	for key in _markers.keys():
+		if not want.has(key):
+			_markers[key].queue_free()
+			_markers.erase(key)
+	for key in want:
+		if not _markers.has(key):
+			_markers[key] = _door_wire(want[key][0]) if key.begins_with("D") else _trap_sign(want[key][0], want[key][1])
+			_room_root.add_child(_markers[key])
+
+
+func _trap_sign(idx: int, kind: String) -> Node3D:
+	var f: Dictionary = world.furniture(room)[idx]
+	var c: Vector2 = (f["rect"] as Rect2).get_center()
+	var l := Label3D.new()
+	l.text = "TRAP: " + World.TRAP_NAMES.get(kind, kind)
+	l.font = Style.stencil()
+	l.font_size = 30
+	l.pixel_size = 0.25
+	l.outline_modulate = Color.BLACK
+	l.outline_size = 6
+	l.modulate = Color(1.0, 0.82, 0.2)
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.position = Vector3(c.x, RoomView.HEIGHTS.get(f["type"], 50.0) + 22.0, c.y)
+	return l
+
+
+func _door_wire(dir: int) -> Node3D:
+	var r := World.ROOM
+	var v := Vector2(World.DIR_VEC[dir])
+	var mid := r.get_center() + v * r.size / 2.0 - v * 6.0
+	var b := BoxMesh.new()
+	var along_x := v.y != 0.0
+	b.size = Vector3(World.DOOR_HALF * 2.0, 1.5, 1.5) if along_x else Vector3(1.5, 1.5, World.DOOR_HALF * 2.0)
+	var mi := MeshInstance3D.new()
+	mi.mesh = b
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(1.0, 0.25, 0.2)
+	mi.material_override = m
+	mi.position = Vector3(mid.x, 10.0, mid.y)
+	return mi
+
+
 ## A pulsing glow over the furniture you can search.
 func _set_highlight(node: Node3D, on: bool) -> void:
 	var a := (0.12 + 0.1 * sin(_t * 6.0)) if on else 0.0
@@ -272,4 +402,6 @@ func _update_cutout(a: Agent) -> void:
 	s.offset = Vector2(centre.x, 0.0)
 	var dim := 0.82
 	s.modulate = Color(dim, dim, dim, 1.0).lerp(Color(1.0, 0.45, 0.45), clampf(a.hurt_time / 0.3, 0.0, 1.0))
+	if a.ko_time > 0.0 and a.ko_kind == "SHOCK" and int(_t * 16.0) % 2 == 0:
+		s.modulate = Color(0.75, 0.97, 1.0) if int(_t * 32.0) % 2 == 0 else Color(0.05, 0.06, 0.08)
 	_labels[a].position = Vector3(a.position.x, 138.0, a.position.y)

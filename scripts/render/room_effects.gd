@@ -7,13 +7,15 @@ const World = preload("res://scripts/core/world.gd")
 const Style = preload("res://scripts/ui/style.gd")
 const Icons = preload("res://scripts/ui/icons.gd")
 
-## { kind, room, pos, t }
+## { kind, room, pos, t, id }
 var _effects: Array = []
+var _next_id := 0
 
 
 ## `extra` adds fields some effects need ("z" height, "seed", "item").
 func add(kind: String, room: Vector2i, pos: Vector2, extra := {}) -> void:
-	var e := {"kind": kind, "room": room, "pos": pos, "t": 0.0}
+	_next_id += 1
+	var e := {"kind": kind, "room": room, "pos": pos, "t": 0.0, "id": _next_id}
 	e.merge(extra)
 	_effects.append(e)
 
