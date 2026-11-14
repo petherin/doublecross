@@ -240,7 +240,11 @@ func _draw_status() -> void:
 	var low := _clock_mine < 30.0
 	var blink := low and int(Time.get_ticks_msec() / 300) % 2 == 0
 	var col := Color("ff5a5f") if low else Color.WHITE
-	var bg := Rect2(8, 4, 250, 38)
+	# Lay the row out from the clock's width (4 digits from 10:00 up).
+	var clock_text := _fmt(_clock_mine)
+	var pips_x := 46.0 + font.get_string_size(clock_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x + 22.0
+	var darts_x := pips_x + _max_hp * 22.0 + 4.0
+	var bg := Rect2(8, 4, darts_x + 40.0, 38)
 	_status.draw_rect(bg, Color(0, 0, 0, 0.45))
 	# Stopwatch icon
 	var c := Vector2(28, 23)
@@ -249,15 +253,15 @@ func _draw_status() -> void:
 	_status.draw_line(c, c + Vector2(5, 2), col, 2.0)
 	_status.draw_rect(Rect2(c.x - 3, c.y - 16, 6, 3), col)
 	var clock_col := Color(col, 0.35) if blink else col
-	_status.draw_string(font, Vector2(46, 32), _fmt(_clock_mine), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, clock_col)
+	_status.draw_string(font, Vector2(46, 32), clock_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, clock_col)
 	# Health pips
 	for i in _max_hp:
-		var p := Vector2(132 + i * 22, 23)
+		var p := Vector2(pips_x + i * 22, 23)
 		_status.draw_circle(p, 8, Color(0, 0, 0, 0.5))
 		_status.draw_circle(p, 6.5, _accent if i < _hp else Color(1, 1, 1, 0.15))
 	# Darts left
-	Icons.draw(_status, "DART", Vector2(210, 23), 22.0, _darts > 0)
-	_status.draw_string(font, Vector2(224, 31), "%d" % _darts, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+	Icons.draw(_status, "DART", Vector2(darts_x, 23), 22.0, _darts > 0)
+	_status.draw_string(font, Vector2(darts_x + 14, 31), "%d" % _darts, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
 	_draw_rival_clocks(font)
 
 
@@ -277,7 +281,7 @@ func _draw_rival_clocks(font: Font) -> void:
 	for i in _rivals.size():
 		var r: Dictionary = _rivals[i]
 		var a := 0.35 if r["out"] else 0.85
-		_status.draw_circle(Vector2(x + 7, 23), 7, Color(r["accent"], a))
+		Icons.mark(_status, r.get("mark", "circle"), Vector2(x + 7, 23), 7.0, Color(r["accent"], a))
 		x += 22.0
 		_status.draw_string(font, Vector2(x, 31), texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, a))
 		x += font.get_string_size(texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x + 14.0
