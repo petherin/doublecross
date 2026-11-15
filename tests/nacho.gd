@@ -1,8 +1,9 @@
 extends SceneTree
 ## Headless regression for Nacho the dog: finding him in his kennel, his
 ## nose (barks at hidden things, growls at traps, never sets them off),
-## following his agent to the next room, guarding them, and running home
-## when they're taken out.
+## following his agent to the next room, going for (and only for as long as)
+## anyone who attacks his agent or him, and running home when his agent is
+## taken out.
 ##   godot --headless --fixed-fps 60 -s res://tests/nacho.gd
 
 const World = preload("res://scripts/core/world.gd")
@@ -12,6 +13,7 @@ var _f := 0
 var _failures := 0
 var _item_key := ""
 var _trap_key := ""
+var _rival_hp := 0
 
 
 func _process(_d: float) -> bool:
@@ -59,18 +61,30 @@ func _process(_d: float) -> bool:
 		me.position = World.ROOM.get_center()
 	if _f == 60 * 41:
 		_check(g.dog.room == me.room, "he follows to the next room")
-		# A rival attacks: Nacho blocks it and bites.
+		# A rival attacks: the blow lands, and Nacho goes for them.
 		var rival: Node = g.agent_of(5)
 		rival.room = me.room
-		rival.position = me.position + Vector2(40, 0)
+		rival.position = me.position + Vector2(60, 0)
 		var hp: int = g.inventories[1]["hp"]
 		g.referee.handle_hit(5, 1, "melee")
-		_check(g.inventories[1]["hp"] == hp, "the blow is blocked")
-		_check(rival.ko_time > 0.0, "and the attacker is bitten and knocked over")
+		_check(g.inventories[1]["hp"] == hp - 1, "blows on his agent still land")
+		_check(g.dog.foe_id == 5, "and Nacho goes for the attacker")
+		_rival_hp = g.inventories[5]["hp"]
+	if _f == 60 * 43:
+		_check(g.inventories[5]["hp"] < _rival_hp, "he bites them")
+	if _f == 60 * 48:
+		# They've stopped attacking for a few seconds: so has he.
+		_check(g.dog.foe_id == 0, "he backs off once they stop")
+		var hp5: int = g.inventories[5]["hp"]
+		# Attacking Nacho himself does nothing to him, but sets him on you.
+		g.referee.handle_hit(5, g.dog.DOG_ID, "melee")
+		_check(g.dog.foe_id == 5, "attacking Nacho sets him on you")
+		_check(g.inventories[1]["hp"] >= 1 and g.inventories[5]["hp"] == hp5, "and nobody's hurt by it")
 	if _f == 60 * 49:
-		# He needs a breather: the next blows land, and the third takes us out.
+		# Taken out: he runs home to his kennel.
 		for i in 3:
 			g.agent_of(1).protect_time = 0.0
+			g.agent_of(1).ko_time = 0.0
 			g.referee.handle_hit(5, 1, "melee")
 		_check(g.dog.owner_id == 0 and g.dog.room == kr, "taken out: he runs home to his kennel")
 		print("nacho: %s" % ("ok" if _failures == 0 else "%d failure(s)" % _failures))

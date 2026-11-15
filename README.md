@@ -91,10 +91,11 @@ scruffy, ginger, very good boy. Search the kennel and he's yours. He follows
 you everywhere, through doors and air vents, and sniffs round each room as
 you go. He **growls** at trapped furniture and wired doorways (he never sets
 them off) and **barks and wags his tail** at furniture with something hidden
-in it; a paw print over the furniture shows you which is which. If a rival
-hits you, Nacho blocks the blow and bites them, knocking them over (he needs
-a few seconds' breather between bites). If you're taken out, he runs back to
-his kennel for someone else to find. Bots look for him too, and use his nose.
+in it; a paw print over the furniture shows you which is which. Nothing can
+hurt him. Anyone who attacks you, or him, gets chased and bitten (each bite
+counts like a blow from a cosh) for as long as they keep attacking; once
+they leave off for a few seconds, so does he. If you're taken out, he runs
+back to his kennel for someone else to find. Bots look for him too, and use his nose.
 
 <p align="center"><img src="docs/nacho.png" alt="Nacho, a scruffy ginger dog with long ears and a red collar, standing, trotting, sitting, sniffing, barking, growling and biting" width="80%"></p>
 
@@ -351,7 +352,7 @@ tests/
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
                         (--spectate: you're put out, and the camera must follow them)
   nacho.gd              Nacho: found in his kennel, sniffs out an item and a trap,
-                        follows to the next room, bites an attacker, goes home
+                        follows to the next room, bites an attacker until they stop, goes home
   net_match.gd          a real host and joiner (two processes) with bots in the
                         empty seats: the host runs them, the joiner sees them move
 tools/

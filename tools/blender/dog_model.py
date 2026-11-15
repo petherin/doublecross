@@ -89,16 +89,16 @@ def _hair(obj, material, count, length, curl=0.6):
     ps.use_modifier_stack = True
     ps.child_type = "INTERPOLATED"
     ps.child_percent = 2
-    ps.rendered_child_count = 6
-    ps.clump_factor = 0.4
+    ps.rendered_child_count = 3
+    ps.clump_factor = 0.55
     ps.roughness_1 = 0.03
     ps.roughness_1_size = 0.6
     ps.roughness_endpoint = 0.02
     ps.kink = "CURL"
-    ps.kink_amplitude = 0.012 * curl
+    ps.kink_amplitude = 0.006 * curl
     ps.kink_frequency = 3.0
-    ps.root_radius = 0.0035
-    ps.tip_radius = 0.0012
+    ps.root_radius = 0.0028
+    ps.tip_radius = 0.001
     ps.radius_scale = 1.0
     ps.use_hair_bspline = True
     ps.display_step = 3
@@ -156,7 +156,7 @@ class Dog:
             [(0.12, 0.13), (0.15, 0.16), (0.15, 0.165), (0.17, 0.18), (0.12, 0.11), (0.11, 0.11), (0.095, 0.095)],
             self.rig)
         _scruff(self.torso.obj, 0.025, 0.06)
-        _hair(self.torso.obj, hair, 1400, 0.07)
+        _hair(self.torso.obj, hair, 1100, 0.038)
         # Each leg is its own skin mesh (a skin needs one root per piece).
         self.legs = []
         for names, radii in (
@@ -166,7 +166,7 @@ class Dog:
                 (["hp_r", "stifle_r", "hock_r", "hpaw_r"], [0.095, 0.065, 0.04, (0.048, 0.042)])):
             leg = AM.SkinPart("leg", m["coat"], names, [(0, 1), (1, 2), (2, 3)], radii, self.rig)
             _scruff(leg.obj, 0.015, 0.05)
-            _hair(leg.obj, hair, 260, 0.05)
+            _hair(leg.obj, hair, 200, 0.03)
             self.legs.append(leg)
         self.tail = AM.SkinPart(
             "tail", m["coat"],
@@ -174,7 +174,7 @@ class Dog:
             [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)],
             [0.04, 0.042, 0.04, 0.036, 0.03, 0.018],
             self.rig)
-        _hair(self.tail.obj, hair, 260, 0.06)
+        _hair(self.tail.obj, hair, 220, 0.045)
         # The red collar round the neck.
         bpy.ops.mesh.primitive_torus_add(major_radius=0.125, minor_radius=0.022, major_segments=32,
                                          minor_segments=8)
@@ -193,16 +193,16 @@ class Dog:
         h = self.head
         h.scale = (1.2, 1.2, 1.2)
         skull = _ellipsoid("skull", 0.1, (0.0, 0, 0.04), (1.2, 0.95, 0.92), m["coat"], h)
-        _hair(skull, hair, 260, 0.045)
+        _hair(skull, hair, 220, 0.028)
         # Shaggy brows over the eyes.
         for s in (1, -1):
             brow = _ellipsoid("brow", 0.042, (0.08, 0.045 * s, 0.085), (1.0, 0.9, 0.5), m["pale"], h)
             _hair(brow, hair, 30, 0.025, curl=1.0)
         muzzle = _ellipsoid("muzzle", 0.075, (0.17, 0, -0.005), (1.6, 0.82, 0.8), m["pale"], h)
-        _hair(muzzle, hair, 160, 0.03)
+        _hair(muzzle, hair, 140, 0.02)
         # The beard and moustache hang below and beside the muzzle.
         beard = _ellipsoid("beard", 0.06, (0.19, 0, -0.065), (1.3, 0.95, 0.95), m["pale"], h)
-        _hair(beard, hair, 160, 0.06, curl=1.2)
+        _hair(beard, hair, 150, 0.045, curl=1.2)
         _ellipsoid("nose", 0.029, (0.285, 0, 0.012), (0.8, 1.1, 0.8), m["nose"], h)
         for s in (1, -1):
             _ellipsoid("eye", 0.022, (0.108, 0.06 * s, 0.055), (0.8, 1, 1), m["eye"], h)
@@ -213,7 +213,7 @@ class Dog:
             pivot = AM._empty("ear_pivot", h)
             pivot.location = (0.0, 0.085 * s, 0.07)
             ear = _ellipsoid("ear", 0.11, (-0.01, 0.025 * s, -0.12), (0.6, 0.22, 1.35), m["coat"], pivot)
-            _hair(ear, hair, 120, 0.05, curl=1.3)
+            _hair(ear, hair, 110, 0.035, curl=1.3)
             self.ears.append((pivot, s))
         # The lower jaw (with tongue) hinges open to bark.
         self.jaw = AM._empty("jaw", h)
@@ -223,7 +223,7 @@ class Dog:
         for s in (1, -1):
             AM._prim_sphere("fang", 0.009, (0.19, 0.025 * s, 0.012), (0.8, 0.8, 1.6), m["teeth"], self.jaw)
         lower = _ellipsoid("lower", 0.06, (0.11, 0, -0.03), (1.5, 0.75, 0.55), m["pale"], self.jaw)
-        _hair(lower, hair, 60, 0.05, curl=1.2)
+        _hair(lower, hair, 60, 0.035, curl=1.2)
 
     # ---------------------------------------------------------- posing
     def pose(self, anim, i, n):

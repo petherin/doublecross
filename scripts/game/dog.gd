@@ -3,8 +3,9 @@ extends Node
 ## then follows them everywhere (through vents too), sniffing round each
 ## room. He growls at trapped furniture and wired doorways (he never sets
 ## them off) and barks and wags his tail at furniture with something hidden
-## in it. He sees off anyone who attacks his agent. If his agent is taken
-## out, he runs home to his kennel to be found again.
+## in it. Nothing can hurt him. Anyone who attacks his agent, or him, gets
+## chased and bitten until they stop. If his agent is taken out, he runs
+## home to his kennel to be found again.
 ##
 ## Who he belongs to is decided by the referee (the host) and arrives as
 ## events; every device walks him about itself, following his agent.
@@ -25,9 +26,16 @@ const SNIFF_TIME := 1.3
 const ALERT_TIME := 2.4
 ## How far he'll wander from his agent to sniff something.
 const LEASH := 720.0
-## Seconds between bites, and how long a bitten agent is knocked over.
-const BITE_COOLDOWN := 6.0
-const BITE_STUN := 1.6
+## Hits aimed at Nacho are sent to the referee with this as the target.
+const DOG_ID := -7
+## He bites his attacker this often while they keep at it, and gives up once
+## they've left off for FOE_MEMORY seconds.
+const BITE_EVERY := 1.2
+const FOE_MEMORY := 3.0
+## How long a bite knocks the attacker over.
+const BITE_STUN := 0.7
+## Close enough to bite.
+const BITE_REACH := 80.0
 
 static var _meta := {}
 static var _tex: Texture2D
@@ -36,6 +44,8 @@ var game: Node
 var world: World
 ## Who found him (0 while he's at home in his kennel).
 var owner_id := 0
+## Who he's going for (0: nobody).
+var foe_id := 0
 var room := Vector2i.ZERO
 var position := Vector2.ZERO
 var facing := PI / 2.0
@@ -63,6 +73,7 @@ func setup(p_game: Node) -> void:
 ## Back to his kennel, to wait for whoever finds him next.
 func go_home() -> void:
 	owner_id = 0
+	foe_id = 0
 	flags.clear()
 	_sniffed.clear()
 	_in_duct = false
@@ -81,12 +92,18 @@ func found_by(pid: int) -> void:
 	_set_state("alert", 1.4)
 
 
-## He's seen someone off: runs at them, jaws snapping.
-func bite(attacker: Agent) -> void:
-	if attacker.room != room:
-		return
-	_target = attacker.position
-	_set_state("bite", 0.7)
+## Someone's attacked his agent (or him): he goes for them (0: calls it off).
+func set_foe(pid: int) -> void:
+	foe_id = pid
+	if pid == 0 and _state in ["guard", "bite"]:
+		_set_state("follow", 0.4)
+	elif pid != 0:
+		_set_state("guard")
+
+
+## A bite lands: a snap of the jaws.
+func bite(_victim: Agent) -> void:
+	_set_state("bite", 0.45)
 
 
 ## Where he sits when he's at home: just outside the kennel door.
@@ -140,7 +157,19 @@ func _process(delta: float) -> void:
 		_sniffed.clear()
 		_set_state("follow")
 	_state_t -= delta
+	var foe: Agent = game.agent_of(foe_id) if foe_id != 0 else null
 	match _state:
+		"guard", "bite":
+			# Chases his attacker, growling, and stays on them.
+			if foe == null or foe.room != room or foe.out:
+				_set_state("follow")
+			else:
+				var to := foe.position - position
+				facing = to.angle()
+				if to.length() > BITE_REACH * 0.6:
+					_move_to(foe.position - to.normalized() * BITE_REACH * 0.5, delta, 1.6)
+				if _state == "bite" and _state_t <= 0.0:
+					_set_state("guard")
 		"follow":
 			var spot := _clamp_in(me.position - Vector2.from_angle(me.facing) * 70.0
 					+ Vector2.from_angle(me.facing + PI / 2) * 30.0)
@@ -174,10 +203,6 @@ func _process(delta: float) -> void:
 		"alert":
 			if _state_t <= 0.0:
 				_set_state("follow", 0.4)
-		"bite":
-			_move_to(_target, delta, 2.2)
-			if _state_t <= 0.0:
-				_set_state("follow")
 	_walk += delta * (9.0 if moving else 0.0)
 
 
@@ -293,7 +318,10 @@ func _frame() -> Array:
 				return ["growl", int(now / 200) % 2]
 			return ["bark", int(now / 120) % 4]
 		"bite":
-			return ["bite", mini(2, int((0.7 - _state_t) / 0.24))]
+			return ["bite", mini(2, int((0.45 - _state_t) / 0.15))]
+		"guard":
+			if not moving:
+				return ["growl", int(now / 200) % 2]
 	if moving:
 		return ["walk", int(fposmod(_walk, TAU) / TAU * 8.0) % 8]
 	return ["idle", int(now / 700) % 2]
@@ -344,8 +372,8 @@ func paint(ci: CanvasItem) -> void:
 	if _state == "alert":
 		word = "GRRR…" if _alert == "trap" else "WOOF!"
 		col = Color("ff5a5f") if _alert == "trap" else Color("ffd23f")
-	elif _state == "bite":
-		word = "GRRAH!"
+	elif _state == "bite" or _state == "guard":
+		word = "GRRAH!" if _state == "bite" else "GRRR!"
 		col = Color("ff5a5f")
 	elif _state == "sniff":
 		word = "sniff sniff"

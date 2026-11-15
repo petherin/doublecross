@@ -10,8 +10,11 @@ const Agent = preload("res://scripts/game/agent.gd")
 var game: Node
 var _rng := RandomNumberGenerator.new()
 var _clock_sync := 0.0
-## When Nacho last saw someone off (msec); he needs a breather between bites.
-var _last_bite := -100000
+## Nacho, in match time (seconds): when he gives up on his attacker, and
+## when he last bit.
+var _now := 0.0
+var _foe_until := 0.0
+var _last_bite := -100.0
 
 
 func _init(p_game: Node) -> void:
@@ -119,6 +122,12 @@ func handle_fire(pid: int) -> void:
 
 
 func handle_hit(by: int, target: int, kind: String) -> void:
+	if target == game.dog.DOG_ID:
+		# Nacho can't be hurt, but he won't let it go.
+		var att: Agent = game.agent_of(by)
+		if not game.over and att and game.dog.owner_id not in [0, by] and att.room == game.dog.room:
+			_set_nacho_on(by)
+		return
 	if game.over or by == target or not game.inventories.has(target) or not game.inventories.has(by):
 		return
 	var ta: Agent = game.agent_of(target)
@@ -127,13 +136,9 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 		return
 	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > game.MELEE_RANGE * 2.0):
 		return
-	# Nacho won't stand for anyone hurting his agent.
-	var now := Time.get_ticks_msec()
-	if game.dog.owner_id == target and game.dog.room == ba.room and game.dog.visible_now() \
-			and now - _last_bite > game.dog.BITE_COOLDOWN * 1000.0:
-		_last_bite = now
-		game.broadcast({"type": "bite", "pid": by, "owner": target, "room": ba.room, "from": game.dog.position})
-		return
+	# Attacking Nacho's agent sets him on you.
+	if target == game.dog.owner_id and kind != "bite" and game.dog.room == ba.room:
+		_set_nacho_on(by)
 	var inv: Dictionary = game.inventories[target]
 	inv["hp"] -= 1
 	if inv["hp"] > 0:
@@ -152,6 +157,31 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 	_send_nacho_home(target)
 
 
+## Points Nacho at someone attacking his agent or him. He keeps at them
+## for as long as they keep attacking.
+func _set_nacho_on(pid: int) -> void:
+	_foe_until = _now + game.dog.FOE_MEMORY
+	if game.dog.foe_id != pid:
+		game.broadcast({"type": "nacho_foe", "pid": pid, "owner": game.dog.owner_id})
+
+
+## Host, every frame: Nacho bites his attacker while they're in reach, and
+## calls it off once they've stopped attacking (or gone).
+func tick_nacho(delta: float) -> void:
+	_now += delta
+	var dog: Node = game.dog
+	if dog.foe_id == 0 or game.over:
+		return
+	var foe: Agent = game.agent_of(dog.foe_id)
+	if foe == null or foe.out or foe.room != dog.room or dog.owner_id == 0 or _now > _foe_until:
+		game.broadcast({"type": "nacho_foe", "pid": 0, "owner": dog.owner_id})
+		return
+	if dog.position.distance_to(foe.position) < dog.BITE_REACH and _now - _last_bite > dog.BITE_EVERY \
+			and foe.ko_time <= 0.0 and foe.protect_time <= 0.0:
+		_last_bite = _now
+		handle_hit(dog.owner_id, dog.foe_id, "bite")
+
+
 ## Nacho's agent is out of action: he runs home to his kennel.
 func _send_nacho_home(pid: int) -> void:
 	if game.dog.owner_id == pid:
@@ -167,6 +197,7 @@ func tick_clocks(delta: float) -> void:
 	for id in game.clocks:
 		if not game.eliminated.has(id):
 			game.clocks[id] -= delta
+	tick_nacho(delta)
 	_clock_sync -= delta
 	if _clock_sync <= 0.0:
 		_clock_sync = 0.5
