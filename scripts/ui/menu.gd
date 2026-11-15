@@ -486,6 +486,12 @@ func _show_settings() -> void:
 	vib.button_pressed = Settings.vibration
 	vib.toggled.connect(func(on): Settings.vibration = on)
 	box.add_child(vib)
+	var detail := CheckButton.new()
+	detail.text = "Detailed first person"
+	detail.tooltip_text = "Rooms next door and moving screens. Turn off if first person is slow."
+	detail.button_pressed = Settings.fp_detail
+	detail.toggled.connect(func(on): Settings.fp_detail = on)
+	box.add_child(detail)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var l := _label("Clock per agent", Style.mono(), 22)
