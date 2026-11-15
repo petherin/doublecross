@@ -43,6 +43,7 @@ var _name_edit: LineEdit
 var _main_buttons: Control
 var _cancel: Button
 var _start: Button
+var _fill_bots: CheckButton
 var _content: Control
 var _art: Control
 var _overlay: Control
@@ -206,6 +207,15 @@ func _ready() -> void:
 	_start.visible = false
 	_start.pressed.connect(func(): start_requested.emit())
 	_content.add_child(_start)
+	# The host can fill the empty seats with bots (at the level picked above).
+	_fill_bots = CheckButton.new()
+	_fill_bots.add_theme_font_size_override("font_size", 19)
+	_fill_bots.button_pressed = Settings.host_bots
+	_fill_bots.visible = false
+	_fill_bots.toggled.connect(func(on):
+		Settings.host_bots = on
+		Settings.save())
+	_status.get_parent().add_child(_fill_bots)
 
 	# ---- Index tabs poking out of the bottom of the folder.
 	_content.add_child(_tab_button("HOW TO PLAY", Vector2(120, 744), _show_help))
@@ -639,6 +649,9 @@ func set_lobby(names: Array, is_host: bool) -> void:
 	else:
 		set_status("In the lobby: %s. Waiting for the host to start…" % who)
 	_start.visible = is_host and names.size() >= 2
+	var seats := Net.MAX_PLAYERS - names.size()
+	_fill_bots.visible = is_host and seats > 0
+	_fill_bots.text = "Fill the %d empty seat%s with %s bots" % [seats, "" if seats == 1 else "s", _bot_level]
 
 
 func _join(ip: String) -> void:
@@ -667,6 +680,7 @@ func _set_waiting(on: bool) -> void:
 			(b as Button).disabled = on
 	_cancel.visible = on
 	_start.visible = false
+	_fill_bots.visible = false
 	_find_row.visible = not on
 	_ip_row.visible = false
 	_ip_edit.release_focus()

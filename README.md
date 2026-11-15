@@ -181,7 +181,10 @@ running a different one and says which version each side has.
    the host appears. **FIND HOST** looks again straight away; **TYPE IP** is the
    fallback (the host's screen shows its address).
 5. Once everyone's in the lobby (two to four agents), the host presses
-   **START MISSION**. With four it starts by itself.
+   **START MISSION**. With four it starts by itself. With fewer, the host can
+   tick **Fill the empty seats with bots** to make up the numbers: the bots
+   play at the difficulty picked under **TAKE ON THE BOTS**, and run on the
+   host's device.
 
 Phones and tablets can play together: wide screens get a wider view, and on
 small screens the controls and text are scaled up.
@@ -249,22 +252,20 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 ### Top five
 
-1. **Bots in hosted games.** Let the host fill empty seats with bots, so two
-   friends can play a full four-agent match.
-2. **Survive a host dropping out.** Today the match ends for everyone if the
+1. **Survive a host dropping out.** Today the match ends for everyone if the
    host's device leaves or sleeps. Hand refereeing to another device, or at
    least let players rejoin a match after a brief disconnect.
-3. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
+2. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
    you, a sneak who uses every vent.
-4. **Match options for the host:** how many traps each, fewer briefcases,
+3. **Match options for the host:** how many traps each, fewer briefcases,
    hidden exit, faster clocks.
-5. **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
+4. **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
+5. **More gadgets and traps:** a smoke bomb that hides you from everyone in the
+   room, a glue trap that slows you down, a bug you plant to see into another
+   room, and decoy intel that looks real until you reach the exit.
 
 ### Gameplay
 
-- **More gadgets and traps:** a smoke bomb that hides you from everyone in the
-  room, a glue trap that slows you down, a bug you plant to see into another
-  room, and decoy intel that looks real until you reach the exit.
 - **Team mode:** two against two, sharing a briefcase and escaping together.
 
 ### Look and feel
@@ -292,8 +293,6 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 - **Profiling on low-end Android** phones for frame rate and battery use.
 - **Screenshot tests** in CI, comparing key screens against approved images so
   visual changes are caught in review.
-- **Network tests:** a host and joiners as separate processes in CI, playing a
-  short scripted match.
 
 ## How it's built
 
@@ -339,6 +338,8 @@ tests/
   smoke.gd              every script compiles, inputs mapped, 300 seeds of base rules
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
                         (--spectate: you're put out, and the camera must follow them)
+  net_match.gd          a real host and joiner (two processes) with bots in the
+                        empty seats: the host runs them, the joiner sees them move
 tools/
   make_audio.py         synthesises every sound, voice, ambience and music loop
   blender/              models and renders agents, furniture and room surfaces
@@ -349,13 +350,15 @@ tools/
 
 Every push and pull request runs `gdlint` over the scripts, the smoke test, and
 bot matches with two and four agents, and one where you're out and the camera
-must follow the bots (GitHub Actions, `.github/workflows/android.yml`).
+must follow the bots, and a network match between two processes (GitHub Actions, `.github/workflows/android.yml`).
 Only after a change reaches `main` are the APK and both Mac apps built and
 published as a release. To run the tests yourself:
 
 ```bash
 godot --headless -s res://tests/smoke.gd
 godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=3 --seed=7
+godot --headless -s res://tests/net_match.gd -- --role=host &
+godot --headless -s res://tests/net_match.gd -- --role=join
 ```
 
 ### Re-rendering the art in Blender

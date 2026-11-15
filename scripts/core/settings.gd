@@ -12,6 +12,8 @@ var vibration := true
 var fp_detail := true
 ## Calmer screen: no shake, slow motion, film grain, strobing or iris wipes.
 var reduced_motion := false
+## Hosting: fill the seats nobody joined with bots (at bot_level).
+var host_bots := false
 var clock_minutes := 6
 var bot_level := "medium"
 ## Computer rivals in a one-player game (1-3).
@@ -31,6 +33,7 @@ func _ready() -> void:
 		vibration = cfg.get_value("game", "vibration", vibration)
 		fp_detail = cfg.get_value("game", "fp_detail", fp_detail)
 		reduced_motion = cfg.get_value("game", "reduced_motion", reduced_motion)
+		host_bots = cfg.get_value("game", "host_bots", host_bots)
 		clock_minutes = cfg.get_value("game", "clock_minutes", clock_minutes)
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
 		bot_count = cfg.get_value("game", "bot_count", bot_count)
@@ -47,6 +50,7 @@ func save() -> void:
 	cfg.set_value("game", "vibration", vibration)
 	cfg.set_value("game", "fp_detail", fp_detail)
 	cfg.set_value("game", "reduced_motion", reduced_motion)
+	cfg.set_value("game", "host_bots", host_bots)
 	cfg.set_value("game", "clock_minutes", clock_minutes)
 	cfg.set_value("game", "bot_level", bot_level)
 	cfg.set_value("game", "bot_count", bot_count)
