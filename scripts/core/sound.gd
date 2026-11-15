@@ -8,7 +8,7 @@ const NAMES := [
 	"found", "gadget", "nothing", "trap_set", "boom", "boing", "twang", "swing",
 	"hit", "down", "dart", "door", "click", "locked", "tick", "win", "lose",
 	"type1", "type2", "type3", "stamp", "paper", "poof", "crawl", "vent", "zap",
-	"oof1", "oof2", "argh1", "argh2", "yell", "haha", "bark1", "bark2", "yip", "growl",
+	"oof1", "oof2", "argh1", "argh2", "yell", "haha", "bark1", "bark2", "yip", "growl", "yelp",
 ]
 const VOICES := 12
 

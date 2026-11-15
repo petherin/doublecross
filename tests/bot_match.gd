@@ -2,6 +2,7 @@ extends SceneTree
 ## Headless regression: an idle player against the hard bot. The bot must
 ## find the intel and briefcase and escape before the clock runs out.
 ##   godot --headless --fixed-fps 60 -s res://tests/bot_match.gd [-- --bots=3 --seed=7 --spectate]
+## --all prints the match's whole timeline (otherwise just Nacho's part).
 ## With --spectate the player is put out after two seconds, and the camera
 ## must follow the bots (room by room) while they play on.
 
@@ -52,7 +53,7 @@ func _process(_delta: float) -> bool:
 		var tl: Array = _game.presenter.timeline
 		print("timeline: %d entries" % tl.size())
 		for e in tl:
-			if "Nacho" in str(e["text"]):
+			if "Nacho" in str(e["text"]) or OS.get_cmdline_user_args().has("--all"):
 				print("  %d:%02d %s" % [int(e["t"]) / 60, int(e["t"]) % 60, e["text"]])
 		var escaped: bool = not tl.is_empty() and str(tl.back()["text"]).ends_with("escaped with the intel")
 		if tl.is_empty() or (_game.result["reason"] == "escape" and not escaped):

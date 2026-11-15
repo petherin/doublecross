@@ -28,8 +28,8 @@ const HELP := [
 	["FIGHTING", "[b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: "
 		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
 	["NACHO", "Somewhere in the base is a [b]KENNEL[/b]. Search it to find [b]NACHO[/b] the dog, who follows "
-		+ "you everywhere, [b]growls[/b] at traps and [b]barks[/b] at hidden things. Nothing hurts him, and he "
-		+ "bites anyone who attacks you or him until they stop. If you're taken out, he runs home."],
+		+ "you everywhere, [b]growls[/b] at traps and [b]barks[/b] at hidden things, and bites anyone who attacks "
+		+ "you or him until they stop. Three hits, or you being taken out, send him home to be found again."],
 	["TIPS", "New agents get a few tips on the ticker tape during their first missions. "
 		+ "Clear them under SETTINGS to see them again."],
 	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · V crawl. "

@@ -123,10 +123,7 @@ func handle_fire(pid: int) -> void:
 
 func handle_hit(by: int, target: int, kind: String) -> void:
 	if target == game.dog.DOG_ID:
-		# Nacho can't be hurt, but he won't let it go.
-		var att: Agent = game.agent_of(by)
-		if not game.over and att and game.dog.owner_id not in [0, by] and att.room == game.dog.room:
-			_set_nacho_on(by)
+		_hit_nacho(by)
 		return
 	if game.over or by == target or not game.inventories.has(target) or not game.inventories.has(by):
 		return
@@ -155,6 +152,22 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 	game.broadcast({"type": "down", "pid": target, "by": by, "kind": kind, "room": ta.room, "lost": lost,
 			"from": ba.position})
 	_send_nacho_home(target)
+
+
+## Someone hits Nacho: it hurts, he goes for them, and three hits send him
+## home to his kennel, nobody's dog any more, for whoever finds him next.
+func _hit_nacho(by: int) -> void:
+	var att: Agent = game.agent_of(by)
+	var dog: Node = game.dog
+	if game.over or att == null or dog.owner_id in [0, by] or att.room != dog.room or dog.protect_time > 0.0:
+		return
+	var hp: int = dog.hp - 1
+	if hp > 0:
+		_set_nacho_on(by)
+		game.broadcast({"type": "nacho_hit", "pid": by, "hp": hp, "room": dog.room})
+	else:
+		game.broadcast({"type": "nacho_down", "pid": by, "owner": dog.owner_id, "room": dog.room,
+				"at": dog.position})
 
 
 ## Points Nacho at someone attacking his agent or him. He keeps at them

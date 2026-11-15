@@ -3,9 +3,10 @@ extends Node
 ## then follows them everywhere (through vents too), sniffing round each
 ## room. He growls at trapped furniture and wired doorways (he never sets
 ## them off) and barks and wags his tail at furniture with something hidden
-## in it. Nothing can hurt him. Anyone who attacks his agent, or him, gets
-## chased and bitten until they stop. If his agent is taken out, he runs
-## home to his kennel to be found again.
+## in it. Anyone who attacks his agent, or him, gets chased and bitten until
+## they stop. He can be hurt: three hits and he runs home to his kennel. He
+## also runs home if his agent is taken out. Either way he's nobody's dog
+## until someone finds him again.
 ##
 ## Who he belongs to is decided by the referee (the host) and arrives as
 ## events; every device walks him about itself, following his agent.
@@ -36,6 +37,8 @@ const FOE_MEMORY := 3.0
 const BITE_STUN := 0.7
 ## Close enough to bite.
 const BITE_REACH := 80.0
+## Hits he can take before he runs home (agents take three, too).
+const MAX_HP := 3
 
 static var _meta := {}
 static var _tex: Texture2D
@@ -46,6 +49,10 @@ var world: World
 var owner_id := 0
 ## Who he's going for (0: nobody).
 var foe_id := 0
+var hp := MAX_HP
+## Flashes red when hit; can't be hit again for a moment.
+var hurt_time := 0.0
+var protect_time := 0.0
 var room := Vector2i.ZERO
 var position := Vector2.ZERO
 var facing := PI / 2.0
@@ -74,6 +81,9 @@ func setup(p_game: Node) -> void:
 func go_home() -> void:
 	owner_id = 0
 	foe_id = 0
+	hp = MAX_HP
+	hurt_time = 0.0
+	protect_time = 0.0
 	flags.clear()
 	_sniffed.clear()
 	_in_duct = false
@@ -99,6 +109,13 @@ func set_foe(pid: int) -> void:
 		_set_state("follow", 0.4)
 	elif pid != 0:
 		_set_state("guard")
+
+
+## He's been hit (he has `p_hp` left).
+func hit(p_hp: int) -> void:
+	hp = p_hp
+	hurt_time = 0.3
+	protect_time = 0.4
 
 
 ## A bite lands: a snap of the jaws.
@@ -138,6 +155,8 @@ func _set_state(s: String, t := 0.0) -> void:
 
 
 func _process(delta: float) -> void:
+	hurt_time = maxf(0.0, hurt_time - delta)
+	protect_time = maxf(0.0, protect_time - delta)
 	if world == null or owner_id == 0:
 		moving = false
 		return
@@ -363,9 +382,16 @@ func paint(ci: CanvasItem) -> void:
 	var fid: int = d * int(m["frames_per_direction"]) + int(m["anims"][fr[0]]["start"]) + int(fr[1])
 	var r: Array = m["rects"]["dog"][fid]
 	var region := Rect2(r[0], r[1], r[2], r[3])
+	var tint := Color.WHITE.lerp(Color(1.0, 0.45, 0.45), hurt_time / 0.3)
 	ci.draw_set_transform(foot, 0.0, Vector2(scale_f, scale_f))
-	ci.draw_texture_rect_region(tex, Rect2(-anchor + Vector2(r[4], r[5]), region.size), region)
+	ci.draw_texture_rect_region(tex, Rect2(-anchor + Vector2(r[4], r[5]), region.size), region, tint)
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# His health, once he's someone's dog.
+	if owner_id != 0:
+		for i in MAX_HP:
+			var pip := foot + Vector2((i - (MAX_HP - 1) / 2.0) * 11.0, -64.0)
+			ci.draw_circle(pip, 3.8, Color(0, 0, 0, 0.6))
+			ci.draw_circle(pip, 2.8, Color("ffb13b") if i < hp else Color(1, 1, 1, 0.15))
 	# What he's saying.
 	var word := ""
 	var col := Color("ffd23f")
