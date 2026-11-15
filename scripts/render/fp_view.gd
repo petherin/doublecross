@@ -25,13 +25,19 @@ const DECOR_Y := 22.0
 const GAP := 60.0
 ## How far the corridors run on out of the rooms next door.
 const STUB := 150.0
+## How far you can look up or down (radians).
+const MAX_PITCH := 0.75
 const WALL_ROT := {"top": 0.0, "bottom": 180.0, "left": 90.0, "right": -90.0, "free": 0.0}
+
+static var _ceiling_cache: ImageTexture
 
 var world: World
 var room := Vector2i(-1, -1)
 ## Detailed mode builds the rooms next door and animates the wall screens;
 ## the light mode (for slower phones) leaves both out.
 var detail_high := true
+## Looking up (+) or down (-), in radians.
+var pitch := 0.0
 var camera: Camera3D
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
@@ -89,6 +95,11 @@ func set_active(on: bool) -> void:
 	visible = on
 	camera.current = on
 	_env.environment = _env.environment if on else _env.environment
+
+
+## Tilts the view up (+) or down (-) by `amount` radians, within limits.
+func look(amount: float) -> void:
+	pitch = clampf(pitch + amount, -MAX_PITCH, MAX_PITCH)
 
 
 ## Builds the 3D room (called on entering a room, while the view is active).
@@ -162,7 +173,7 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 	_cam_roll = lerpf(_cam_roll, roll, minf(1.0, delta * 6.0))
 	var bob := sin(_t * 9.0) * (2.0 if me.moving else 0.0)
 	camera.position = Vector3(me.position.x, EYE_H + bob - _cam_drop, me.position.y) + jitter
-	camera.rotation = Vector3(0.0, -me.facing - PI / 2.0, _cam_roll)
+	camera.rotation = Vector3(0.0 if ko else pitch, -me.facing - PI / 2.0, _cam_roll)
 	for i in _furniture.size():
 		_set_highlight(_furniture[i], i == highlight)
 	for a: Agent in agents:
@@ -189,10 +200,7 @@ func _build_shell(r_room: Vector2i, tint: Color, from_dir: int) -> void:
 	floor_mat.uv1_scale = Vector3(r.size.x / TEX_UNITS, r.size.y / TEX_UNITS, 1.0)
 	_quad(Vector2(r.size.x, r.size.y), Vector3(r.get_center().x, 0.0, r.get_center().y),
 			Vector3(-PI / 2.0, 0.0, 0.0), floor_mat)
-	var ceiling := StandardMaterial3D.new()
-	ceiling.albedo_color = Color(0.09, 0.09, 0.11)
-	_quad(Vector2(r.size.x, r.size.y), Vector3(r.get_center().x, WALL_H, r.get_center().y),
-			Vector3(PI / 2.0, 0.0, 0.0), ceiling)
+	_build_ceiling(tint, from_dir == -1)
 	var c := r.get_center()
 	var dh := World.DOOR_HALF
 	# Each wall: where it runs, which way its face points, and its door.
@@ -301,6 +309,126 @@ func _passage(dir: int, tint: Color, length := GAP) -> void:
 			var z: float = mid.y + side * dh
 			_wall(Vector2(mid.x - length / 2.0, z), Vector2(mid.x + length / 2.0, z), 0.0, DOOR_H,
 					0.0 if side < 0.0 else PI, tint)
+
+
+## The ceiling: tiles, beams, strip lights, pipes and a duct, so looking
+## up shows a working base. `full` adds the small fittings (only worth it
+## in the room you're in).
+func _build_ceiling(tint: Color, full: bool) -> void:
+	var r := World.ROOM
+	var c := r.get_center()
+	var tiles := StandardMaterial3D.new()
+	tiles.albedo_texture = _ceiling_tex()
+	tiles.albedo_color = Color(0.5, 0.5, 0.52).lerp(tint, 0.06)
+	tiles.roughness = 0.9
+	tiles.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	tiles.uv1_scale = Vector3(r.size.x / TEX_UNITS, r.size.y / TEX_UNITS, 1.0)
+	_quad(r.size, Vector3(c.x, WALL_H, c.y), Vector3(PI / 2.0, 0.0, 0.0), tiles)
+	var steel := _plain_mat(Color(0.26, 0.27, 0.3), 0.6)
+	var paint := _plain_mat(Color(0.36, 0.37, 0.4).lerp(tint, 0.1), 0.0)
+	# A moulding where the walls meet the ceiling.
+	_box(Vector3(r.size.x, 12, 10), Vector3(c.x, WALL_H - 6, r.position.y + 5), paint)
+	_box(Vector3(r.size.x, 12, 10), Vector3(c.x, WALL_H - 6, r.end.y - 5), paint)
+	_box(Vector3(10, 12, r.size.y), Vector3(r.position.x + 5, WALL_H - 6, c.y), paint)
+	_box(Vector3(10, 12, r.size.y), Vector3(r.end.x - 5, WALL_H - 6, c.y), paint)
+	# Steel beams across the room, between the lights.
+	for fx in [0.12, 0.51, 0.9]:
+		_box(Vector3(22, 18, r.size.y), Vector3(r.position.x + r.size.x * fx, WALL_H - 9, c.y), steel)
+	# Strip lights, where the room's lamps hang.
+	var housing := _plain_mat(Color(0.7, 0.7, 0.68), 0.3)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.95, 0.82).lerp(tint, 0.15)
+	for fx in [0.3, 0.72]:
+		var x: float = r.position.x + r.size.x * fx
+		for dz in [-90.0, 90.0]:
+			_box(Vector3(34, 8, 150), Vector3(x, WALL_H - 4, c.y + dz), housing)
+			_box(Vector3(24, 2, 138), Vector3(x, WALL_H - 9, c.y + dz), glow)
+	# Pipes along the back wall, and an air duct down the right-hand side.
+	var pipe := _plain_mat(Color(0.42, 0.3, 0.22), 0.7)
+	_pipe(r.size.x, 6.0, Vector3(c.x, WALL_H - 18, r.position.y + 18), pipe)
+	_pipe(r.size.x, 3.5, Vector3(c.x, WALL_H - 34, r.position.y + 30), steel)
+	_box(Vector3(36, 26, r.size.y), Vector3(r.end.x - 52, WALL_H - 14, c.y), _plain_mat(Color(0.5, 0.52, 0.54), 0.8))
+	if not full:
+		return
+	for i in 6:
+		var x := r.position.x + 90.0 + float(i) * (r.size.x - 180.0) / 5.0
+		_box(Vector3(4, 40, 32), Vector3(x, WALL_H - 20, r.position.y + 22), steel)
+	# Smoke detectors, each with a little red light.
+	var led := StandardMaterial3D.new()
+	led.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	led.albedo_color = Color(1.0, 0.12, 0.08)
+	for at in [Vector2(r.position.x + r.size.x * 0.4, c.y - 150.0), Vector2(r.position.x + r.size.x * 0.62, c.y + 170.0)]:
+		var disc := CylinderMesh.new()
+		disc.top_radius = 9.0
+		disc.bottom_radius = 10.0
+		disc.height = 5.0
+		var mi := MeshInstance3D.new()
+		mi.mesh = disc
+		mi.material_override = _plain_mat(Color(0.85, 0.85, 0.82), 0.0)
+		mi.position = Vector3(at.x, WALL_H - 2.5, at.y)
+		_target.add_child(mi)
+		_box(Vector3(2, 1, 2), Vector3(at.x + 5, WALL_H - 5.5, at.y), led)
+
+
+func _plain_mat(col: Color, metal: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.metallic = metal
+	m.roughness = 0.55
+	return m
+
+
+func _box(size: Vector3, at: Vector3, mat: Material) -> MeshInstance3D:
+	var b := BoxMesh.new()
+	b.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = b
+	mi.material_override = mat
+	mi.position = at
+	_target.add_child(mi)
+	return mi
+
+
+## A pipe `length` long running along x.
+func _pipe(length: float, radius: float, at: Vector3, mat: Material) -> void:
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = radius
+	cyl.bottom_radius = radius
+	cyl.height = length
+	cyl.radial_segments = 10
+	cyl.rings = 1
+	var mi := MeshInstance3D.new()
+	mi.mesh = cyl
+	mi.material_override = mat
+	mi.position = at
+	mi.rotation = Vector3(0.0, 0.0, PI / 2.0)
+	_target.add_child(mi)
+
+
+## Ceiling tiles: two-by-two acoustic panels, speckled, with dark joins.
+static func _ceiling_tex() -> ImageTexture:
+	if _ceiling_cache:
+		return _ceiling_cache
+	var img := Image.create(128, 128, false, Image.FORMAT_RGB8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4021
+	for y in 128:
+		for x in 128:
+			var v := 0.82 + rng.randf_range(-0.05, 0.05)
+			if rng.randf() < 0.04:
+				v -= 0.18  # the pinholes in acoustic tiles
+			var ex := mini(x % 64, 63 - x % 64)
+			var ey := mini(y % 64, 63 - y % 64)
+			var edge := mini(ex, ey)
+			if edge < 2:
+				v = 0.22  # the metal grid between tiles
+			elif edge < 4:
+				v *= 0.86  # a bevel
+			img.set_pixel(x, y, Color(v, v, v * 0.98))
+	img.generate_mipmaps()
+	_ceiling_cache = ImageTexture.create_from_image(img)
+	return _ceiling_cache
 
 
 ## A corridor leading on out of a room next door: a short passage, a wall
