@@ -121,17 +121,21 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   hats, brass stabs and a rising riff come in when your clock is nearly out.
 - **Spy-file screens:** the title screen is a case-file dossier, each match
   opens with a briefing that self-destructs, and ends with a stamped debrief.
-- **First person (experimental):** the **1ST PERSON** button (or <kbd>Tab</kbd>)
+- **First person:** the **1ST PERSON** button (or <kbd>Tab</kbd>)
   switches to seeing the room through your agent's eyes: real 3D walls,
   floor and Blender-modelled furniture, with the other agents as *Doom*-style
   cut-outs from their sprite sheets. Through each doorway you see the next
   room (though not who's in it, which stays hidden as it does overhead), and
-  the walls carry the same screens, maps, clocks and posters as overhead.
+  beyond that, dim corridors fading into the haze, so the base carries on. The
+  walls carry the same screens, maps, clocks and posters as overhead.
   W/S walk, ←/→ turn, A/D sidestep; on a touch screen the stick walks and
   turns, and you can swipe the right half to look around.
   Explosions, shocks, flying paperwork and the comic-book words happen in 3D
   too, your trap markers and tripwires show, and when you're stunned the
-  view reels (or drops to the floor when you're taken out).
+  view reels (or drops to the floor when you're taken out). On slower phones,
+  turn off **Detailed first person** in SETTINGS for a lighter version (no
+  rooms next door, still screens); if first person runs slowly for a few
+  seconds, the game switches to it by itself and tells you.
 - **Readable for everyone:** each agent has a shape as well as a colour
   (● Crimson, ▲ Cobalt, ■ Amber, ◆ Jade) on their name tag and clock, and new
   players get a few one-off tips on the ticker tape.
@@ -222,9 +226,9 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 The keys are Godot input actions (**Project → Project Settings → Input Map**), so
 they're easy to change.
 
-**SETTINGS** on the title screen has music and effects volume, vibration, the
-clock length, and a button to see the new-player tips again. **HOW TO PLAY**
-is the field manual.
+**SETTINGS** on the title screen has music and effects volume, vibration,
+first-person detail, the clock length, and a button to see the new-player
+tips again. **HOW TO PLAY** is the field manual.
 
 ## Ideas for what's next
 
@@ -262,8 +266,6 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 - **Doors and drawers that open:** animated doorways, and furniture doors that
   swing open when searched (a second Blender render of each piece).
-- **First person, finished:** a sense of the whole base (lit corridors
-  beyond the neighbouring rooms), and a frame-rate check on older phones.
 - **Taunts:** a button to make your agent gloat, wave or shake a fist.
 - **Stats and achievements** kept on the device: wins, fastest escape, traps
   sprung, rivals taken out.

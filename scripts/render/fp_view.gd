@@ -23,10 +23,15 @@ const TEX_UNITS := 128.0
 const DECOR_Y := 22.0
 ## The short passage between neighbouring rooms, seen through doorways.
 const GAP := 60.0
+## How far the corridors run on out of the rooms next door.
+const STUB := 150.0
 const WALL_ROT := {"top": 0.0, "bottom": 180.0, "left": 90.0, "right": -90.0, "free": 0.0}
 
 var world: World
 var room := Vector2i(-1, -1)
+## Detailed mode builds the rooms next door and animates the wall screens;
+## the light mode (for slower phones) leaves both out.
+var detail_high := true
 var camera: Camera3D
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
@@ -60,6 +65,10 @@ func _ready() -> void:
 	_env.environment.background_mode = Environment.BG_COLOR
 	_env.environment.background_color = Color(0.01, 0.01, 0.015)
 	_env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	# A little haze, so the rooms and corridors beyond fade into the dark.
+	_env.environment.fog_enabled = true
+	_env.environment.fog_light_color = Color(0.03, 0.03, 0.04)
+	_env.environment.fog_density = 0.0012
 	add_child(_env)
 	_room_root = Node3D.new()
 	add_child(_room_root)
@@ -112,7 +121,7 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	# The rooms next door, seen through the doorways (their furniture and
 	# lights, but not who's in them: that stays hidden, as it is overhead).
 	for dir in World.DIR_VEC:
-		if world.opening(room, dir) != 1:
+		if not detail_high or world.opening(room, dir) != 1:
 			continue
 		var n: Vector2i = room + World.DIR_VEC[dir]
 		var nroot := Node3D.new()
@@ -209,7 +218,11 @@ func _build_shell(r_room: Vector2i, tint: Color, from_dir: int) -> void:
 		if opening != 0:
 			_wall(a + along * (mid_t - dh), a + along * (mid_t + dh), DOOR_H, WALL_H, w[2], tint)
 			# Doors from the room we're in lead to rooms we've built; others are dark.
-			var built: bool = opening == 1 and (from_dir == -1 or dir == from_dir)
+			if opening == 1 and from_dir != -1 and dir != from_dir:
+				# Out of a room next door: a dim corridor running on into the base.
+				_stub(dir, tint)
+				continue
+			var built: bool = opening == 1 and ((from_dir == -1 and detail_high) or dir == from_dir)
 			if not built:
 				_doorway(a + along * mid_t, w[2], opening == 2)
 
@@ -266,13 +279,13 @@ func _doorway(at: Vector2, yaw: float, is_exit: bool) -> void:
 
 
 ## The short passage through the doorway in direction `dir`.
-func _passage(dir: int, tint: Color) -> void:
+func _passage(dir: int, tint: Color, length := GAP) -> void:
 	var r := World.ROOM
 	var v := Vector2(World.DIR_VEC[dir])
 	var dh := World.DOOR_HALF
-	var mid := r.get_center() + v * (r.size / 2.0 + Vector2(GAP, GAP) / 2.0)
+	var mid := r.get_center() + v * (r.size / 2.0 + Vector2(length, length) / 2.0)
 	var along_y := v.x == 0.0
-	var size := Vector2(dh * 2.0, GAP) if along_y else Vector2(GAP, dh * 2.0)
+	var size := Vector2(dh * 2.0, length) if along_y else Vector2(length, dh * 2.0)
 	var floor_mat := _surface_mat("floor", Color(0.4, 0.42, 0.45))
 	floor_mat.uv1_scale = Vector3(size.x / TEX_UNITS, size.y / TEX_UNITS, 1.0)
 	_quad(size, Vector3(mid.x, 0.0, mid.y), Vector3(-PI / 2.0, 0.0, 0.0), floor_mat)
@@ -282,12 +295,32 @@ func _passage(dir: int, tint: Color) -> void:
 	for side in [-1.0, 1.0]:
 		if along_y:
 			var x: float = mid.x + side * dh
-			_wall(Vector2(x, mid.y - GAP / 2.0), Vector2(x, mid.y + GAP / 2.0), 0.0, DOOR_H,
+			_wall(Vector2(x, mid.y - length / 2.0), Vector2(x, mid.y + length / 2.0), 0.0, DOOR_H,
 					-side * PI / 2.0, tint)
 		else:
 			var z: float = mid.y + side * dh
-			_wall(Vector2(mid.x - GAP / 2.0, z), Vector2(mid.x + GAP / 2.0, z), 0.0, DOOR_H,
+			_wall(Vector2(mid.x - length / 2.0, z), Vector2(mid.x + length / 2.0, z), 0.0, DOOR_H,
 					0.0 if side < 0.0 else PI, tint)
+
+
+## A corridor leading on out of a room next door: a short passage, a wall
+## where it turns out of sight, and one weak lamp, so the base carries on.
+func _stub(dir: int, tint: Color) -> void:
+	_passage(dir, tint.darkened(0.3), STUB)
+	var r := World.ROOM
+	var v := Vector2(World.DIR_VEC[dir])
+	var end := r.get_center() + v * (r.size / 2.0 + Vector2(STUB, STUB))
+	var dh := World.DOOR_HALF
+	var side := Vector2(-v.y, v.x) * dh
+	# The far end faces back at you (yaw as the room's own walls use).
+	_wall(end + side, end - side, 0.0, DOOR_H, atan2(-v.x, -v.y), tint.darkened(0.3))
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(0.85, 0.9, 1.0).lerp(tint, 0.3)
+	lamp.light_energy = 2.2
+	lamp.omni_range = 260.0
+	var at := end - v * (STUB * 0.45)
+	lamp.position = Vector3(at.x, DOOR_H - 15.0, at.y)
+	_target.add_child(lamp)
 
 
 func _build_lights(tint: Color, strength: float) -> void:
@@ -358,7 +391,7 @@ func show_extras(effects: Array, my_traps: Dictionary, vent_highlight: int, dart
 	_show_darts(darts)
 	# Screens on the walls scroll and sweep, a few times a second.
 	_decor_t += get_process_delta_time()
-	if _decor_t > 0.12:
+	if _decor_t > 0.12 and detail_high:
 		_decor_t = 0.0
 		for p in _painters:
 			if is_instance_valid(p):

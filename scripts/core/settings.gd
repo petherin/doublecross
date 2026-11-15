@@ -8,6 +8,8 @@ const PATH := "user://settings.cfg"
 var music_volume := 0.7
 var sfx_volume := 0.9
 var vibration := true
+## First person with the rooms next door and moving screens (off for slow phones).
+var fp_detail := true
 var clock_minutes := 6
 var bot_level := "medium"
 ## Computer rivals in a one-player game (1-3).
@@ -25,6 +27,7 @@ func _ready() -> void:
 		music_volume = cfg.get_value("audio", "music", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 		vibration = cfg.get_value("game", "vibration", vibration)
+		fp_detail = cfg.get_value("game", "fp_detail", fp_detail)
 		clock_minutes = cfg.get_value("game", "clock_minutes", clock_minutes)
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
 		bot_count = cfg.get_value("game", "bot_count", bot_count)
@@ -39,6 +42,7 @@ func save() -> void:
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("game", "vibration", vibration)
+	cfg.set_value("game", "fp_detail", fp_detail)
 	cfg.set_value("game", "clock_minutes", clock_minutes)
 	cfg.set_value("game", "bot_level", bot_level)
 	cfg.set_value("game", "bot_count", bot_count)

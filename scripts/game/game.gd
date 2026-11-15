@@ -57,6 +57,11 @@ const DART_SPEED := 950.0
 const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians)
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
+## Below this many frames a second for SLOW_TIME, first person drops to its
+## light mode (on older phones).
+const SLOW_FPS := 35.0
+const SLOW_TIME := 3.0
+
 const STYLES := [
 	{"name": "AGENT CRIMSON", "accent": Color("ff5a5f"), "sheet": "crimson", "mark": "circle", "voice": 1.0},
 	{"name": "AGENT COBALT", "accent": Color("5ab0ff"), "sheet": "cobalt", "mark": "triangle", "voice": 0.84},
@@ -100,6 +105,7 @@ var hud: Hud
 ## First-person view, built when first switched on.
 var fp: FpView
 var first_person := false
+var _slow_time := 0.0
 var _agent_by_id := {}
 var _exit_cooldown := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -287,6 +293,7 @@ func _process(delta: float) -> void:
 		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
 		fp.show_extras(view.effects.in_room(local_agent.room), view.my_traps, view.vent_highlight, darts)
 		hud.set_facing(local_agent.facing)
+		_watch_frame_rate(delta)
 	else:
 		# Controls are screen-relative: up on the stick = up the screen.
 		local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
@@ -365,12 +372,35 @@ func toggle_view() -> void:
 		hud.set_facing(NAN)
 	fp.set_active(first_person)
 	if first_person:
+		_slow_time = -2.0  # give the new room a moment to settle
+		fp.detail_high = Settings.fp_detail
 		fp.rebuild(world, local_agent.room)
 	hud.set_first_person(first_person)
 
 
+## If first person keeps running slowly, switches to its light mode (no
+## rooms next door, still screens), remembers that, and says so.
+func _watch_frame_rate(delta: float) -> void:
+	if not fp.detail_high:
+		return
+	if Engine.get_frames_per_second() < SLOW_FPS:
+		_slow_time += delta
+	else:
+		_slow_time = minf(_slow_time, 0.0)
+	if _slow_time < SLOW_TIME:
+		return
+	_slow_time = 0.0
+	fp.detail_high = false
+	Settings.fp_detail = false
+	Settings.save()
+	fp.rebuild(world, local_agent.room)
+	hud.toast("First person was running slowly, so it's switched to lighter detail. (Change it in SETTINGS.)",
+			Color("ffd23f"), 3.5)
+
+
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	if first_person:
+		_slow_time = -2.0
 		fp.rebuild(world, room)
 	view.room = room
 	view.lights.rebuild(world, room)
