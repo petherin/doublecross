@@ -668,6 +668,8 @@ func rival_near(a: Agent, reach: float) -> Agent:
 
 ## A split second of slow motion to sell a knockout.
 func hit_stop(seconds := 0.12) -> void:
+	if Settings.reduced_motion:
+		return
 	Engine.time_scale = 0.25
 	get_tree().create_timer(seconds, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
 

@@ -174,7 +174,8 @@ func _draw_explosion(ci: CanvasItem, e: Dictionary) -> void:
 	# 1) White-hot flash
 	if t < 0.18:
 		var f := t / 0.18
-		ci.draw_circle(c, 40.0 + f * 120.0, Color(1.0, 0.97, 0.8, 0.85 * (1.0 - f)))
+		var peak := 0.3 if Settings.reduced_motion else 0.85
+		ci.draw_circle(c, 40.0 + f * 120.0, Color(1.0, 0.97, 0.8, peak * (1.0 - f)))
 	# 2) Sparks and debris flying out
 	if t < 0.9:
 		for i in 16:

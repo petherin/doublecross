@@ -232,8 +232,9 @@ The keys are Godot input actions (**Project → Project Settings → Input Map**
 they're easy to change.
 
 **SETTINGS** on the title screen has music and effects volume, vibration,
-first-person detail, the clock length, and a button to see the new-player
-tips again. **HOW TO PLAY** is the field manual.
+first-person detail, **reduced motion** (no screen shake, slow motion, film
+grain, flicker or iris wipes, and softer flashes), the clock length, and a
+button to see the new-player tips again. **HOW TO PLAY** is the field manual.
 
 ## Ideas for what's next
 
@@ -243,14 +244,14 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 1. **Bots in hosted games.** Let the host fill empty seats with bots, so two
    friends can play a full four-agent match.
-2. **Reduced-motion setting.** One switch to turn off screen shake, flashes,
-   slow motion and film grain, for players who find them uncomfortable.
-3. **Survive a host dropping out.** Today the match ends for everyone if the
+2. **Survive a host dropping out.** Today the match ends for everyone if the
    host's device leaves or sleeps. Hand refereeing to another device, or at
    least let players rejoin a match after a brief disconnect.
-4. **A match recap.** Add a timeline to the debrief card: who found what, who
+3. **A match recap.** Add a timeline to the debrief card: who found what, who
    trapped whom, who took out whom, and each agent's escape time.
-5. **Pause** in one-player games.
+4. **Pause** in one-player games.
+5. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
+   you, a sneak who uses every vent.
 
 ### Gameplay
 
@@ -261,8 +262,6 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 - **Team mode:** two against two, sharing a briefcase and escaping together.
 - **Match options for the host:** how many traps each, fewer briefcases,
   hidden exit, faster clocks.
-- **Bot personalities:** a trapper who rigs everything, a brawler who hunts
-  you, a sneak who uses every vent.
 
 ### Look and feel
 

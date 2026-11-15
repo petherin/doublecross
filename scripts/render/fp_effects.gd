@@ -65,6 +65,9 @@ func _spawn(e: Dictionary) -> void:
 
 ## A light that blazes and dies away (flickering, for electricity).
 func _flash(at: Vector3, col: Color, energy: float, seconds: float, flicker := false) -> void:
+	if Settings.reduced_motion:
+		energy *= 0.4
+		flicker = false
 	var l := OmniLight3D.new()
 	l.light_color = col
 	l.light_energy = energy
