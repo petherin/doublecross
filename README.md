@@ -100,6 +100,13 @@ and then walk into their own traps; **MEDIUM** ones learn the vents as they go;
 **HARD** ones know every vent from the start and are quickest to pick a fight
 with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
 
+Each bot also has a personality, shown on its name tag: a **TRAPPER** rigs
+far more furniture and strings tripwires across doorways; a **BRAWLER** picks
+fights whether or not you're carrying anything, and chases hard; a **SNEAK**
+knows every air vent, uses them all, slips away from fights and comes back to
+search wherever it hears intel go flying. With several bots, each gets a
+different one.
+
 One-player games can be paused (**PAUSE**, <kbd>Esc</kbd> or <kbd>P</kbd>):
 the clocks stop and nobody moves until you resume. They pause themselves when
 you switch away from the app.
@@ -255,18 +262,18 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 1. **Survive a host dropping out.** Today the match ends for everyone if the
    host's device leaves or sleeps. Hand refereeing to another device, or at
    least let players rejoin a match after a brief disconnect.
-2. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
-   you, a sneak who uses every vent.
-3. **Match options for the host:** how many traps each, fewer briefcases,
+2. **Match options for the host:** how many traps each, fewer briefcases,
    hidden exit, faster clocks.
-4. **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
-5. **More gadgets and traps:** a smoke bomb that hides you from everyone in the
+3. **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
+4. **More gadgets and traps:** a smoke bomb that hides you from everyone in the
    room, a glue trap that slows you down, a bug you plant to see into another
    room, and decoy intel that looks real until you reach the exit.
+5. **Team mode:** two against two, sharing a briefcase and escaping together.
 
 ### Gameplay
 
-- **Team mode:** two against two, sharing a briefcase and escaping together.
+- **Bots that learn from you:** a bot that notices which rooms you favour and
+  lays traps there.
 
 ### Look and feel
 

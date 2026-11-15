@@ -30,6 +30,13 @@ const FIGHT := {
 	"hard": {"aggro": 0.85, "react": [0.15, 0.4], "aim": 0.08, "chase": 700.0},
 }
 
+## Each bot also has a personality, on top of its difficulty:
+##  trapper: rigs far more furniture, and strings tripwires across doorways
+##  brawler: picks a fight whether or not you carry anything, and chases hard
+##  sneak:   knows every vent, slips away from fights, and comes back to
+##           search wherever it hears intel go flying
+const PERSONALITIES := ["trapper", "brawler", "sneak"]
+
 const LEVELS := {
 	"easy": {
 		"speed": 0.72, "think": [0.7, 1.5], "memory": 0.75, "avoid_own": 0.7,
@@ -49,6 +56,7 @@ var game: Node
 var agent: Agent
 var id := 2
 var level := "hard"
+var personality := ""
 var _p: Dictionary = LEVELS["hard"]
 var _f: Dictionary = FIGHT["hard"]
 var _engaged := false
@@ -72,13 +80,26 @@ var _stuck_time := 0.0
 var _last_pos := Vector2.ZERO
 
 
-func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard") -> void:
+func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard", p_personality := "") -> void:
 	game = p_game
 	agent = p_agent
 	id = p_id
 	level = p_level if LEVELS.has(p_level) else "hard"
-	_p = LEVELS[level]
-	_f = FIGHT[level]
+	personality = p_personality
+	_p = LEVELS[level].duplicate()
+	_f = FIGHT[level].duplicate()
+	match personality:
+		"trapper":
+			_p["trap"] = minf(0.8, _p["trap"] * 2.5)
+			_f["aggro"] *= 0.5
+		"brawler":
+			_f["aggro"] = maxf(_f["aggro"], 0.9)
+			_f["chase"] *= 1.5
+			_p["trap"] *= 0.4
+		"sneak":
+			_p["vents"] = "all"
+			_p["sneaky"] = true
+			_f["aggro"] *= 0.3
 	if _p["vents"] == "all":
 		for i in game.world.vents.size():
 			_vents_known[i] = true
@@ -138,8 +159,10 @@ func _maybe_trap(key: String, chance: float) -> void:
 		return
 	var info := {}
 	var door: int = game.near_door(agent)
-	# Careless bots also string tripwires across doors they'll use themselves.
-	if door != -1 and _p["avoid_own"] < 1.0 and _rng.randf() < 0.35:
+	# Careless bots string tripwires across doors they'll use themselves;
+	# trappers do it on purpose.
+	var wires: bool = _p["avoid_own"] < 1.0 or personality == "trapper"
+	if door != -1 and wires and _rng.randf() < (0.5 if personality == "trapper" else 0.35):
 		info = {"kind": "WIRE", "key": World.door_key(agent.room, door)}
 	elif not game.traps.has(key) and not game.contents.has(key):
 		var kinds: Array = World.FURNITURE_TRAPS
@@ -185,7 +208,8 @@ func _fight(delta: float) -> bool:
 	if _met_in != agent.room:
 		_met_in = agent.room
 		var rid: int = game.id_of(rival)
-		var worth: bool = rid != -1 and not game.inventories[rid]["items"].is_empty()
+		# A brawler doesn't need a reason.
+		var worth: bool = rid != -1 and (personality == "brawler" or not game.inventories[rid]["items"].is_empty())
 		var hurry: bool = game.clocks.get(id, 0.0) < 60.0
 		_engaged = worth and not hurry and _rng.randf() < _f["aggro"]
 		_fight_time = 0.0
@@ -200,7 +224,7 @@ func _fight(delta: float) -> bool:
 		return false
 	# Don't keep at a fight that's going nowhere.
 	_fight_time += delta
-	if _fight_time > 6.0:
+	if _fight_time > (10.0 if personality == "brawler" else 6.0):
 		_engaged = false
 		return false
 	_path = PackedVector2Array()
@@ -323,6 +347,17 @@ func _head_for_room(target: Vector2i, final_action: Dictionary) -> void:
 				if _rng.randf() < 0.4:
 					_go_to(world().vents[i]["front"], {"type": "vent", "idx": i})
 					return
+	# A sneak takes any vent that gets it nearer (even when a door is
+	# quicker), and has a look down any it hasn't been through yet.
+	if personality == "sneak":
+		for i in world().vents.size():
+			var v: Dictionary = world().vents[i]
+			var dest: Vector2i = world().vents[v["link"]]["room"]
+			var nearer := _room_distance(dest, target) < _room_distance(agent.room, target)
+			if v["room"] == agent.room and (nearer or not _vents_tried.has(i)) and _rng.randf() < 0.8:
+				_vents_tried[i] = true
+				_go_to(v["front"], {"type": "vent", "idx": i})
+				return
 	var step := _route_step(agent.room, target)
 	if step.get("type", "") == "vent":
 		_go_to(world().vents[step["idx"]]["front"], {"type": "vent", "idx": step["idx"]})
