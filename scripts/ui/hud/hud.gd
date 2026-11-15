@@ -11,6 +11,8 @@ signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
 signal view_pressed
+signal pause_pressed
+signal resumed
 
 const World = preload("res://scripts/core/world.gd")
 const Joystick = preload("res://scripts/ui/joystick.gd")
@@ -22,6 +24,7 @@ const DuctView = preload("res://scripts/ui/hud/duct_view.gd")
 const Briefing = preload("res://scripts/ui/hud/briefing.gd")
 const Debrief = preload("res://scripts/ui/hud/debrief.gd")
 const Iris = preload("res://scripts/ui/hud/iris.gd")
+const PauseCard = preload("res://scripts/ui/hud/pause_card.gd")
 
 var world: World
 var joystick: Joystick
@@ -61,6 +64,8 @@ var _bar: ColorRect
 var _leave: Button
 var _view_button: Button
 var _watching: Label
+var _pause_button: Button
+var _pause_card: PauseCard
 ## In first person, the way you're looking (an arrow on the mini-map); NAN when overhead.
 var _facing := NAN
 var _has_case := false
@@ -186,6 +191,16 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_watching.visible = false
 	add_child(_watching)
 
+	# One-player games can be paused (hidden in multiplayer).
+	_pause_button = Button.new()
+	_pause_button.text = "PAUSE"
+	_pause_button.size = Vector2(90, 40)
+	_pause_button.add_theme_font_size_override("font_size", 16)
+	_pause_button.focus_mode = Control.FOCUS_NONE
+	_pause_button.visible = false
+	_pause_button.pressed.connect(func(): pause_pressed.emit())
+	add_child(_pause_button)
+
 	_minimap = Control.new()
 	_minimap.size = Vector2(56, 56)
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -228,6 +243,10 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	add_child(_fade)
 	_iris = Iris.new()
 	add_child(_iris)
+	_pause_card = PauseCard.new(_area())
+	_pause_card.resumed.connect(func(): resumed.emit())
+	_pause_card.abandoned.connect(func(): leave_requested.emit())
+	add_child(_pause_card)
 
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -340,6 +359,7 @@ func _layout() -> void:
 	_leave.position = Vector2(L.x - 110, 10)
 	_view_button.position = Vector2(L.x - 252, 10)
 	_minimap.position = Vector2(L.x - 330, 12)
+	_pause_button.position = Vector2(L.x - 432, 10)
 	_watching.position = Vector2(0, 108)
 	_watching.size = Vector2(L.x, 30)
 	_fit_room_label()
@@ -418,6 +438,17 @@ func set_watching(agent_name: String, col: Color) -> void:
 	_watching.visible = true
 
 
+## Shows the PAUSE button (one-player games only).
+func set_pausable(on: bool) -> void:
+	_pause_button.visible = on
+	_fit_room_label()
+
+
+## Shows or hides the "mission on hold" card.
+func show_pause(on: bool) -> void:
+	_pause_card.show_card(on, _area())
+
+
 func set_first_person(on: bool) -> void:
 	_view_button.text = "OVERHEAD" if on else "1ST PERSON"
 
@@ -444,7 +475,7 @@ func show_duct(crawl_sheet: Texture2D, seconds: float) -> void:
 ## Sizes the room-name plate to the name, centred in the space in the top bar.
 func _fit_room_label() -> void:
 	var L := _area()
-	var space := maxf(0.0, L.x - 620 - 340)
+	var space := maxf(0.0, L.x - 620 - (442 if _pause_button.visible else 340))
 	var w := Style.stencil().get_string_size(_room_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x + 40
 	_room_label.size = Vector2(minf(space, w), 42)
 	_room_label.position = Vector2(620 + (space - _room_label.size.x) / 2.0, 9)

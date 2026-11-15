@@ -8,6 +8,7 @@ extends SceneTree
 
 var _failures := 0
 var _frames := 0
+var _held := 0.0
 var _game: Node
 var _menu: Node
 
@@ -25,7 +26,7 @@ func _process(_delta: float) -> bool:
 		_check_worlds()
 		for action in ["move_left", "move_right", "move_up", "move_down", "search", "crawl",
 				"attack", "fire", "trap_bomb", "trap_spring", "trap_wire", "trap_shock", "toggle_view", "turn_left", "turn_right",
-				"strafe_left", "strafe_right", "look_up", "look_down"]:
+				"strafe_left", "strafe_right", "look_up", "look_down", "pause"]:
 			_check(InputMap.has_action(action) and not InputMap.action_get_events(action).is_empty(),
 					"input action " + action)
 		_menu = load("res://scripts/ui/menu.gd").new()
@@ -35,6 +36,14 @@ func _process(_delta: float) -> bool:
 		# The bot matches cover the full effects; this run takes the calmer paths.
 		root.get_node("Settings").reduced_motion = true
 		_game.setup(7, 1, [1], "medium", 6, {1: "SMOKE"})
+	elif _frames == 60:
+		_check(_game.solo, "a one-player game can be paused")
+		_game._set_paused(true)
+		_held = _game.clocks[1]
+	elif _frames == 100:
+		_check(paused and _game.clocks[1] == _held, "the clock stops while paused")
+		_game._set_paused(false)
+		_check(not paused, "resumes")
 	elif _frames == 120:
 		_check(not _game.over, "match ended within two seconds")
 		print("smoke: %s" % ("ok" if _failures == 0 else "%d failure(s)" % _failures))
