@@ -30,6 +30,8 @@ const EventPresenter = preload("res://scripts/game/event_presenter.gd")
 const FP_TURN_SPEED := 2.6
 ## Radians turned per pixel dragged on the right half of the screen.
 const FP_LOOK_SPEED := 0.006
+## Looking up and down with keys or the right stick (radians a second).
+const FP_PITCH_SPEED := 1.6
 ## Seconds left on your clock when the room's alarm light starts.
 const ALARM_TIME := 30.0
 ## Peer ids of computer-controlled rivals in one-player games: 2, 3, 4.
@@ -288,6 +290,7 @@ func _process(delta: float) -> void:
 			strafe = 0.0
 		if not (local_agent.frozen or local_agent.searching or local_agent.ko_time > 0.0):
 			local_agent.facing = wrapf(local_agent.facing + turn * FP_TURN_SPEED * delta, -PI, PI)
+			fp.look(Input.get_axis("look_down", "look_up") * FP_PITCH_SPEED * delta)
 		var ahead := Vector2.from_angle(local_agent.facing)
 		local_agent.move_input = (ahead * forward + ahead.orthogonal() * -strafe).limit_length(1.0)
 		fp.update_view(local_agent, agents, nearest_furniture(local_agent), delta)
@@ -348,15 +351,16 @@ func _unhandled_input(event: InputEvent) -> void:
 ## mouse with the button held) turns you. Returns true if it used the event.
 func _look_drag(event: InputEvent) -> bool:
 	var half := get_viewport().get_visible_rect().size.x / 2.0
-	var dx := 0.0
+	var d := Vector2.ZERO
 	if event is InputEventScreenDrag and event.position.x > half:
-		dx = event.relative.x
+		d = event.relative
 	elif event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_LEFT and event.position.x > half:
-		dx = event.relative.x
+		d = event.relative
 	else:
 		return false
 	if not (local_agent.frozen or local_agent.ko_time > 0.0):
-		local_agent.facing = wrapf(local_agent.facing + dx * FP_LOOK_SPEED, -PI, PI)
+		local_agent.facing = wrapf(local_agent.facing + d.x * FP_LOOK_SPEED, -PI, PI)
+		fp.look(-d.y * FP_LOOK_SPEED)
 	return true
 
 
@@ -373,6 +377,7 @@ func toggle_view() -> void:
 	fp.set_active(first_person)
 	if first_person:
 		_slow_time = -2.0  # give the new room a moment to settle
+		fp.pitch = 0.0
 		fp.detail_high = Settings.fp_detail
 		fp.rebuild(world, local_agent.room)
 	hud.set_first_person(first_person)

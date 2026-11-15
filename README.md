@@ -128,8 +128,10 @@ with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
   room (though not who's in it, which stays hidden as it does overhead), and
   beyond that, dim corridors fading into the haze, so the base carries on. The
   walls carry the same screens, maps, clocks and posters as overhead.
-  W/S walk, ←/→ turn, A/D sidestep; on a touch screen the stick walks and
-  turns, and you can swipe the right half to look around.
+  W/S walk, ←/→ turn, A/D sidestep, Q/Z look up and down; on a touch screen
+  the stick walks and turns, and you can swipe the right half to look around,
+  up and down too. Overhead there are ceiling tiles, steel beams, strip
+  lights, pipes and an air duct.
   Explosions, shocks, flying paperwork and the comic-book words happen in 3D
   too, your trap markers and tripwires show, and when you're stunned the
   view reels (or drops to the floor when you're taken out). On slower phones,
@@ -220,6 +222,7 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 | Crawl through a vent | **CRAWL** (appears at a vent) | <kbd>V</kbd> | B |
 | Switch overhead / first person | **1ST PERSON** / **OVERHEAD** (top bar) | <kbd>Tab</kbd> | Start |
 | First person: turn / sidestep | Stick left/right, or swipe the right half | <kbd>←</kbd>/<kbd>→</kbd> turn · <kbd>A</kbd>/<kbd>D</kbd> sidestep | Right stick turns · left stick sidesteps |
+| First person: look up / down | Swipe up or down on the right half | <kbd>Q</kbd>/<kbd>Z</kbd> or <kbd>Page Up</kbd>/<kbd>Page Down</kbd> | Right stick up/down |
 | Skip the briefing | Tap | Any key | |
 | Leave the match | **LEAVE** / Android back | Close the window | |
 
