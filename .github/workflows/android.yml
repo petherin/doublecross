@@ -58,6 +58,15 @@ jobs:
       - name: Bot match (spectating once out)
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=2 --spectate
 
+      - name: Network match (host and joiner, bots in the empty seats)
+        run: |
+          ~/godot/godot --headless -s res://tests/net_match.gd -- --role=host > host.log 2>&1 &
+          HOST=$!
+          sleep 1
+          timeout 150 ~/godot/godot --headless -s res://tests/net_match.gd -- --role=join
+          wait $HOST || { cat host.log; exit 1; }
+          grep "net_match host: ok" host.log
+
   android:
     # Never export or upload downloadable build artifacts for pull requests.
     # This job runs only after code has reached the main branch.

@@ -159,17 +159,18 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		var id: int = ids[i]
 		var a := Agent.new()
 		a.name = "Agent_%d" % id
-		a.set_multiplayer_authority(id)
+		var is_bot := id in bot_ids
+		# Bots are run by the host (peer 1) and sent to everyone like a player.
+		a.set_multiplayer_authority(1 if is_bot else id)
 		var start: Vector2i = starts[i]
 		var style: Dictionary = STYLES[i % STYLES.size()].duplicate()
 		var chosen: String = str(names.get(id, "")).strip_edges().to_upper()
 		if chosen != "":
 			style["name"] = chosen
-		var is_bot := id in bot_ids
 		if is_bot:
 			style["name"] += " (BOT)"
-		# The bot's agent is simulated on this device, like the player's own.
-		a.configure(world, start, id == my_id or is_bot, style)
+		# The host simulates the bots' agents, like the player's own.
+		a.configure(world, start, id == my_id or (is_bot and multiplayer.is_server()), style)
 		add_child(a)
 		agents.append(a)
 		_agent_by_id[id] = a
@@ -187,8 +188,9 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	view.my_id = my_id
 	view.darts = darts
 
-	for bid in bot_ids:
-		_add_bot(bid, bot_level)
+	if multiplayer.is_server():
+		for bid in bot_ids:
+			_add_bot(bid, bot_level)
 	add_child(Tips.new(self))
 
 	var vig_layer := CanvasLayer.new()

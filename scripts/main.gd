@@ -11,6 +11,8 @@ var _game: Game
 var _offline_mode := ""   # "", "practice" or "bot"
 var _bot_level := "medium"
 var _bot_count := 1
+## Bots the host put in a networked match: [level, how many].
+var _hosted_bots := ["", 0]
 var _minutes := 6
 ## peer id -> chosen codename, gathered by the host before the match starts.
 var _names := {}
@@ -101,7 +103,15 @@ func _start_match() -> void:
 	if not Net.is_hosting or Net.in_game or _names.size() < 2:
 		return
 	Net.in_game = true
-	start_game.rpc(randi(), Settings.clock_minutes, _names)
+	_start_hosted(randi())
+
+
+## Host: starts a match for everyone in the lobby, with bots in any empty
+## seats if the host asked for them.
+func _start_hosted(seed_value: int) -> void:
+	var seats := Net.MAX_PLAYERS - _names.size()
+	var level := Settings.bot_level if Settings.host_bots and seats > 0 else ""
+	start_game.rpc(seed_value, Settings.clock_minutes, _names, level, seats if level != "" else 0)
 
 
 ## A joining player introduces themselves: codename and app version. Every
@@ -138,10 +148,11 @@ func lobby(names: Dictionary) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func start_game(seed_value: int, minutes := 6, names := {}) -> void:
+func start_game(seed_value: int, minutes := 6, names := {}, bot_level := "", bot_count := 0) -> void:
 	Net.in_game = true
 	_minutes = minutes
 	_names = names
+	_hosted_bots = [bot_level, bot_count]
 	_offline_mode = ""
 	_begin(seed_value, names.keys())
 
@@ -164,7 +175,7 @@ func _rematch() -> void:
 			if id != 1 and not multiplayer.get_peers().has(id):
 				_names.erase(id)
 		if _names.size() >= 2:
-			start_game.rpc(randi(), Settings.clock_minutes, _names)
+			_start_hosted(randi())
 		else:
 			_leave()
 
@@ -183,7 +194,11 @@ func _begin(seed_value: int, ids: Array) -> void:
 	_game.name = "Game"
 	add_child(_game)
 	var bot_level := _bot_level if _offline_mode == "bot" else ""
-	_game.setup(seed_value, multiplayer.get_unique_id(), ids, bot_level, _minutes, _names, _bot_count)
+	var bot_count := _bot_count
+	if _offline_mode == "":
+		bot_level = _hosted_bots[0]
+		bot_count = _hosted_bots[1]
+	_game.setup(seed_value, multiplayer.get_unique_id(), ids, bot_level, _minutes, _names, bot_count)
 	Sound.music(true)
 	Sound.music_tempo(1.0)
 	_game.leave_requested.connect(_leave)
