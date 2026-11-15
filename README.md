@@ -126,7 +126,9 @@ you switch away from the app.
   shaker, toms and a low swell come in while a rival is in your room; driving
   hats, brass stabs and a rising riff come in when your clock is nearly out.
 - **Spy-file screens:** the title screen is a case-file dossier, each match
-  opens with a briefing that self-destructs, and ends with a stamped debrief.
+  opens with a briefing that self-destructs, and ends with a stamped debrief
+  with a timeline clipped to it: who found what, who trapped or took out whom,
+  who ran out of time, and when the winner got out.
 - **First person:** the **1ST PERSON** button (or <kbd>Tab</kbd>)
   switches to seeing the room through your agent's eyes: real 3D walls,
   floor and Blender-modelled furniture, with the other agents as *Doom*-style
@@ -252,19 +254,17 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 2. **Survive a host dropping out.** Today the match ends for everyone if the
    host's device leaves or sleeps. Hand refereeing to another device, or at
    least let players rejoin a match after a brief disconnect.
-3. **A match recap.** Add a timeline to the debrief card: who found what, who
-   trapped whom, who took out whom, and each agent's escape time.
-4. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
+3. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
    you, a sneak who uses every vent.
-5. **Match options for the host:** how many traps each, fewer briefcases,
+4. **Match options for the host:** how many traps each, fewer briefcases,
    hidden exit, faster clocks.
+5. **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
 
 ### Gameplay
 
 - **More gadgets and traps:** a smoke bomb that hides you from everyone in the
   room, a glue trap that slows you down, a bug you plant to see into another
   room, and decoy intel that looks real until you reach the exit.
-- **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
 - **Team mode:** two against two, sharing a briefcase and escaping together.
 
 ### Look and feel

@@ -524,7 +524,8 @@ func _process(delta: float) -> void:
 
 
 ## The case-file debrief at the end of the match.
-func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool) -> void:
+func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool,
+		timeline: Array = []) -> void:
 	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
 		b.visible = false
 	_watching.visible = false
@@ -532,7 +533,7 @@ func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_
 	if _toast_tween:
 		_toast_tween.kill()
 	_tape.modulate.a = 0.0
-	_end = Debrief.new(_area(), winner == my_id, winner, winner_name, reason, can_rematch)
+	_end = Debrief.new(_area(), winner == my_id, winner, winner_name, reason, can_rematch, timeline)
 	_end.rematch_requested.connect(rematch_requested.emit)
 	_end.leave_requested.connect(leave_requested.emit)
 	add_child(_end)

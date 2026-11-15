@@ -7,14 +7,53 @@ const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
 
 var game: Node
+## The match so far, for the debrief: {"t": seconds in, "text", "col"}.
+var timeline: Array = []
 
 
 func _init(p_game: Node) -> void:
 	game = p_game
 
 
+## Adds a line to the timeline, about agent `a`.
+func note(a: Agent, text: String) -> void:
+	timeline.append({"t": game.elapsed, "text": short_name(a) + " " + text, "col": a.accent})
+
+
+## "AGENT COBALT (BOT)" -> "COBALT", to keep the timeline lines short.
+static func short_name(a: Agent) -> String:
+	return a.display_name.trim_prefix("AGENT ").trim_suffix(" (BOT)")
+
+
+## The moments worth a line in the debrief: intel and briefcases found,
+## traps sprung, takedowns and agents going out.
+func _record(e: Dictionary) -> void:
+	var who: Agent = game.agent_of(e.get("pid", 0))
+	if who == null:
+		return
+	match e.get("type", ""):
+		"search":
+			var found: String = e["found"]
+			if found in World.INTEL or (found == World.BRIEFCASE and not e.get("spare", false)):
+				note(who, "found the " + found)
+		"ko":
+			var owner: Agent = game.agent_of(e["owner"])
+			var trap: String = World.TRAP_NAMES[e["kind"]].to_lower()
+			if owner == who:
+				note(who, "walked into their own " + trap)
+			elif owner:
+				note(who, "was caught by %s's %s" % [short_name(owner), trap])
+		"down":
+			var by: Agent = game.agent_of(e["by"])
+			if by:
+				note(by, "took out " + short_name(who))
+		"out":
+			note(who, "ran out of time" if e["reason"] == "time" else "left the mission")
+
+
 ## Applies one match event on this device: animations, toasts, flashes and sounds.
 func present(e: Dictionary) -> void:
+	_record(e)
 	var pid: int = e.get("pid", 0)
 	var me: bool = pid == game.my_id
 	_sound(e, me)

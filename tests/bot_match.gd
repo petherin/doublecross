@@ -49,6 +49,12 @@ func _process(_delta: float) -> bool:
 		for b in _game.bots.values():
 			won = won or b.agent.celebrating
 		print("match over after %.0f s: %s; a bot escaped: %s" % [_frames / 60.0, _game.result, won])
+		var tl: Array = _game.presenter.timeline
+		print("timeline: %d entries" % tl.size())
+		var escaped: bool = not tl.is_empty() and str(tl.back()["text"]).ends_with("escaped with the intel")
+		if tl.is_empty() or (_game.result["reason"] == "escape" and not escaped):
+			print("FAIL: the debrief timeline is missing or doesn't end with the escape")
+			return _finish(1)
 		return _finish(0 if won else 1)
 	if _frames > LIMIT:
 		print("FAIL: match did not finish in time")

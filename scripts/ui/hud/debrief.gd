@@ -10,6 +10,8 @@ const Style = preload("res://scripts/ui/style.gd")
 ## When the stamp starts to fall, and how long it takes to land.
 const STAMP_AT := 0.55
 const STAMP_FALL := 0.16
+## The width of the timeline sheet clipped beside the card.
+const SHEET_W := 430.0
 
 var _dim: ColorRect
 var _card: Control
@@ -19,20 +21,35 @@ var _stamp_col := Color.WHITE
 var _sub_text := ""
 var _t := 0.0
 var _landed := false
+var _timeline: Array = []
+var _sheet: Control
 
 
 ## `winner` is a peer id, or 0 if nobody won; `reason` is "escape" or "time".
-func _init(area: Vector2, won: bool, winner: int, winner_name: String, reason: String, can_rematch: bool) -> void:
+func _init(area: Vector2, won: bool, winner: int, winner_name: String, reason: String, can_rematch: bool,
+		timeline: Array = []) -> void:
 	size = area
+	_timeline = timeline
 	_describe(won, winner, winner_name, reason)
 	_dim = ColorRect.new()
 	_dim.color = Color(0, 0, 0, 0.0)
 	_dim.size = area
 	add_child(_dim)
 
+	# The timeline is clipped on beside the card, when there's room for it.
+	var both := 760.0 + SHEET_W - 16.0
+	var with_sheet := not timeline.is_empty() and area.x >= both + 20.0
 	_card = Control.new()
 	_card.size = Vector2(760, 440)
 	_card.position = (area - _card.size) / 2.0 + Vector2(0, -20)
+	if with_sheet:
+		_card.position.x = (area.x - both) / 2.0
+		_sheet = Control.new()
+		_sheet.size = Vector2(SHEET_W, 440)
+		_sheet.position = Vector2(_card.position.x + 760.0 - 16.0, _card.position.y + 16.0)
+		_sheet.rotation = 0.012
+		_sheet.draw.connect(_draw_sheet)
+		add_child(_sheet)
 	_card.theme = Style.paper_theme()
 	_card.draw.connect(_draw_card)
 	add_child(_card)
@@ -105,6 +122,41 @@ func _draw_card() -> void:
 	c.draw_string(Style.typewriter(), Vector2(44, 204), _sub_text, HORIZONTAL_ALIGNMENT_LEFT, 680, 23, Style.INK)
 	Style.draw_redacted(c, Vector2(44, 248), "REMARKS:", [160, 90, 130])
 	Style.draw_paperclip(c, Vector2(700, 6), 1.6, 70.0)
+
+
+## Attachment A: what happened when, one line per moment, in each agent's
+## colour (the latest ones, if there were too many to fit).
+func _draw_sheet() -> void:
+	var c := _sheet
+	Style.draw_paper(c, Rect2(Vector2.ZERO, c.size), Style.PAPER.darkened(0.04), 0.0)
+	c.draw_string(Style.mono_bold(), Vector2(26, 44), "ATTACHMENT A: TIMELINE", HORIZONTAL_ALIGNMENT_LEFT, -1, 19,
+			Style.RED_INK)
+	c.draw_line(Vector2(24, 58), Vector2(c.size.x - 24, 58), Style.INK, 1.5)
+	var font := Style.typewriter()
+	var width := c.size.x - 128.0
+	# Keep the latest entries that fit, each wrapped to as many lines as it needs.
+	var room := c.size.y - 96.0
+	var shown := []
+	for k in range(_timeline.size() - 1, -1, -1):
+		var h := font.get_multiline_string_size(_timeline[k]["text"], HORIZONTAL_ALIGNMENT_LEFT, width, 16).y + 8.0
+		if h > room - (24.0 if k > 0 else 0.0):
+			break
+		room -= h
+		shown.push_front([_timeline[k], h])
+	var y := 82.0
+	if shown.size() < _timeline.size():
+		c.draw_string(font, Vector2(26, y + 12), "(earlier entries withheld)", HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
+				Color(Style.INK, 0.6))
+		y += 24.0
+	for item in shown:
+		var entry: Dictionary = item[0]
+		var t := int(entry["t"])
+		c.draw_string(Style.mono(), Vector2(36, y + 13), "%d:%02d" % [t / 60, t % 60], HORIZONTAL_ALIGNMENT_LEFT, -1,
+				15, Color(Style.INK, 0.7))
+		c.draw_circle(Vector2(94, y + 8), 5.0, (entry["col"] as Color).darkened(0.25))
+		c.draw_multiline_string(font, Vector2(106, y + 13), entry["text"], HORIZONTAL_ALIGNMENT_LEFT, width, 16, -1,
+				Style.INK)
+		y += item[1]
 
 
 ## The rubber stamp slams down a moment after the card appears.
