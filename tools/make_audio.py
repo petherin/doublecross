@@ -514,6 +514,22 @@ def voices():
                                     (0.22, 280, 230, "a", 1.0, 0.0)]), 0.5, 0.15), 0.7)
 
 
+def dog():
+    """Nacho: barks (a sharp, falling "ruff" through a dog-sized throat),
+    a happy yip-yip when he's found, and a low rumbling growl."""
+    def ruff(f0a, f0b, length, vowel="a", rough=0.5):
+        return _voice([(0.018, f0a * 0.8, f0a, "h", 0.4, 1.0), (length, f0a, f0b, vowel, 1.0, 0.0)],
+                      breath=0.25, rough=rough)
+    save_wav("bark1", reverb(ruff(520, 300, 0.13), 0.35, 0.12), 0.8)
+    save_wav("bark2", reverb(mix(ruff(480, 290, 0.12), at(ruff(540, 320, 0.11, "o"), 0.19)), 0.35, 0.12), 0.8)
+    save_wav("yip", reverb(mix(ruff(700, 560, 0.08, "e", 0.2), at(ruff(760, 600, 0.09, "e", 0.2), 0.14),
+                               at(ruff(820, 640, 0.1, "e", 0.2), 0.3)), 0.35, 0.12), 0.75)
+    # Growl: a gravelly low buzz, the rumble pulsing as he breathes out.
+    g = _voice([(1.1, 95, 85, "o", 0.0, 1.0)], breath=0.4, rough=0.9)
+    pulse = 0.55 + 0.45 * np.sin(2 * np.pi * 3.2 * np.arange(len(g)) / SR) ** 2
+    save_wav("growl", reverb(lowpass(g * pulse, 1400), 0.4, 0.12), 0.7)
+
+
 # ------------------------------------------------------------------ music
 
 def music():
@@ -723,6 +739,7 @@ def _write_loop(name, buf, loop_len):
 if __name__ == "__main__":
     sfx()
     voices()
+    dog()
     if not ONLY or "music" in ONLY:
         music()
     if not ONLY or "ambience" in ONLY:

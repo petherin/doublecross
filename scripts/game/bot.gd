@@ -285,6 +285,14 @@ func _targets_in(room: Vector2i) -> Array:
 				out.append(i)
 		elif not _searched.has(key):
 			out.append(i)
+	# With Nacho at its side, a bot keeps clear of what he growls at and goes
+	# straight for what he barks at.
+	if game.dog.owner_id == id and game.dog.room == room:
+		var flags: Dictionary = game.dog.flags
+		out = out.filter(func(i): return flags.get(World.furniture_key(room, i), "") != "trap")
+		var barked := out.filter(func(i): return flags.get(World.furniture_key(room, i), "") == "item")
+		if not barked.is_empty():
+			return barked
 	return out
 
 

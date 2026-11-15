@@ -53,6 +53,7 @@ const TYPES := {
 	"plant": Vector2(55, 55),
 	"rack": Vector2(140, 40),
 	"sofa": Vector2(170, 70),
+	"kennel": Vector2(100, 80),
 }
 const WALL_TYPES := ["desk", "console", "cabinet", "locker", "shelf", "safe", "plant", "rack", "sofa"]
 ## Front walls (bottom/right) sit nearest the camera, so only low furniture
@@ -80,6 +81,8 @@ var exit_room := Vector2i(1, 0)
 var exit_dir: int = Dir.UP
 ## Starting contents of the furniture: furniture_key -> item name.
 var hidden := {}
+## Nacho's kennel: the one in the base, as [room, furniture index].
+var kennel := [Vector2i(-1, -1), -1]
 ## Air-vent shortcuts: { room, dir (UP/LEFT wall), along (x or y on that
 ## wall), front (floor point to stand at), link (index of the partner vent) }.
 var vents: Array = []
@@ -118,6 +121,7 @@ func _init(seed_in: int, player_count := 2) -> void:
 	var e: Array = exits[rng.randi_range(0, exits.size() - 1)]
 	exit_room = e[0]
 	exit_dir = e[1]
+	_place_kennel(rng)
 	_hide_items(rng)
 	_place_vents(rng)
 
@@ -303,7 +307,8 @@ func _hide_items(rng: RandomNumberGenerator) -> void:
 	var spots := []
 	for r in rooms:
 		for i in (rooms[r]["furniture"] as Array).size():
-			spots.append([r, i])
+			if not is_kennel(r, i):
+				spots.append([r, i])
 	spots = _shuffled(spots, rng)
 	var used_rooms := {}
 	# One of each piece of intel, however many agents: that's what the
@@ -323,6 +328,37 @@ func _hide_items(rng: RandomNumberGenerator) -> void:
 			hidden[key] = item
 			used_rooms[spot[0]] = true
 			break
+
+
+## Puts Nacho's kennel against the back wall of one room (never a starting
+## room), in place of a piece of furniture there.
+func _place_kennel(rng: RandomNumberGenerator) -> void:
+	var starts := start_rooms()
+	var sz: Vector2 = TYPES["kennel"]
+	for r in _shuffled(rooms.keys(), rng):
+		if r in starts:
+			continue
+		var items: Array = rooms[r]["furniture"]
+		for i in items.size():
+			var f: Dictionary = items[i]
+			if f["wall"] != "top" and f["wall"] != "left":
+				continue
+			var c: Vector2 = (f["rect"] as Rect2).get_center()
+			var rect := Rect2(c.x - sz.x / 2, ROOM.position.y, sz.x, sz.y) if f["wall"] == "top" \
+					else Rect2(ROOM.position.x, c.y - sz.x / 2, sz.y, sz.x)
+			var clash := false
+			for j in items.size():
+				if j != i and (items[j]["rect"] as Rect2).grow(14).intersects(rect):
+					clash = true
+			if clash:
+				continue
+			items[i] = {"type": "kennel", "rect": rect, "wall": f["wall"], "detail": f["detail"]}
+			kennel = [r, i]
+			return
+
+
+func is_kennel(room: Vector2i, idx: int) -> bool:
+	return kennel[0] == room and kennel[1] == idx
 
 
 static func _shuffled(arr: Array, rng: RandomNumberGenerator) -> Array:

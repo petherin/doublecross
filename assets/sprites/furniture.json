@@ -264,6 +264,22 @@
         165.0,
         180.0
       ]
+    },
+    "kennel_left": {
+      "color": "res://assets/sprites/furniture/kennel_left.png",
+      "normal": "res://assets/sprites/furniture/kennel_left_n.png",
+      "anchor": [
+        140.0,
+        185.0
+      ]
+    },
+    "kennel_top": {
+      "color": "res://assets/sprites/furniture/kennel_top.png",
+      "normal": "res://assets/sprites/furniture/kennel_top_n.png",
+      "anchor": [
+        140.0,
+        185.0
+      ]
     }
   }
 }

@@ -10,6 +10,8 @@ const Agent = preload("res://scripts/game/agent.gd")
 var game: Node
 var _rng := RandomNumberGenerator.new()
 var _clock_sync := 0.0
+## When Nacho last saw someone off (msec); he needs a breather between bites.
+var _last_bite := -100000
 
 
 func _init(p_game: Node) -> void:
@@ -25,6 +27,11 @@ func handle_search(pid: int, room: Vector2i, idx: int) -> void:
 	if game.over or not game.inventories.has(pid):
 		return
 	var key := World.furniture_key(room, idx)
+	if game.world.is_kennel(room, idx):
+		# Nacho's kennel: he's either at home (and now yours) or out.
+		game.broadcast({"type": "search", "pid": pid, "key": key, "found": "", "left": "", "disarmed": "",
+				"spare": false, "kennel": true, "nacho": game.dog.owner_id == 0})
+		return
 	var inv: Dictionary = game.inventories[pid]
 	var disarmed := ""
 	if game.traps.has(key):
@@ -70,6 +77,8 @@ func handle_trap(pid: int, info: Dictionary) -> void:
 		reason = "That trap didn't work."
 	elif game.traps.has(key):
 		reason = "Something's already rigged here. Best leave it alone…"
+	elif key == World.furniture_key(game.world.kennel[0], game.world.kennel[1]):
+		reason = "Not in Nacho's kennel!"
 	elif game.traps_owned_by(pid) >= game.MAX_TRAPS:
 		reason = "You've already got %d game.traps set." % game.MAX_TRAPS
 	if reason != "":
@@ -118,6 +127,13 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 		return
 	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > game.MELEE_RANGE * 2.0):
 		return
+	# Nacho won't stand for anyone hurting his agent.
+	var now := Time.get_ticks_msec()
+	if game.dog.owner_id == target and game.dog.room == ba.room and game.dog.visible_now() \
+			and now - _last_bite > game.dog.BITE_COOLDOWN * 1000.0:
+		_last_bite = now
+		game.broadcast({"type": "bite", "pid": by, "owner": target, "room": ba.room, "from": game.dog.position})
+		return
 	var inv: Dictionary = game.inventories[target]
 	inv["hp"] -= 1
 	if inv["hp"] > 0:
@@ -133,6 +149,13 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 	_penalise(target, game.DOWN_PENALTY)
 	game.broadcast({"type": "down", "pid": target, "by": by, "kind": kind, "room": ta.room, "lost": lost,
 			"from": ba.position})
+	_send_nacho_home(target)
+
+
+## Nacho's agent is out of action: he runs home to his kennel.
+func _send_nacho_home(pid: int) -> void:
+	if game.dog.owner_id == pid:
+		game.broadcast({"type": "nacho_home", "pid": pid})
 
 
 func _penalise(pid: int, seconds: float) -> void:
@@ -166,6 +189,7 @@ func eliminate(pid: int, reason: String) -> void:
 	for item in lost:
 		_hide_somewhere(item, room)
 	game.broadcast({"type": "out", "pid": pid, "reason": reason, "room": room, "lost": lost})
+	_send_nacho_home(pid)
 	var active := []
 	for id in game.agent_ids():
 		if not game.eliminated.has(id):
@@ -200,7 +224,7 @@ func _hide_somewhere(item: String, room: Vector2i) -> void:
 	for r in game.world.rooms:
 		for i in game.world.furniture(r).size():
 			var k := World.furniture_key(r, i)
-			if game.contents.has(k) or game.traps.has(k):
+			if game.contents.has(k) or game.traps.has(k) or game.world.is_kennel(r, i):
 				continue
 			anywhere.append(k)
 			if r == room:
