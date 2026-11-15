@@ -44,6 +44,7 @@ TYPES = {
     "desk": (150, 70, 40), "console": (180, 60, 52), "cabinet": (70, 60, 72),
     "locker": (110, 50, 120), "crate": (80, 80, 58), "shelf": (160, 45, 112),
     "safe": (75, 75, 62), "plant": (55, 55, 24), "rack": (140, 40, 100), "sofa": (170, 70, 24),
+    "kennel": (100, 80, 70),
 }
 WALL_TYPES = ["desk", "console", "cabinet", "locker", "shelf", "safe", "plant", "rack", "sofa"]
 FRONT_TYPES = ["desk", "crate", "safe", "plant", "sofa", "console"]
@@ -63,6 +64,8 @@ def variants():
             walls |= {"bottom", "right"}
         if t in FREE_TYPES:
             walls.add("free")
+        if t == "kennel":
+            walls = {"top", "left"}   # Nacho's kennel stands against a back wall
         out += [(t, w) for w in sorted(walls)]
     return out
 
@@ -205,6 +208,7 @@ def materials():
         "sofa": _fabric("sofa", (0.36, 0.08, 0.12), scale=90, strength=0.2),
         "sofa_dark": _fabric("sofa_dark", (0.24, 0.05, 0.08), scale=90, strength=0.2),
         "red": _principled("stencil", (0.75, 0.12, 0.1), 0.7),
+        "roof": _principled("roof", (0.36, 0.05, 0.045), 0.6),
         "screen": screen_material(),
         "led_r": emission("led_r", (1.0, 0.2, 0.15)),
         "led_g": emission("led_g", (0.25, 1.0, 0.45)),
@@ -419,6 +423,46 @@ def build_sofa(k, m, w, d, H):
     for sx in (-1, 1):
         for sy in (-1, 1):
             k.cyl(2, 4, (sx * (w / 2 - 8), sy * (d / 2 - 8), 2), m["wood_dark"], 10)
+
+
+def build_kennel(k, m, w, d, H):
+    """Nacho's kennel: plank walls, a pitched red roof, an arched doorway and
+    his name over it."""
+    hw = H * 0.6
+    k.box((w, d, 3), (0, 0, 1.5), m["wood_dark"], 0.5)
+    k.box((w - 4, d - 4, hw), (0, 0, hw / 2 + 2), m["wood"], 0.8)
+    # Planks.
+    for i in range(1, 5):
+        z = 2 + hw * i / 5
+        k.box((w - 3, d - 3, 0.8), (0, 0, z), m["wood_dark"], 0)
+    # Gable ends under the roof (a triangular prism along the ridge).
+    verts, faces = [], []
+    for x in (-w / 2 + 2, w / 2 - 2):
+        verts += [(x, -d / 2 + 2, hw + 2), (x, d / 2 - 2, hw + 2), (x, 0, H)]
+    faces = [(0, 1, 2), (5, 4, 3), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)]
+    me = bpy.data.meshes.new("gable")
+    me.from_pydata(verts, [], faces)
+    k._obj("gable", me, m["wood"], (0, 0, 0))
+    # Roof: two red panels meeting at the ridge, overhanging all round.
+    run = d / 2 + 5
+    rise = H - hw
+    slope = math.sqrt(run * run + rise * rise)
+    ang = math.atan2(rise, run)
+    for sy in (-1, 1):
+        k.box((w + 10, slope, 3.5), (0, sy * run / 2, hw + 2 + rise / 2 + 1.5), m["roof"], 0.6,
+              rot=(-sy * ang, 0, 0))
+    k.box((w + 12, 5, 4), (0, 0, H + 2.5), m["wood_dark"], 0.8)
+    # Arched doorway, dark inside.
+    door_w = w * 0.36
+    door_h = hw * 0.78
+    k.box((door_w, 1.2, door_h - door_w / 2), (0, -d / 2 + 1.4, 2 + (door_h - door_w / 2) / 2), m["black"], 0)
+    k.cyl(door_w / 2, 1.2, (0, -d / 2 + 1.4, 2 + door_h - door_w / 2), m["black"], 24,
+          rot=(math.radians(90), 0, 0))
+    # Name board.
+    k.box((w * 0.5, 1.5, 9), (0, -d / 2 + 1.0, hw - 4), m["paper"], 0.4)
+    k.text("NACHO", 7.0, (0, -d / 2 + 0.1, hw - 4), m["red"])
+    # A food bowl by the door.
+    k.cyl(7, 4, (w / 2 - 12, -d / 2 + 9, 4), m["steel"], 20, r2=9)
 
 
 # ------------------------------------------------------------------ rendering

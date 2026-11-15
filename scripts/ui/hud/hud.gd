@@ -468,8 +468,8 @@ func set_known_vents(pairs: Array) -> void:
 
 
 ## The cut-away of the agent crawling through a duct, shown for `seconds`.
-func show_duct(crawl_sheet: Texture2D, seconds: float) -> void:
-	add_child(DuctView.new(_area(), crawl_sheet, seconds))
+func show_duct(crawl_sheet: Texture2D, seconds: float, dog_sheet: Texture2D = null) -> void:
+	add_child(DuctView.new(_area(), crawl_sheet, seconds, dog_sheet))
 
 
 ## Sizes the room-name plate to the name, centred in the space in the top bar.

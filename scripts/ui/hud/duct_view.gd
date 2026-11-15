@@ -8,12 +8,15 @@ const FRAMES := 8
 const CAPTION := "…crawling through the air ducts…"
 
 var _sheet: Texture2D
+## Nacho's side-on trot, if he's crawling through with the agent.
+var _dog: Texture2D
 var _seconds := 1.0
 var _t := 0.0
 
 
-func _init(area: Vector2, crawl_sheet: Texture2D, seconds: float) -> void:
+func _init(area: Vector2, crawl_sheet: Texture2D, seconds: float, dog_sheet: Texture2D = null) -> void:
 	size = area
+	_dog = dog_sheet
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	modulate.a = 0.0
 	_sheet = crawl_sheet
@@ -39,6 +42,7 @@ func _draw() -> void:
 	var top := size.y / 2.0 - h / 2.0
 	var scroll := _t * 240.0
 	_draw_duct(top, h, scroll)
+	_draw_dog(top, h)
 	_draw_agent(top, h)
 	# Dust drifting by.
 	for i in 24:
@@ -74,6 +78,19 @@ func _draw_duct(top: float, h: float, scroll: float) -> void:
 			var slat := Vector2(x - 34 + k * 22, top + 2)
 			draw_line(slat, slat + Vector2(8, 0), Color(1.0, 0.95, 0.75, 0.6), 3.0)
 		x += 520.0
+
+
+## Nacho, trotting along behind (he's quicker on four legs, so he bounces).
+func _draw_dog(top: float, h: float) -> void:
+	if _dog == null:
+		return
+	var fw := _dog.get_width() / FRAMES
+	var fh := _dog.get_height()
+	var f := int(_t * 14.0) % FRAMES
+	var sc := 1.25
+	var at := Vector2(size.x / 2.0 - fw * sc * 1.25 + sin(_t * 2.6 + 1.0) * 26.0,
+			top + h - fh * sc + 6 - absf(sin(_t * 14.0)) * 4.0)
+	draw_texture_rect_region(_dog, Rect2(at, Vector2(fw, fh) * sc), Rect2(f * fw, 0, fw, fh))
 
 
 func _draw_agent(top: float, h: float) -> void:

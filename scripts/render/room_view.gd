@@ -16,7 +16,7 @@ const DOOR_TOP := 82.0
 const LEDGE_H := 16.0
 const HEIGHTS := {
 	"desk": 40.0, "console": 52.0, "cabinet": 72.0, "locker": 120.0, "crate": 58.0,
-	"shelf": 112.0, "safe": 62.0, "plant": 24.0, "rack": 100.0, "sofa": 24.0,
+	"shelf": 112.0, "safe": 62.0, "plant": 24.0, "rack": 100.0, "sofa": 24.0, "kennel": 70.0,
 }
 
 static var _furn_meta := {}
@@ -31,6 +31,8 @@ var room := Vector2i.ZERO:
 var lights: RoomLights
 ## Agents to draw; only those in `room` are shown.
 var agents: Array = []
+## Nacho the dog (drawn among the agents, wherever he is).
+var dog: Node
 ## Index of the furniture the local agent can search right now (-1 = none).
 var highlight := -1
 var highlight_color := Color.WHITE
@@ -155,7 +157,10 @@ func _draw() -> void:
 	for i in items.size():
 		things.append({"rect": items[i]["rect"], "f": items[i], "i": i})
 	things.sort_custom(_box_behind)
-	var here := agents.filter(func(a): return a.room == room)
+	var here: Array = []
+	here.append_array(agents.filter(func(a): return a.room == room))
+	if dog and dog.room == room and dog.visible_now():
+		here.append(dog)
 	here.sort_custom(func(a, b): return a.position.x + a.position.y < b.position.x + b.position.y)
 	for a in here:
 		var slot := 0
@@ -186,6 +191,8 @@ func _draw() -> void:
 			_draw_dart(d)
 	_draw_front_ledges(area)
 	_draw_my_tripwires()
+	if dog:
+		dog.paint_marks(self, my_id, HEIGHTS)
 	for e in effects.in_room(room):
 		effects.draw(self, e)
 

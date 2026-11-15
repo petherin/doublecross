@@ -17,7 +17,11 @@ func _init(p_game: Node) -> void:
 
 ## Adds a line to the timeline, about agent `a`.
 func note(a: Agent, text: String) -> void:
-	timeline.append({"t": game.elapsed, "text": short_name(a) + " " + text, "col": a.accent})
+	var line := short_name(a) + " " + text
+	# The same thing twice in a few seconds is one moment.
+	if not timeline.is_empty() and timeline.back()["text"] == line and game.elapsed - timeline.back()["t"] < 5.0:
+		return
+	timeline.append({"t": game.elapsed, "text": line, "col": a.accent})
 
 
 ## "AGENT COBALT (TRAPPER BOT)" -> "COBALT", to keep the timeline lines short.
@@ -34,8 +38,16 @@ func _record(e: Dictionary) -> void:
 	match e.get("type", ""):
 		"search":
 			var found: String = e["found"]
-			if found in World.INTEL or (found == World.BRIEFCASE and not e.get("spare", false)):
+			if e.get("nacho", false):
+				note(who, "found Nacho the dog")
+			elif found in World.INTEL or (found == World.BRIEFCASE and not e.get("spare", false)):
 				note(who, "found the " + found)
+		"nacho_foe":
+			var keeper: Agent = game.agent_of(e["owner"])
+			if keeper:
+				note(keeper, "set Nacho on " + short_name(who))
+		"nacho_home":
+			note(who, "lost Nacho, who ran home")
 		"ko":
 			var owner: Agent = game.agent_of(e["owner"])
 			var trap: String = World.TRAP_NAMES[e["kind"]].to_lower()
@@ -45,10 +57,40 @@ func _record(e: Dictionary) -> void:
 				note(who, "was caught by %s's %s" % [short_name(owner), trap])
 		"down":
 			var by: Agent = game.agent_of(e["by"])
-			if by:
+			if by and e["kind"] == "bite":
+				note(who, "was taken out by Nacho")
+			elif by:
 				note(by, "took out " + short_name(who))
 		"out":
 			note(who, "ran out of time" if e["reason"] == "time" else "left the mission")
+
+
+## Nacho's teeth find their mark: a snap, a yelp and a stumble.
+func _bitten(victim: Agent, me: bool) -> void:
+	game.dog.bite(victim)
+	victim.knock_out("BITE", game.dog.BITE_STUN)
+	if victim.room == game.watched.room:
+		Sound.play("bark", 0.0)
+	if me:
+		game.hud.toast("Nacho bit you! Stop attacking and he'll back off.", Color("ffd23f"), 2.0)
+
+
+## Nacho's kennel was searched: he's found, or he's already out.
+func _kennel(e: Dictionary, pid: int, me: bool, col: Color) -> void:
+	var who: Agent = game.agent_of(pid)
+	if e.get("nacho", false):
+		game.dog.found_by(pid)
+		if game.dog.room == game.watched.room:
+			Sound.play("yip", -2.0)
+		if me:
+			game.hud.toast("You found NACHO! He'll sniff out traps and hidden intel, and see off attackers.",
+					col, 4.0)
+		else:
+			game.hud.toast("%s found Nacho the dog!" % who.display_name, col, 3.0)
+	elif me:
+		var keeper: Agent = game.agent_of(game.dog.owner_id)
+		game.hud.toast("Nacho's kennel is empty. He's out with %s." % (keeper.display_name if keeper else "someone"),
+				Color(1, 1, 1, 0.8), 2.5)
 
 
 ## Applies one match event on this device: animations, toasts, flashes and sounds.
@@ -61,6 +103,9 @@ func present(e: Dictionary) -> void:
 	var warn := Color("ffd23f")
 	match e.get("type", ""):
 		"search":
+			if e.get("kennel", false):
+				_kennel(e, pid, me, col)
+				return
 			if not me:
 				return
 			var found: String = e["found"]
@@ -99,6 +144,8 @@ func present(e: Dictionary) -> void:
 		"hit":
 			var victim: Agent = game.agent_of(pid)
 			victim.hurt(victim.position - e["from"])
+			if e["kind"] == "bite":
+				_bitten(victim, me)
 			game.view.add_effect("HIT", victim.room, victim.position)
 			if victim.room == game.watched.room:
 				game.view.shake(3.0, 0.2)
@@ -109,6 +156,8 @@ func present(e: Dictionary) -> void:
 		"down":
 			var victim: Agent = game.agent_of(pid)
 			victim.hurt(victim.position - e["from"])
+			if e["kind"] == "bite":
+				game.dog.bite(victim)
 			victim.knock_out("DOWN", game.DOWN_TIME)
 			victim.protect_time = game.PROTECT_TIME
 			game.view.add_effect("DOWN", e["room"], victim.position)
@@ -134,6 +183,20 @@ func present(e: Dictionary) -> void:
 					game.spectate()
 				var why := "ran out of time" if e["reason"] == "time" else "left the base"
 				game.hud.toast("%s %s and is out!" % [who.display_name, why], col, 3.5)
+		"nacho_foe":
+			game.dog.set_foe(pid)
+			if pid == 0:
+				return
+			if game.dog.room == game.watched.room:
+				Sound.play("growl", -2.0)
+			if me:
+				game.hud.toast("Nacho's coming for you! Stop attacking and he'll back off.", warn, 3.0)
+			elif e["owner"] == game.my_id:
+				game.hud.toast("Nacho goes for %s!" % game.agent_of(pid).display_name, col, 2.5)
+		"nacho_home":
+			game.dog.go_home()
+			if me:
+				game.hud.toast("Nacho has run back to his kennel.", Color(1, 1, 1, 0.8), 2.5)
 		"ko":
 			var victim: Agent = game.agent_of(pid)
 			victim.knock_out(e["kind"], game.KO_TIME)
@@ -161,7 +224,7 @@ func _sound(e: Dictionary, me: bool) -> void:
 	var here: bool = not e.has("room") or e["room"] == game.watched.room
 	match e.get("type", ""):
 		"search":
-			if not me:
+			if not me or e.get("kennel", false):
 				return
 			if e["disarmed"] != "":
 				Sound.play("gadget")

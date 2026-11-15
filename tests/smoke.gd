@@ -82,6 +82,12 @@ func _check_worlds() -> void:
 		for item in World.INTEL:
 			_check(items.count(item) == 1, "exactly one " + item + tag)
 		_check(w.opening(w.exit_room, w.exit_dir) == 2, "exit on an outer wall" + tag)
+		var kennels := 0
+		for r in w.rooms:
+			for f in w.rooms[r]["furniture"]:
+				kennels += 1 if f["type"] == "kennel" else 0
+		_check(kennels == 1 and w.kennel[1] >= 0 and not w.kennel[0] in starts, "one kennel, not in a start room" + tag)
+		_check(not w.hidden.has(World.furniture_key(w.kennel[0], w.kennel[1])), "nothing hidden in the kennel" + tag)
 		_check(w.vents.size() >= 2 and w.vents.size() % 2 == 0, "vents come in pairs" + tag)
 		for i in w.vents.size():
 			var v: Dictionary = w.vents[i]

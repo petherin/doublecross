@@ -86,6 +86,19 @@ match ends: **NEXT AGENT** (or <kbd>Tab</kbd>) switches who you're watching.
 more rooms away. Stand at one and press CRAWL. The ones you've used appear on
 your mini-map.
 
+**Nacho the dog.** Somewhere in the base is a kennel with Nacho in it: a
+scruffy, ginger, very good boy. Search the kennel and he's yours. He follows
+you everywhere, through doors and air vents, and sniffs round each room as
+you go. He **growls** at trapped furniture and wired doorways (he never sets
+them off) and **barks and wags his tail** at furniture with something hidden
+in it; a paw print over the furniture shows you which is which. Nothing can
+hurt him. Anyone who attacks you, or him, gets chased and bitten (each bite
+counts like a blow from a cosh) for as long as they keep attacking; once
+they leave off for a few seconds, so does he. If you're taken out, he runs
+back to his kennel for someone else to find. Bots look for him too, and use his nose.
+
+<p align="center"><img src="docs/nacho.png" alt="Nacho, a scruffy ginger dog with long ears and a red collar, standing, trotting, sitting, sniffing, barking, growling and biting" width="80%"></p>
+
 **The base** is generated from a random number shared by every device, so
 everyone sees the same map, and it's different every match. It grows with the
 party: 3×3 rooms for two agents, 4×3 for three, 4×4 for four.
@@ -345,6 +358,8 @@ tests/
   smoke.gd              every script compiles, inputs mapped, 300 seeds of base rules
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
                         (--spectate: you're put out, and the camera must follow them)
+  nacho.gd              Nacho: found in his kennel, sniffs out an item and a trap,
+                        follows to the next room, bites an attacker until they stop, goes home
   net_match.gd          a real host and joiner (two processes) with bots in the
                         empty seats: the host runs them, the joiner sees them move
 tools/
@@ -379,6 +394,7 @@ python3.11 -m venv .blendenv
 .blendenv/bin/python tools/blender/build_agents.py                 # all four agents
 .blendenv/bin/python tools/blender/build_agents.py --only amber    # just one
 .blendenv/bin/python tools/blender/build_crawl.py                  # duct-crawl sheets
+.blendenv/bin/python tools/blender/build_dog.py                    # Nacho (sprites and duct sheet)
 .blendenv/bin/python tools/blender/build_furniture.py --only safe  # furniture
 .blendenv/bin/python tools/blender/build_rooms.py                  # floor and wall surfaces
 ```
@@ -395,9 +411,16 @@ the frames into compact atlases. Add `--preview` for small, quick renders.
 
 <p align="center"><img src="docs/agent-turnaround.png" alt="The crimson agent from eight directions, plus walk, search, swing, hurt and knocked-down poses" width="90%"></p>
 
+`build_dog.py` does the same for Nacho (`dog_model.py`): skin-modifier body,
+legs and tail over a posable dog skeleton, a sculpted head with beard, long
+ears, brown nose and a jaw that opens to bark, and Blender's own rendered hair
+(curled, clumped and roughened) for his wiry ginger coat. He's rendered with
+the agents' camera in seven animations (idle, trot, sniff, sit, bark, growl,
+bite), plus a side-on trot for the air-duct cut-away.
+
 `build_furniture.py` models every piece (desk with monitor and mug, control
 console, filing cabinet, lockers, TOP SECRET crate, bookcase, safe, potted plant,
-gadget rack, sofa) in game units and renders it for each wall it can stand
+gadget rack, sofa, and Nacho's kennel) in game units and renders it for each wall it can stand
 against, at exactly the game's scale so the sprites line up with the collision
 boxes. `build_rooms.py` renders the steel tread-plate floor and riveted wall
 panels as tiling textures with normal maps.

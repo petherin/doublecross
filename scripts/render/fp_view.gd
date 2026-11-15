@@ -38,7 +38,10 @@ var room := Vector2i(-1, -1)
 var detail_high := true
 ## Looking up (+) or down (-), in radians.
 var pitch := 0.0
+## Nacho the dog, shown as a cut-out like the agents.
+var dog: Node
 var camera: Camera3D
+var _dog_sprite: Sprite3D
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
 var _target: Node3D
@@ -115,6 +118,7 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 			_labels[a].queue_free()
 	_cutouts.clear()
 	_labels.clear()
+	_dog_sprite = null
 	_fx.clear()
 	_vents.clear()
 	_markers.clear()
@@ -179,6 +183,7 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 	camera.rotation = Vector3(0.0 if ko else pitch, -me.facing - PI / 2.0, _cam_roll)
 	for i in _furniture.size():
 		_set_highlight(_furniture[i], i == highlight)
+	_show_dog()
 	for a: Agent in agents:
 		if a == me:
 			continue
@@ -676,6 +681,33 @@ func _add_cutout(a: Agent) -> void:
 	l.no_depth_test = false
 	_room_root.add_child(l)
 	_labels[a] = l
+
+
+## Nacho, if he's in this room (his sheet is drawn the same way as an agent's).
+func _show_dog() -> void:
+	var here: bool = dog != null and dog.room == room and dog.visible_now() and dog.sheet() != null
+	if not here:
+		if _dog_sprite:
+			_dog_sprite.visible = false
+		return
+	if _dog_sprite == null:
+		_dog_sprite = Sprite3D.new()
+		_dog_sprite.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		_dog_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+		_dog_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		_dog_sprite.shaded = false
+		_dog_sprite.region_enabled = true
+		var tex: Texture2D = dog.sheet()
+		_dog_sprite.texture = (tex as CanvasTexture).diffuse_texture if tex is CanvasTexture else tex
+		_room_root.add_child(_dog_sprite)
+	var frame: Dictionary = dog.frame_for_view(camera.position.x, camera.position.z)
+	var centre: Vector2 = frame["centre"]
+	_dog_sprite.visible = true
+	_dog_sprite.region_rect = frame["region"]
+	_dog_sprite.pixel_size = frame["scale"]
+	_dog_sprite.position = Vector3(dog.position.x, -centre.y * frame["scale"], dog.position.y)
+	_dog_sprite.offset = Vector2(centre.x, 0.0)
+	_dog_sprite.modulate = Color(0.85, 0.85, 0.85)
 
 
 ## Picks the sprite frame for how this agent looks from the camera.

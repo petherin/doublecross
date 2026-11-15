@@ -25,6 +25,7 @@ const Grain = preload("res://scripts/render/grain.gd")
 const Referee = preload("res://scripts/game/referee.gd")
 const Tips = preload("res://scripts/game/tips.gd")
 const EventPresenter = preload("res://scripts/game/event_presenter.gd")
+const Dog = preload("res://scripts/game/dog.gd")
 
 ## How fast left/right turns you in first person (radians a second).
 const FP_TURN_SPEED := 2.6
@@ -107,6 +108,8 @@ var hud: Hud
 ## First-person view, built when first switched on.
 var fp: FpView
 var first_person := false
+## Nacho, the base's dog.
+var dog: Dog
 ## The agent the camera follows: you, or (once you're out) a rival you watch.
 var watched: Agent
 var spectating := false
@@ -184,6 +187,11 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		if id == my_id:
 			local_agent = a
 	view.agents = agents
+	dog = Dog.new()
+	add_child(dog)
+	dog.setup(self)
+	dog.alerted.connect(_on_dog_alerted)
+	view.dog = dog
 	view.highlight_color = local_agent.accent
 	view.my_id = my_id
 	view.darts = darts
@@ -420,6 +428,7 @@ func toggle_view() -> void:
 	first_person = not first_person
 	if first_person and fp == null:
 		fp = FpView.new()
+		fp.dog = dog
 		add_child(fp)
 	view.visible = not first_person
 	local_agent.face_lock = first_person
@@ -656,7 +665,10 @@ func do_vent(id: int, idx: int) -> void:
 	a.enter_vent(idx)
 	if id == my_id:
 		var sheet := "res://assets/sprites/crawl_%s.png" % a.sheet_name
-		hud.show_duct(load(sheet) if ResourceLoader.exists(sheet) else null, CRAWL_TIME)
+		var dog_sheet: Texture2D = null
+		if dog.owner_id == my_id and ResourceLoader.exists("res://assets/sprites/crawl_dog.png"):
+			dog_sheet = load("res://assets/sprites/crawl_dog.png")
+		hud.show_duct(load(sheet) if ResourceLoader.exists(sheet) else null, CRAWL_TIME, dog_sheet)
 		Sound.play("crawl", 0.0, false, 0.0)
 		var pair := [mini(idx, dest), maxi(idx, dest)]
 		if not known_vents.has(pair):
@@ -667,6 +679,24 @@ func do_vent(id: int, idx: int) -> void:
 			a.exit_vent(dest)
 			if id == my_id and not over:
 				hud.toast("Out of the vent in the %s." % world.rooms[a.room]["name"].to_upper(), Color.WHITE, 2.0))
+
+
+## Nacho has found something for his agent: tell them, if it's us.
+func _on_dog_alerted(key: String, kind: String) -> void:
+	if dog.room != watched.room:
+		return
+	Sound.play("growl" if kind == "trap" else "bark", -4.0)
+	if dog.owner_id != my_id:
+		return
+	var what := "that doorway"
+	var parts := key.split(",")
+	if parts.size() == 3:
+		var f: Dictionary = world.furniture(dog.room)[int(parts[2])]
+		what = "the " + str(f["type"]).to_upper()
+	if kind == "trap":
+		hud.toast("Nacho growls at %s. It's trapped!" % what, Color("ff5a5f"), 3.0)
+	else:
+		hud.toast("Nacho barks at %s and wags his tail. Something's in there!" % what, Color("ffd23f"), 3.0)
 
 
 func _on_vent_moved(a: Agent, entering: bool) -> void:
@@ -750,6 +780,9 @@ func do_melee(id: int) -> void:
 	show_attack.rpc("melee", id, a.position, Vector2.from_angle(a.facing))
 	if target:
 		_send_hit(id, id_of(target), "melee")
+	elif dog.owner_id not in [0, id] and dog.room == a.room and dog.visible_now() \
+			and dog.position.distance_to(a.position) < MELEE_RANGE * 1.2:
+		_send_hit(id, Dog.DOG_ID, "melee")   # a swing at Nacho: harmless, but he won't forget it
 
 
 ## Fire a dart. Auto-aims at a rival roughly in front; `aim_error` (radians)
@@ -814,6 +847,13 @@ func _physics_process(delta: float) -> void:
 					_send_hit(d["owner"], oid, "dart")
 					stop = true
 					break
+		# Nacho snaps darts out of the air (they can't hurt him), and goes for
+		# whoever threw it.
+		if d["live"] and not stop and dog.owner_id not in [0, d["owner"]] and dog.room == d["room"] \
+				and dog.visible_now() \
+				and Geometry2D.get_closest_point_to_segment(dog.position, old, p).distance_to(dog.position) < 30.0:
+			_send_hit(d["owner"], Dog.DOG_ID, "dart")
+			stop = true
 		if not stop:
 			keep.append(d)
 	darts.clear()
