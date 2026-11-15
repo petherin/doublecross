@@ -60,6 +60,7 @@ var _held: Array = []
 var _bar: ColorRect
 var _leave: Button
 var _view_button: Button
+var _watching: Label
 ## In first person, the way you're looking (an arrow on the mini-map); NAN when overhead.
 var _facing := NAN
 var _has_case := false
@@ -176,6 +177,14 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	_view_button.focus_mode = Control.FOCUS_NONE
 	_view_button.pressed.connect(func(): view_pressed.emit())
 	add_child(_view_button)
+
+	_watching = _label("", 20, Color.WHITE)
+	_watching.add_theme_font_override("font", Style.stencil())
+	_watching.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_watching.add_theme_color_override("font_outline_color", Color.BLACK)
+	_watching.add_theme_constant_override("outline_size", 6)
+	_watching.visible = false
+	add_child(_watching)
 
 	_minimap = Control.new()
 	_minimap.size = Vector2(56, 56)
@@ -331,6 +340,8 @@ func _layout() -> void:
 	_leave.position = Vector2(L.x - 110, 10)
 	_view_button.position = Vector2(L.x - 252, 10)
 	_minimap.position = Vector2(L.x - 330, 12)
+	_watching.position = Vector2(0, 108)
+	_watching.size = Vector2(L.x, 30)
 	_fit_room_label()
 	_fade.size = L
 	_iris.size = L
@@ -395,6 +406,18 @@ func set_facing(angle: float) -> void:
 
 
 ## Updates the view switch to offer the other view.
+## Once you're out: hides your controls and says whose mission you're
+## watching; the view button moves you on to the next agent.
+func set_watching(agent_name: String, col: Color) -> void:
+	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
+		b.visible = false
+	_close_trap_menu()
+	_view_button.text = "NEXT AGENT"
+	_watching.text = "OUT  ·  WATCHING %s" % agent_name
+	_watching.add_theme_color_override("font_color", col)
+	_watching.visible = true
+
+
 func set_first_person(on: bool) -> void:
 	_view_button.text = "OVERHEAD" if on else "1ST PERSON"
 
@@ -472,6 +495,7 @@ func _process(delta: float) -> void:
 func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool) -> void:
 	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
 		b.visible = false
+	_watching.visible = false
 	_close_trap_menu()
 	if _toast_tween:
 		_toast_tween.kill()

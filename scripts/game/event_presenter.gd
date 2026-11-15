@@ -61,7 +61,7 @@ func present(e: Dictionary) -> void:
 			var victim: Agent = game.agent_of(pid)
 			victim.hurt(victim.position - e["from"])
 			game.view.add_effect("HIT", victim.room, victim.position)
-			if victim.room == game.local_agent.room:
+			if victim.room == game.watched.room:
 				game.view.shake(3.0, 0.2)
 			if me:
 				game.hud.flash(Color("ff2a2a"))
@@ -73,7 +73,7 @@ func present(e: Dictionary) -> void:
 			victim.knock_out("DOWN", game.DOWN_TIME)
 			victim.protect_time = game.PROTECT_TIME
 			game.view.add_effect("DOWN", e["room"], victim.position)
-			if e["room"] == game.local_agent.room:
+			if e["room"] == game.watched.room:
 				game.view.shake(8.0, 0.4)
 				game.hit_stop()
 			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
@@ -89,14 +89,17 @@ func present(e: Dictionary) -> void:
 			if me:
 				game.hud.toast("Your clock ran out. You're out of the mission." if e["reason"] == "time"
 						else "You've left the mission.", warn, 4.0)
+				game.spectate()
 			else:
+				if game.spectating and who == game.watched:
+					game.spectate()
 				var why := "ran out of time" if e["reason"] == "time" else "left the base"
 				game.hud.toast("%s %s and is out!" % [who.display_name, why], col, 3.5)
 		"ko":
 			var victim: Agent = game.agent_of(pid)
 			victim.knock_out(e["kind"], game.KO_TIME)
 			game.view.add_effect(e["kind"], e["room"], victim.position)
-			if e["room"] == game.local_agent.room:
+			if e["room"] == game.watched.room:
 				game.view.shake({"BOMB": 16.0, "SHOCK": 4.0}.get(e["kind"], 6.0), 1.2 if e["kind"] == "SHOCK" else 0.5)
 				game.hit_stop()
 			elif e["kind"] == "BOMB":
@@ -116,7 +119,7 @@ func present(e: Dictionary) -> void:
 
 
 func _sound(e: Dictionary, me: bool) -> void:
-	var here: bool = not e.has("room") or e["room"] == game.local_agent.room
+	var here: bool = not e.has("room") or e["room"] == game.watched.room
 	match e.get("type", ""):
 		"search":
 			if not me:
@@ -145,7 +148,7 @@ func _sound(e: Dictionary, me: bool) -> void:
 				Settings.buzz(600 if e["kind"] == "SHOCK" else 350 if e["kind"] == "BOMB" else 200)
 		"hit":
 			var v: Agent = game.agent_of(e["pid"])
-			if v.room == game.local_agent.room:
+			if v.room == game.watched.room:
 				Sound.play("hit", -1.0)
 				Sound.play("oof", -4.0, false, 0.06, v.voice)
 			if me:
