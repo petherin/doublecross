@@ -170,8 +170,11 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 		jitter = Vector3(sin(_t * 97.0), cos(_t * 83.0), 0.0) * 3.0
 	elif ko:
 		roll = sin(_t * 3.0) * 0.14
+	if Settings.reduced_motion:
+		roll = 0.0
+		jitter = Vector3.ZERO
 	_cam_roll = lerpf(_cam_roll, roll, minf(1.0, delta * 6.0))
-	var bob := sin(_t * 9.0) * (2.0 if me.moving else 0.0)
+	var bob := sin(_t * 9.0) * (2.0 if me.moving and not Settings.reduced_motion else 0.0)
 	camera.position = Vector3(me.position.x, EYE_H + bob - _cam_drop, me.position.y) + jitter
 	camera.rotation = Vector3(0.0 if ko else pitch, -me.facing - PI / 2.0, _cam_roll)
 	for i in _furniture.size():

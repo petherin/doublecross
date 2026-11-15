@@ -492,6 +492,14 @@ func _show_settings() -> void:
 	detail.button_pressed = Settings.fp_detail
 	detail.toggled.connect(func(on): Settings.fp_detail = on)
 	box.add_child(detail)
+	var calm := CheckButton.new()
+	calm.text = "Reduced motion"
+	calm.tooltip_text = "No screen shake, slow motion, film grain, flicker or iris wipes; softer flashes."
+	calm.button_pressed = Settings.reduced_motion
+	calm.toggled.connect(func(on):
+		Settings.reduced_motion = on
+		Settings.changed.emit())
+	box.add_child(calm)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var l := _label("Clock per agent", Style.mono(), 22)

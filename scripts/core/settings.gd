@@ -10,6 +10,8 @@ var sfx_volume := 0.9
 var vibration := true
 ## First person with the rooms next door and moving screens (off for slow phones).
 var fp_detail := true
+## Calmer screen: no shake, slow motion, film grain, strobing or iris wipes.
+var reduced_motion := false
 var clock_minutes := 6
 var bot_level := "medium"
 ## Computer rivals in a one-player game (1-3).
@@ -28,6 +30,7 @@ func _ready() -> void:
 		sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 		vibration = cfg.get_value("game", "vibration", vibration)
 		fp_detail = cfg.get_value("game", "fp_detail", fp_detail)
+		reduced_motion = cfg.get_value("game", "reduced_motion", reduced_motion)
 		clock_minutes = cfg.get_value("game", "clock_minutes", clock_minutes)
 		bot_level = cfg.get_value("game", "bot_level", bot_level)
 		bot_count = cfg.get_value("game", "bot_count", bot_count)
@@ -43,6 +46,7 @@ func save() -> void:
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("game", "vibration", vibration)
 	cfg.set_value("game", "fp_detail", fp_detail)
+	cfg.set_value("game", "reduced_motion", reduced_motion)
 	cfg.set_value("game", "clock_minutes", clock_minutes)
 	cfg.set_value("game", "bot_level", bot_level)
 	cfg.set_value("game", "bot_count", bot_count)

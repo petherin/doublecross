@@ -16,6 +16,8 @@ func _ready() -> void:
 
 ## Snaps closed around `centre` (this control's coordinates), then opens.
 func play(centre: Vector2) -> void:
+	if Settings.reduced_motion:
+		return  # a plain cut
 	_centre = centre
 	_max_radius = size.length()
 	var tw := create_tween()

@@ -107,6 +107,8 @@ func _process(delta: float) -> void:
 
 ## Rattles the whole room for `seconds`, starting `amplitude` pixels out.
 func shake(amplitude: float, seconds: float) -> void:
+	if Settings.reduced_motion:
+		return
 	if _shake_t > 0.0 and _shake_amp * _shake_t / _shake_len > amplitude:
 		return   # a bigger shake is already under way
 	_shake_amp = amplitude

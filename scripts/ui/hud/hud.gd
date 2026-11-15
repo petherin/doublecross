@@ -453,8 +453,9 @@ func _fit_room_label() -> void:
 
 ## A quick coloured flash over the whole screen (when you get caught).
 func flash(col: Color) -> void:
-	_flash.color = Color(col, 0.45)
-	create_tween().tween_property(_flash, "color:a", 0.0, 0.5)
+	var calm: bool = Settings.reduced_motion
+	_flash.color = Color(col, 0.15 if calm else 0.45)
+	create_tween().tween_property(_flash, "color:a", 0.0, 0.9 if calm else 0.5)
 
 
 func toast(msg: String, col := Color.WHITE, seconds := 2.5) -> void:

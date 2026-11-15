@@ -16,6 +16,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	visible = not Settings.reduced_motion
+	if not visible:
+		return
 	var vs := get_viewport().get_visible_rect().size
 	size = vs + Vector2(256, 256)
 	position = -Vector2(_rng.randi_range(0, 255), _rng.randi_range(0, 255))

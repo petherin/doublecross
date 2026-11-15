@@ -88,12 +88,14 @@ func flash(floor_pos: Vector2, color: Color, energy: float) -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	if is_instance_valid(_alarm_light):
-		var target := (0.55 + 0.45 * sin(_t * 7.0)) * 0.9 if alarm else 0.0
+		var beat := 0.65 if Settings.reduced_motion else 0.55 + 0.45 * sin(_t * 7.0)
+		var target := beat * 0.9 if alarm else 0.0
 		_alarm_light.energy = lerpf(_alarm_light.energy, target, minf(1.0, delta * 10.0))
 	for f in _flicker:
 		var l: PointLight2D = f[0]
 		if is_instance_valid(l):
-			l.energy = f[1] * (0.7 + 0.3 * signf(sin(_t * 13.0 + f[2] + sin(_t * 3.1) * 4.0)))
+			var flick := 1.0 if Settings.reduced_motion else 0.7 + 0.3 * signf(sin(_t * 13.0 + f[2] + sin(_t * 3.1) * 4.0))
+			l.energy = f[1] * flick
 	var keep := []
 	for f in _flashes:
 		var l: PointLight2D = f[0]
@@ -103,6 +105,7 @@ func _process(delta: float) -> void:
 		if f[1] > 0.9:
 			l.queue_free()
 			continue
-		l.energy = f[2] * (1.0 - f[1] / 0.9) * (0.85 + 0.15 * sin(f[1] * 60.0))
+		var damp := 0.5 if Settings.reduced_motion else 0.85 + 0.15 * sin(f[1] * 60.0)
+		l.energy = f[2] * (1.0 - f[1] / 0.9) * damp
 		keep.append(f)
 	_flashes = keep

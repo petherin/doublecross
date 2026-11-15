@@ -32,6 +32,8 @@ func _process(_delta: float) -> bool:
 		root.add_child(_menu)
 		_game = load("res://scripts/game/game.gd").new()
 		root.add_child(_game)
+		# The bot matches cover the full effects; this run takes the calmer paths.
+		root.get_node("Settings").reduced_motion = true
 		_game.setup(7, 1, [1], "medium", 6, {1: "SMOKE"})
 	elif _frames == 120:
 		_check(not _game.over, "match ended within two seconds")

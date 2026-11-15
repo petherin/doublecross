@@ -44,7 +44,7 @@ func _draw() -> void:
 		var lp: Vector2 = lamps[i]
 		# One lamp in some rooms flickers.
 		var flicker := 1.0
-		if (hash_v + i) % 4 == 0:
+		if (hash_v + i) % 4 == 0 and not Settings.reduced_motion:
 			flicker = 0.75 + 0.25 * signf(sin(t * 13.0 + sin(t * 3.1) * 4.0))
 		var top := World.iso(lp, 210.0)
 		var l := World.iso(lp + Vector2(-140, 140), 0.0)
