@@ -227,9 +227,8 @@ The keys are Godot input actions (**Project → Project Settings → Input Map**
 they're easy to change.
 
 **SETTINGS** on the title screen has music and effects volume, vibration,
-first-person detail, the
-clock length, and a button to see the new-player tips again. **HOW TO PLAY**
-is the field manual.
+first-person detail, the clock length, and a button to see the new-player
+tips again. **HOW TO PLAY** is the field manual.
 
 ## Ideas for what's next
 
