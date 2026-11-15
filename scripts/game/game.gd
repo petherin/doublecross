@@ -112,6 +112,8 @@ var watched: Agent
 var spectating := false
 ## A one-player game (against bots, or practice): only these can be paused.
 var solo := false
+## Seconds of play so far (for the debrief's timeline).
+var elapsed := 0.0
 var _slow_time := 0.0
 var _agent_by_id := {}
 var _exit_cooldown := 0.0
@@ -314,6 +316,8 @@ func _process(delta: float) -> void:
 		# Controls are screen-relative: up on the stick = up the screen.
 		local_agent.move_input = World.screen_to_floor_dir(move.limit_length(1.0))
 
+	if not over:
+		elapsed += delta
 	_melee_cd -= delta
 	_dart_cd -= delta
 	if multiplayer.is_server() and not over:
@@ -910,6 +914,8 @@ func game_over(winner: int, reason := "escape") -> void:
 		a.frozen = true
 	if _agent_by_id.has(winner):
 		_agent_by_id[winner].celebrating = true
+		if reason == "escape":
+			presenter.note(_agent_by_id[winner], "escaped with the intel")
 	var name := ""
 	if _agent_by_id.has(winner):
 		name = _agent_by_id[winner].display_name
@@ -921,4 +927,4 @@ func game_over(winner: int, reason := "escape") -> void:
 		var w: Agent = _agent_by_id[winner]
 		if winner == my_id or w.room == watched.room:
 			Sound.play("haha", -2.0, false, 0.03, w.voice)
-	hud.show_end(winner, my_id, name, reason, multiplayer.is_server())
+	hud.show_end(winner, my_id, name, reason, multiplayer.is_server(), presenter.timeline)
