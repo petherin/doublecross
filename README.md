@@ -100,6 +100,10 @@ and then walk into their own traps; **MEDIUM** ones learn the vents as they go;
 **HARD** ones know every vent from the start and are quickest to pick a fight
 with anyone carrying intel. **SOLO TRAINING** lets you explore alone.
 
+One-player games can be paused (**PAUSE**, <kbd>Esc</kbd> or <kbd>P</kbd>):
+the clocks stop and nobody moves until you resume. They pause themselves when
+you switch away from the app.
+
 ## Look and sound
 
 - **Art from Blender:** the agents, furniture, floors and walls are 3D models
@@ -225,6 +229,7 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 | Switch overhead / first person | **1ST PERSON** / **OVERHEAD** (top bar) | <kbd>Tab</kbd> | Start |
 | First person: turn / sidestep | Stick left/right, or swipe the right half | <kbd>←</kbd>/<kbd>→</kbd> turn · <kbd>A</kbd>/<kbd>D</kbd> sidestep | Right stick turns · left stick sidesteps |
 | First person: look up / down | Swipe up or down on the right half | <kbd>Q</kbd>/<kbd>Z</kbd> or <kbd>Page Up</kbd>/<kbd>Page Down</kbd> | Right stick up/down |
+| Pause (one-player games) | **PAUSE** (top bar) | <kbd>Esc</kbd> or <kbd>P</kbd> | |
 | Skip the briefing | Tap | Any key | |
 | Leave the match | **LEAVE** / Android back | Close the window | |
 
@@ -249,9 +254,10 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
    least let players rejoin a match after a brief disconnect.
 3. **A match recap.** Add a timeline to the debrief card: who found what, who
    trapped whom, who took out whom, and each agent's escape time.
-4. **Pause** in one-player games.
-5. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
+4. **Bot personalities:** a trapper who rigs everything, a brawler who hunts
    you, a sneak who uses every vent.
+5. **Match options for the host:** how many traps each, fewer briefcases,
+   hidden exit, faster clocks.
 
 ### Gameplay
 
@@ -260,8 +266,6 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
   room, and decoy intel that looks real until you reach the exit.
 - **Locked rooms:** some doors need the KEYCARD, making it worth grabbing early.
 - **Team mode:** two against two, sharing a briefcase and escaping together.
-- **Match options for the host:** how many traps each, fewer briefcases,
-  hidden exit, faster clocks.
 
 ### Look and feel
 

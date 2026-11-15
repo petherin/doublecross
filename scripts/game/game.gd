@@ -110,6 +110,8 @@ var first_person := false
 ## The agent the camera follows: you, or (once you're out) a rival you watch.
 var watched: Agent
 var spectating := false
+## A one-player game (against bots, or practice): only these can be paused.
+var solo := false
 var _slow_time := 0.0
 var _agent_by_id := {}
 var _exit_cooldown := 0.0
@@ -211,6 +213,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	hud.crawl_pressed.connect(_try_vent)
 	hud.fire_pressed.connect(_try_fire)
 	hud.view_pressed.connect(toggle_view)
+	hud.pause_pressed.connect(_set_paused.bind(true))
+	hud.resumed.connect(_set_paused.bind(false))
 	watched = local_agent
 	for a in agents:
 		a.room_changed.connect(func(r: Vector2i):
@@ -237,7 +241,9 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 				a.frozen = false)
 	hud.show_briefing(local_agent.display_name, rivals, int(time_limit / 60.0))
 	_update_hud_status()
-	if multiplayer.has_multiplayer_peer() and not multiplayer.multiplayer_peer is OfflineMultiplayerPeer:
+	solo = not multiplayer.has_multiplayer_peer() or multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+	hud.set_pausable(solo)
+	if not solo:
 		multiplayer.peer_disconnected.connect(_on_peer_left)
 
 
@@ -352,6 +358,27 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_fire()
 	elif event.is_action_pressed("toggle_view"):
 		toggle_view()
+	elif event.is_action_pressed("pause"):
+		_set_paused(true)
+
+
+func _notification(what: int) -> void:
+	# A one-player game holds itself when the app goes to the background.
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_set_paused(true)
+
+
+func _exit_tree() -> void:
+	get_tree().paused = false
+
+
+## Freezes (or restarts) a one-player game: clocks, agents, bots and darts.
+func _set_paused(on: bool) -> void:
+	if not solo or (on and over) or hud == null or get_tree().paused == on:
+		return
+	get_tree().paused = on
+	hud.show_pause(on)
+	Sound.play("paper", -4.0)
 
 
 ## First person: dragging on the right half of the screen (a finger, or the
