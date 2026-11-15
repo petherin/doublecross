@@ -78,7 +78,9 @@ room.
 **Clocks.** Every agent has their own clock: 4, 6, 8 or 10 minutes for a two-agent
 game (set by the host), scaled up for the bigger bases. Under 30 seconds the
 room's alarm light starts beating. If your clock runs out you're out of the
-mission and your intel scatters; the last agent still in wins.
+mission and your intel scatters; the last agent still in wins. Once you're
+out, the camera follows the agents still playing, room by room, until the
+match ends: **NEXT AGENT** (or <kbd>Tab</kbd>) switches who you're watching.
 
 **Air vents.** Some rooms have a crawl-through vent that joins a room two or
 more rooms away. Stand at one and press CRAWL. The ones you've used appear on
@@ -239,18 +241,16 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 
 ### Top five
 
-1. **Spectate when you're out.** Once your clock runs out you're left
-   staring at a frozen agent. Let eliminated players follow the others room
-   by room until the match ends.
-2. **Bots in hosted games.** Let the host fill empty seats with bots, so two
+1. **Bots in hosted games.** Let the host fill empty seats with bots, so two
    friends can play a full four-agent match.
-3. **Reduced-motion setting.** One switch to turn off screen shake, flashes,
+2. **Reduced-motion setting.** One switch to turn off screen shake, flashes,
    slow motion and film grain, for players who find them uncomfortable.
-4. **Survive a host dropping out.** Today the match ends for everyone if the
+3. **Survive a host dropping out.** Today the match ends for everyone if the
    host's device leaves or sleeps. Hand refereeing to another device, or at
    least let players rejoin a match after a brief disconnect.
-5. **A match recap.** Add a timeline to the debrief card: who found what, who
+4. **A match recap.** Add a timeline to the debrief card: who found what, who
    trapped whom, who took out whom, and each agent's escape time.
+5. **Pause** in one-player games.
 
 ### Gameplay
 
@@ -263,7 +263,6 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
   hidden exit, faster clocks.
 - **Bot personalities:** a trapper who rigs everything, a brawler who hunts
   you, a sneak who uses every vent.
-- **Pause** in one-player games.
 
 ### Look and feel
 
@@ -336,6 +335,7 @@ scripts/
 tests/
   smoke.gd              every script compiles, inputs mapped, 300 seeds of base rules
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
+                        (--spectate: you're put out, and the camera must follow them)
 tools/
   make_audio.py         synthesises every sound, voice, ambience and music loop
   blender/              models and renders agents, furniture and room surfaces
@@ -345,7 +345,8 @@ tools/
 ### Tests and CI
 
 Every push and pull request runs `gdlint` over the scripts, the smoke test, and
-bot matches with two and four agents (GitHub Actions, `.github/workflows/android.yml`).
+bot matches with two and four agents, and one where you're out and the camera
+must follow the bots (GitHub Actions, `.github/workflows/android.yml`).
 Only after a change reaches `main` are the APK and both Mac apps built and
 published as a release. To run the tests yourself:
 

@@ -55,6 +55,9 @@ jobs:
       - name: Bot match (4 agents)
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=3
 
+      - name: Bot match (spectating once out)
+        run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=2 --spectate
+
   android:
     # Never export or upload downloadable build artifacts for pull requests.
     # This job runs only after code has reached the main branch.

@@ -107,6 +107,9 @@ var hud: Hud
 ## First-person view, built when first switched on.
 var fp: FpView
 var first_person := false
+## The agent the camera follows: you, or (once you're out) a rival you watch.
+var watched: Agent
+var spectating := false
 var _slow_time := 0.0
 var _agent_by_id := {}
 var _exit_cooldown := 0.0
@@ -208,7 +211,11 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	hud.crawl_pressed.connect(_try_vent)
 	hud.fire_pressed.connect(_try_fire)
 	hud.view_pressed.connect(toggle_view)
-	local_agent.room_changed.connect(_on_room_changed)
+	watched = local_agent
+	for a in agents:
+		a.room_changed.connect(func(r: Vector2i):
+			if a == watched:
+				_on_room_changed(r))
 	local_agent.search_finished.connect(_on_local_search_finished)
 	local_agent.trap_finished.connect(_on_local_trap_finished)
 	local_agent.door_passed.connect(_on_local_door_passed)
@@ -307,9 +314,9 @@ func _process(delta: float) -> void:
 		referee.tick_clocks(delta)
 	_update_hud_status()
 	_sounds(delta)
-	view.lights.alarm = not over and clocks.get(my_id, ALARM_TIME) < ALARM_TIME
+	view.lights.alarm = not over and not spectating and clocks.get(my_id, ALARM_TIME) < ALARM_TIME
 
-	var busy := over or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0
+	var busy := over or spectating or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0
 	hud.attack_button.enabled = not busy and _melee_cd <= 0.0
 	hud.fire_button.enabled = not busy and _dart_cd <= 0.0 and inventories[my_id]["darts"] > 0
 	var near := -1 if busy else nearest_furniture(local_agent)
@@ -364,8 +371,12 @@ func _look_drag(event: InputEvent) -> bool:
 	return true
 
 
-## Switches between the isometric view and first person.
+## Switches between the isometric view and first person (or, once you're
+## out, to the next agent to watch).
 func toggle_view() -> void:
+	if spectating:
+		spectate()
+		return
 	first_person = not first_person
 	if first_person and fp == null:
 		fp = FpView.new()
@@ -403,13 +414,32 @@ func _watch_frame_rate(delta: float) -> void:
 			Color("ffd23f"), 3.5)
 
 
+## Once you're out, the camera follows the agents still in the mission,
+## room by room, until it's over; each call moves on to the next of them.
+func spectate() -> void:
+	if over:
+		return
+	if not spectating:
+		if first_person:
+			toggle_view()
+		spectating = true
+	var i := agents.find(watched)
+	for step in range(1, agents.size() + 1):
+		var a: Agent = agents[(i + step) % agents.size()]
+		if a != local_agent and not a.out:
+			watched = a
+			_on_room_changed(a.room)
+			hud.set_watching(a.display_name, a.accent)
+			return
+
+
 func _on_room_changed(room: Vector2i, animate := true) -> void:
 	if first_person:
 		_slow_time = -2.0
 		fp.rebuild(world, room)
 	view.room = room
 	view.lights.rebuild(world, room)
-	hud.show_room(room, animate, view.base_position + World.iso(local_agent.position, 60.0))
+	hud.show_room(room, animate, view.base_position + World.iso(watched.position, 60.0))
 	Sound.ambience(room_tone(world.rooms[room]["name"]))
 	if animate:
 		Sound.play("door", -6.0)
@@ -430,7 +460,7 @@ static func room_tone(room_name: String) -> String:
 ## Footsteps, rummaging, the low-time tick and music tempo.
 func _sounds(delta: float) -> void:
 	for a in agents:
-		if a.room != local_agent.room:
+		if a.room != watched.room:
 			continue
 		var vol := -12.0 if a == local_agent else -16.0
 		if a.moving and a.ko_time <= 0.0:
@@ -448,7 +478,7 @@ func _sounds(delta: float) -> void:
 	# The music tightens up with a rival in the room and when time is short.
 	var danger := 0.0
 	for a in agents:
-		if a != local_agent and not a.out and a.room == local_agent.room and a.ko_time <= 0.0:
+		if a != local_agent and not a.out and a.room == watched.room and a.ko_time <= 0.0:
 			danger = 1.0
 	Sound.music_layers(danger, 1.0 if left < 60.0 else 0.0)
 	if left < 30.0 and int(left) != _last_tick:
@@ -601,7 +631,7 @@ func do_vent(id: int, idx: int) -> void:
 
 func _on_vent_moved(a: Agent, entering: bool) -> void:
 	# Grille rattles and a puff of dust, for whoever's in that room.
-	if a.room != local_agent.room:
+	if a.room != watched.room:
 		return
 	Sound.play("vent", -2.0)
 	if not entering:
@@ -717,7 +747,7 @@ func show_attack(kind: String, id: int, pos: Vector2, dir: Vector2) -> void:
 
 
 func _attack_sound(sound_name: String, room: Vector2i) -> void:
-	if room == local_agent.room:
+	if room == watched.room:
 		Sound.play(sound_name, -3.0)
 
 
@@ -860,6 +890,6 @@ func game_over(winner: int, reason := "escape") -> void:
 	Sound.play("win" if winner == my_id else "lose")
 	if _agent_by_id.has(winner):
 		var w: Agent = _agent_by_id[winner]
-		if winner == my_id or w.room == local_agent.room:
+		if winner == my_id or w.room == watched.room:
 			Sound.play("haha", -2.0, false, 0.03, w.voice)
 	hud.show_end(winner, my_id, name, reason, multiplayer.is_server())
