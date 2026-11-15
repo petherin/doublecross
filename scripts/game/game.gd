@@ -773,16 +773,22 @@ func _try_fire() -> void:
 func do_melee(id: int) -> void:
 	var a: Agent = _agent_by_id[id]
 	var target := rival_near(a, MELEE_RANGE)
-	if target:
+	# Nacho (someone else's) can be hit too, if he's the nearer.
+	var dog_d := INF
+	if dog.owner_id not in [0, id] and dog.room == a.room and dog.visible_now():
+		dog_d = dog.position.distance_to(a.position)
+	var at_dog := dog_d < MELEE_RANGE * 1.2 and (target == null or dog_d < target.position.distance_to(a.position))
+	if at_dog:
+		a.facing = (dog.position - a.position).angle()
+	elif target:
 		a.facing = (target.position - a.position).angle()
 	a.swing()
 	_attack_sound("swing", a.room)
 	show_attack.rpc("melee", id, a.position, Vector2.from_angle(a.facing))
-	if target:
+	if at_dog:
+		_send_hit(id, Dog.DOG_ID, "melee")
+	elif target:
 		_send_hit(id, id_of(target), "melee")
-	elif dog.owner_id not in [0, id] and dog.room == a.room and dog.visible_now() \
-			and dog.position.distance_to(a.position) < MELEE_RANGE * 1.2:
-		_send_hit(id, Dog.DOG_ID, "melee")   # a swing at Nacho: harmless, but he won't forget it
 
 
 ## Fire a dart. Auto-aims at a rival roughly in front; `aim_error` (radians)
@@ -847,8 +853,7 @@ func _physics_process(delta: float) -> void:
 					_send_hit(d["owner"], oid, "dart")
 					stop = true
 					break
-		# Nacho snaps darts out of the air (they can't hurt him), and goes for
-		# whoever threw it.
+		# Darts hit Nacho too (and he goes for whoever threw it).
 		if d["live"] and not stop and dog.owner_id not in [0, d["owner"]] and dog.room == d["room"] \
 				and dog.visible_now() \
 				and Geometry2D.get_closest_point_to_segment(dog.position, old, p).distance_to(dog.position) < 30.0:

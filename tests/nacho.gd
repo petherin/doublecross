@@ -2,8 +2,9 @@ extends SceneTree
 ## Headless regression for Nacho the dog: finding him in his kennel, his
 ## nose (barks at hidden things, growls at traps, never sets them off),
 ## following his agent to the next room, going for (and only for as long as)
-## anyone who attacks his agent or him, and running home when his agent is
-## taken out.
+## anyone who attacks his agent or him, being taken out by three hits, and
+## running home (nobody's dog until he's found again) when he or his agent
+## is taken out.
 ##   godot --headless --fixed-fps 60 -s res://tests/nacho.gd
 
 const World = preload("res://scripts/core/world.gd")
@@ -75,18 +76,28 @@ func _process(_d: float) -> bool:
 	if _f == 60 * 48:
 		# They've stopped attacking for a few seconds: so has he.
 		_check(g.dog.foe_id == 0, "he backs off once they stop")
-		var hp5: int = g.inventories[5]["hp"]
-		# Attacking Nacho himself does nothing to him, but sets him on you.
+		# Hitting Nacho hurts him, and sets him on you.
 		g.referee.handle_hit(5, g.dog.DOG_ID, "melee")
-		_check(g.dog.foe_id == 5, "attacking Nacho sets him on you")
-		_check(g.inventories[1]["hp"] >= 1 and g.inventories[5]["hp"] == hp5, "and nobody's hurt by it")
+		_check(g.dog.hp == g.dog.MAX_HP - 1, "Nacho can be hurt")
+		_check(g.dog.foe_id == 5, "and hitting him sets him on you")
 	if _f == 60 * 49:
-		# Taken out: he runs home to his kennel.
+		# Two more hits: he's taken out, and runs home, nobody's dog.
+		for i in 2:
+			g.dog.protect_time = 0.0
+			g.referee.handle_hit(5, g.dog.DOG_ID, "melee")
+		_check(g.dog.owner_id == 0 and g.dog.room == kr and g.dog.hp == g.dog.MAX_HP,
+				"three hits and he's back in his kennel, nobody's dog")
+		# Whoever finds him next: he's theirs.
+		g.referee.handle_search(5, kr, g.world.kennel[1])
+		_check(g.dog.owner_id == 5, "the next agent to find him gets him")
+	if _f == 60 * 50:
+		# His new agent is taken out: home he goes again.
+		var rival: Node = g.agent_of(5)
 		for i in 3:
-			g.agent_of(1).protect_time = 0.0
-			g.agent_of(1).ko_time = 0.0
-			g.referee.handle_hit(5, 1, "melee")
-		_check(g.dog.owner_id == 0 and g.dog.room == kr, "taken out: he runs home to his kennel")
+			rival.protect_time = 0.0
+			rival.ko_time = 0.0
+			g.referee.handle_hit(1, 5, "dart")
+		_check(g.dog.owner_id == 0 and g.dog.room == kr, "his agent taken out: he runs home to his kennel")
 		print("nacho: %s" % ("ok" if _failures == 0 else "%d failure(s)" % _failures))
 		g.queue_free()
 		quit(0 if _failures == 0 else 1)

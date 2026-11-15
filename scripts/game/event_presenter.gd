@@ -48,6 +48,8 @@ func _record(e: Dictionary) -> void:
 				note(keeper, "set Nacho on " + short_name(who))
 		"nacho_home":
 			note(who, "lost Nacho, who ran home")
+		"nacho_down":
+			note(who, "took out Nacho, who ran home")
 		"ko":
 			var owner: Agent = game.agent_of(e["owner"])
 			var trap: String = World.TRAP_NAMES[e["kind"]].to_lower()
@@ -193,6 +195,20 @@ func present(e: Dictionary) -> void:
 				game.hud.toast("Nacho's coming for you! Stop attacking and he'll back off.", warn, 3.0)
 			elif e["owner"] == game.my_id:
 				game.hud.toast("Nacho goes for %s!" % game.agent_of(pid).display_name, col, 2.5)
+		"nacho_hit":
+			game.dog.hit(e["hp"])
+			if e["room"] == game.watched.room:
+				Sound.play("yelp", -3.0)
+				Sound.play("hit", -6.0)
+		"nacho_down":
+			game.view.add_effect("PUFF", e["room"], e["at"])
+			if e["room"] == game.watched.room:
+				Sound.play("yelp", 0.0)
+			game.dog.go_home()
+			if e["owner"] == game.my_id:
+				game.hud.toast("Nacho's been taken out! He's limped home to his kennel.", warn, 3.0)
+			elif me:
+				game.hud.toast("You saw off Nacho. He's run home to his kennel.", col, 3.0)
 		"nacho_home":
 			game.dog.go_home()
 			if me:
