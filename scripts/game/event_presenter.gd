@@ -24,9 +24,9 @@ func note(a: Agent, text: String) -> void:
 	timeline.append({"t": game.elapsed, "text": line, "col": a.accent})
 
 
-## "AGENT COBALT (BOT)" -> "COBALT", to keep the timeline lines short.
+## "AGENT COBALT (TRAPPER BOT)" -> "COBALT", to keep the timeline lines short.
 static func short_name(a: Agent) -> String:
-	return a.display_name.trim_prefix("AGENT ").trim_suffix(" (BOT)")
+	return a.display_name.trim_prefix("AGENT ").get_slice(" (", 0)
 
 
 ## The moments worth a line in the debrief: intel and briefcases found,
