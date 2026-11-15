@@ -49,7 +49,7 @@ func _process(delta: float) -> bool:
 
 ## "" while the match is still being watched, otherwise the result line.
 func _judge(g: Node, delta: float) -> String:
-	var bots: Array = g.agents.filter(func(a): return a.display_name.ends_with("(BOT)"))
+	var bots: Array = g.agents.filter(func(a): return a.display_name.ends_with(" BOT)"))
 	if bots.size() != 2:
 		return "FAIL: %s sees %d bots, wanted 2" % [_role, bots.size()]
 	if _role == "host" and g.bots.size() != 2:

@@ -168,7 +168,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		if chosen != "":
 			style["name"] = chosen
 		if is_bot:
-			style["name"] += " (BOT)"
+			style["name"] += " (%s BOT)" % bot_personality(seed_value, id).to_upper()
 		# The host simulates the bots' agents, like the player's own.
 		a.configure(world, start, id == my_id or (is_bot and multiplayer.is_server()), style)
 		add_child(a)
@@ -190,7 +190,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 
 	if multiplayer.is_server():
 		for bid in bot_ids:
-			_add_bot(bid, bot_level)
+			_add_bot(bid, bot_level, bot_personality(seed_value, bid))
 	add_child(Tips.new(self))
 
 	var vig_layer := CanvasLayer.new()
@@ -251,11 +251,18 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		multiplayer.peer_disconnected.connect(_on_peer_left)
 
 
-func _add_bot(bid: int, level: String) -> void:
+## Which personality bot `bid` plays this match: dealt round from the seed,
+## so every device agrees and several bots each get a different one.
+static func bot_personality(seed_value: int, bid: int) -> String:
+	var n: int = Bot.PERSONALITIES.size()
+	return Bot.PERSONALITIES[posmod(seed_value + bid - FIRST_BOT_ID, n)]
+
+
+func _add_bot(bid: int, level: String, personality := "") -> void:
 	var ba: Agent = _agent_by_id[bid]
 	var b := Bot.new()
 	add_child(b)
-	b.setup(self, ba, bid, level)
+	b.setup(self, ba, bid, level, personality)
 	bots[bid] = b
 	ba.search_finished.connect(func(r, i): referee.handle_search(bid, r, i))
 	ba.trap_finished.connect(func(info): referee.handle_trap(bid, info))
