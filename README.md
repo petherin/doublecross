@@ -207,6 +207,8 @@ always fetch the newest one:
 | **Android** phones and tablets | [⬇ DoubleCross.apk](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross.apk) |
 | **Mac** with Apple Silicon (M1 and later) | [⬇ DoubleCross-macOS-AppleSilicon.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-AppleSilicon.zip) |
 | **Mac** with an Intel processor | [⬇ DoubleCross-macOS-Intel.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-macOS-Intel.zip) |
+| **Windows** PC (64-bit) | [⬇ DoubleCross-Windows.zip](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-Windows.zip) |
+| **Linux** PC (64-bit) | [⬇ DoubleCross-Linux.tar.gz](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-Linux.tar.gz) |
 
 Not sure which Mac you have? **Apple menu → About This Mac** shows *Chip: Apple M…* or *Processor: Intel…*.
 
@@ -253,6 +255,28 @@ small screens the controls and text are scaled up.
    It needs that to find and join games.
 
 A Mac can play against phones and tablets on the same Wi-Fi.
+
+### On a Windows PC
+
+1. Download [**DoubleCross-Windows.zip**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-Windows.zip)
+   and unzip it to a folder of your choice. Keep **DoubleCross.exe** and
+   **DoubleCross.pck** together: the `.pck` is the game's data.
+2. Double-click **DoubleCross.exe**. The game isn't signed with a code-signing
+   certificate, so the first time Windows may say it protected your PC: choose
+   **More info → Run anyway**.
+3. If Windows Firewall asks whether Double Cross may use **private networks**,
+   allow it. It needs that to find and join games on your Wi-Fi.
+
+### On a Linux PC
+
+1. Download [**DoubleCross-Linux.tar.gz**](https://github.com/petherin/doublecross/releases/latest/download/DoubleCross-Linux.tar.gz)
+   and unpack it (`tar -xzf DoubleCross-Linux.tar.gz`).
+2. Run **DoubleCross.x86_64** (double-click it, or `./DoubleCross.x86_64`). It
+   needs OpenGL 3.3 graphics, which any desktop from the last decade has.
+3. If you run a firewall, let it accept UDP on ports 47810–47812 so other
+   devices can find and join your games.
+
+PCs, Macs, phones and tablets can all play together on the same network.
 
 ### From source in Godot (Mac, Windows or Linux)
 
@@ -329,7 +353,8 @@ Suggestions, roughly in the order they'd pay off. Nothing here is promised.
 - **Store releases:** Google Play (needs a release signing key and a developer
   account), and a signed, notarised Mac app so macOS stops warning about it
   (needs an Apple developer account).
-- **More platforms:** Godot can also build for Windows, Linux, iPhone and iPad.
+- **More platforms:** Godot can also build for iPhone and iPad (it needs an
+  Apple developer account to install them).
 - **Remappable controls** in SETTINGS, full gamepad navigation of the menus,
   and **translations** of the on-screen text.
 
@@ -404,7 +429,7 @@ tools/
 Every push and pull request runs `gdlint` over the scripts, the smoke test, and
 bot matches with two and four agents, and one where you're out and the camera
 must follow the bots, and a network match between two processes (GitHub Actions, `.github/workflows/android.yml`).
-Only after a change reaches `main` are the APK and both Mac apps built and
+Only after a change reaches `main` are the APK, both Mac apps and the Windows and Linux builds built and
 published as a release. To run the tests yourself:
 
 ```bash
@@ -472,6 +497,8 @@ It needs `numpy`, and `ffmpeg` for the Ogg loops.
 Install the Android SDK and OpenJDK 17, set their paths in **Editor → Editor
 Settings → Export → Android**, then use **Project → Export…**. The Mac presets
 need the single-processor templates that CI makes with `tools/thin_macos_template.py`.
+The **Windows** and **Linux** presets use Godot's standard 64-bit templates; on
+Windows the game's data goes in `DoubleCross.pck` beside the `.exe`.
 
 `android/debug.keystore` is a throwaway **debug-only** signing key (password
 `android`). It's committed so every build is signed the same way and installs

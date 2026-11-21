@@ -1,4 +1,4 @@
-name: Build Android APK and Mac app
+name: Build and release (Android, Mac, Windows, Linux)
 
 # Pull requests run linting and headless gameplay tests only.
 # Downloadable packages and GitHub Releases are produced only after changes
@@ -98,9 +98,9 @@ jobs:
           path: |
             ~/godot
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}-android-macos
+          key: godot-${{ env.GODOT_VERSION }}-android-macos-windows-linux
 
-      - name: Install Godot and the Android + macOS export templates
+      - name: Install Godot and the Android, macOS, Windows and Linux export templates
         run: |
           if [ ! -x ~/godot/godot ]; then
             mkdir -p ~/godot
@@ -109,10 +109,12 @@ jobs:
             mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
           fi
           T=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          if [ ! -f "$T/android_debug.apk" ] || [ ! -f "$T/macos.zip" ]; then
+          if [ ! -f "$T/android_debug.apk" ] || [ ! -f "$T/macos.zip" ] \
+              || [ ! -f "$T/windows_release_x86_64.exe" ] || [ ! -f "$T/linux_release.x86_64" ]; then
             mkdir -p "$T"
             wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
-            unzip -q -j -o /tmp/templates.tpz 'templates/android_*' 'templates/macos.zip' 'templates/version.txt' -d "$T"
+            unzip -q -j -o /tmp/templates.tpz 'templates/android_*' 'templates/macos.zip' \
+              'templates/windows_release_x86_64.exe' 'templates/linux_release.x86_64' 'templates/version.txt' -d "$T"
             rm /tmp/templates.tpz
           fi
           ls "$T"
@@ -182,6 +184,27 @@ jobs:
             build/DoubleCross-macOS-AppleSilicon.zip
             build/DoubleCross-macOS-Intel.zip
 
+      - name: Export Windows and Linux
+        # 64-bit PCs. Windows: the game and its data pack, zipped together.
+        # Linux: one executable with the data inside, in a tarball so it
+        # keeps its executable permission.
+        run: |
+          mkdir -p build/windows build/linux
+          ~/godot/godot --headless --export-release "Windows" build/windows/DoubleCross.exe
+          ~/godot/godot --headless --export-release "Linux" build/linux/DoubleCross.x86_64
+          test -f build/windows/DoubleCross.exe && test -f build/windows/DoubleCross.pck
+          test -x build/linux/DoubleCross.x86_64
+          (cd build/windows && zip -q ../DoubleCross-Windows.zip DoubleCross.exe DoubleCross.pck)
+          tar -czf build/DoubleCross-Linux.tar.gz -C build/linux DoubleCross.x86_64
+          ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: double-cross-windows-linux
+          path: |
+            build/DoubleCross-Windows.zip
+            build/DoubleCross-Linux.tar.gz
+
       - name: Publish a release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -199,8 +222,11 @@ jobs:
             echo "- **Android (phones and tablets):** \`DoubleCross.apk\`. Open it on the device and allow installs from that source the first time."
             echo "- **Mac with Apple Silicon (M1 and later):** \`DoubleCross-macOS-AppleSilicon.zip\`"
             echo "- **Mac with an Intel processor:** \`DoubleCross-macOS-Intel.zip\`"
+            echo "- **Windows (64-bit):** \`DoubleCross-Windows.zip\`. Unzip and run *DoubleCross.exe* (keep *DoubleCross.pck* beside it). If Windows says it protected your PC, choose *More info* → *Run anyway*."
+            echo "- **Linux (64-bit):** \`DoubleCross-Linux.tar.gz\`. Unpack and run *DoubleCross.x86_64*."
             echo
             echo "Not sure which Mac you have? Apple menu → About This Mac: it says *Chip: Apple M…* or *Processor: Intel…*. Unzip, move *Double Cross.app* to Applications, then see the README for getting past macOS's unidentified-developer warning."
           } > notes.md
           gh release create "$TAG" build/DoubleCross.apk build/DoubleCross-macOS-AppleSilicon.zip build/DoubleCross-macOS-Intel.zip \
+            build/DoubleCross-Windows.zip build/DoubleCross-Linux.tar.gz \
             --title "Double Cross $TAG" --notes-file notes.md --target "$GITHUB_SHA" --latest
