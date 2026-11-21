@@ -260,14 +260,16 @@ func _fight(delta: float) -> bool:
 ## Attacks from a distance: lob a bomb if they're far enough off not to
 ## catch us in the blast (a trapper keeps one back for trapping), backing
 ## off while it's in the air; or fire a dart. True if it did either.
+## Easy bots aren't that careful, and sometimes blow themselves up.
 func _ranged(dist: float, to: Vector2, delta: float) -> bool:
 	var keep: int = 1 if personality == "trapper" else 0
 	var acted := false
-	if _attack_cd <= 0.0 and game.inventories[id]["bombs"] > keep and dist > game.referee.BLAST_FAR + 20.0 \
+	if _attack_cd <= 0.0 and game.inventories[id]["bombs"] > keep and dist > min_throw_distance() \
 			and dist < game.THROW_RANGE and _rng.randf() < _f["lob"]:
 		game.do_throw(id, _f["spread"])
 		_attack_cd = game.THROW_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
-		_hold = game.THROW_TIME + 0.4
+		if level != "easy" or _rng.randf() < 0.5:
+			_hold = game.THROW_TIME + 0.4
 		acted = true
 	elif _hold > 0.0:
 		_hold -= delta
@@ -278,6 +280,12 @@ func _ranged(dist: float, to: Vector2, delta: float) -> bool:
 		_attack_cd = game.DART_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
 		acted = true
 	return acted
+
+
+## How close a rival can be for this bot to still lob a bomb at them:
+## careful bots stay outside their own blast; easy ones don't think.
+func min_throw_distance() -> float:
+	return 120.0 if level == "easy" else game.referee.BLAST_FAR + 20.0
 
 
 # ------------------------------------------------------------------ decisions

@@ -89,7 +89,9 @@ A thrown bomb arcs through the air for a moment (long enough to dodge, if
 you're quick) and auto-aims at a rival in front of you. Where it lands, a
 direct hit takes you out (Nacho too); within a floor square and a half it's
 two hits, within two and a half squares one. Mind your own blast: it hurts
-the thrower too.
+the thrower too. Bots lob them in fights; medium and hard bots keep clear of
+their own blast, but easy bots aren't that bright and now and then blow
+themselves up.
 
 **Air vents.** Some rooms have a crawl-through vent that joins a room two or
 more rooms away. Stand at one and press CRAWL. The ones you've used appear on

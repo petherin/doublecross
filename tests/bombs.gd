@@ -78,6 +78,15 @@ func _process(_d: float) -> bool:
 		var before: int = g.flying.size()
 		g.referee.handle_throw(1, c)
 		_check(g.flying.size() == before, "and with none left you can't throw")
+		# Careful bots throw from outside their own blast; easy ones don't.
+		for lv in ["easy", "medium", "hard"]:
+			var b: Node = load("res://scripts/game/bot.gd").new()
+			b.set_physics_process(false)
+			g.add_child(b)
+			b.setup(g, me, 1, lv)
+			var careless: bool = b.min_throw_distance() < g.referee.BLAST_NEAR
+			_check(careless == (lv == "easy"), "%s bots %s" % [lv, "can bomb themselves" if lv == "easy"
+					else "throw from outside their own blast"])
 		print("bombs: %s" % ("ok" if _failures == 0 else "%d failure(s)" % _failures))
 		g.queue_free()
 		quit(0 if _failures == 0 else 1)
