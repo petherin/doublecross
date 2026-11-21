@@ -663,8 +663,8 @@ func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> v
 			ci.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.85), 2.0, true)
 		return
 
-	# Dizzy stars while knocked out (not after a slip: that's just undignified)
-	if ko and ko_kind != "SLIP":
+	# Dizzy stars while knocked out
+	if ko:
 		for i in 4:
 			var a := _walk * 1.5 + i * TAU / 4.0
 			var sp := foot + Vector2(cos(a) * 26.0, -top + 2.0 + sin(a) * 8.0)

@@ -94,6 +94,16 @@ func _poo(e: Dictionary) -> void:
 				game.hud.toast("Mind your step: Nacho's left a little present.", Color("e0b080"), 3.0)
 
 
+## The turd someone slipped in is gone (squashed flat, all over them).
+func _tread_in(room: Vector2i, pos: Vector2) -> void:
+	for t in game.turds:
+		if t["room"] == room and (t["pos"] as Vector2).is_equal_approx(pos):
+			game.turds.erase(t)
+			break
+	for b in game.bots.values():
+		b.forget_room(room)
+
+
 ## Nacho's teeth find their mark: a snap, a yelp and a stumble.
 func _bitten(victim: Agent, me: bool) -> void:
 	game.dog.bite(victim)
@@ -189,13 +199,16 @@ func present(e: Dictionary) -> void:
 			if e["kind"] == "bite":
 				game.dog.bite(victim)
 			var slipped: bool = e["kind"] == "slip"
-			# A slip isn't a blow: no flash of stars, just feet up and over.
+			# A slip isn't a blow: no burst, just feet up, over and thump.
 			victim.knock_out("SLIP" if slipped else "DOWN", game.DOWN_TIME)
 			victim.protect_time = game.PROTECT_TIME
-			if not slipped:
+			if slipped:
+				_tread_in(e["room"], e["turd"])
+			else:
 				game.view.add_effect("DOWN", e["room"], victim.position)
-				if e["room"] == game.watched.room:
-					game.view.shake(8.0, 0.4)
+			if e["room"] == game.watched.room:
+				game.view.shake(8.0, 0.4)
+				if not slipped:
 					game.hit_stop()
 			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
 			if e["kind"] == "slip":

@@ -528,8 +528,8 @@ func _grid(room: Vector2i) -> AStarGrid2D:
 				if (f["rect"] as Rect2).grow(margin).has_point(p):
 					solid = true
 					break
-			# Nobody treads in Nacho's mess on purpose.
-			for t in game.turds:
+			# Medium and hard bots watch where they tread; easy ones blunder on.
+			for t in (game.turds if level != "easy" else []):
 				if t["room"] == room and p.distance_to(t["pos"]) < game.dog.TURD_RADIUS + Agent.RADIUS + 10.0:
 					solid = true
 			g.set_point_solid(cell, solid)

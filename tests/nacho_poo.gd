@@ -1,8 +1,9 @@
 extends SceneTree
 ## Headless regression for Nacho's poo: he squats, leaves a turd that stays
 ## put, stops (and goes for them) if anyone starts on him or his agent mid-
-## poo, won't start while he's fighting, and anyone who treads in a turd
-## slips and is taken out, losing everything they carry.
+## poo, won't start while he's fighting or at home unowned, and anyone who
+## treads in a turd slips and is taken out, losing everything they carry
+## (and the turd's gone). Easy bots blunder into them; the others don't.
 ##   godot --headless --fixed-fps 60 -s res://tests/nacho_poo.gd
 
 const World = preload("res://scripts/core/world.gd")
@@ -30,6 +31,11 @@ func _process(_d: float) -> bool:
 		me.room = kr
 		me.position = g.dog.kennel_front() + Vector2(160, 160)
 		rival.room = _other_room(kr)
+		# Nobody's dog yet: he won't go at home.
+		g.referee.poo_now()
+	if _f == 30:
+		_check(not g.dog.is_pooing() and g.turds.is_empty(), "no poo while he's at home in his kennel")
+		g.referee._poo_at = INF   # (in a match it'd wait until he's found)
 		g.referee.handle_search(1, kr, g.world.kennel[1])
 	if _f == 120:
 		g.referee.poo_now()
@@ -69,14 +75,27 @@ func _process(_d: float) -> bool:
 		_check(inv["items"].is_empty() and not inv["case"] and inv["gadgets"].is_empty(), "losing everything")
 		var hidden: Array = g.contents.values()
 		_check("CASH" in hidden and "BRIEFCASE" in hidden and "TOOLKIT" in hidden, "which is hidden again")
-		_check(g.turds.size() == 1, "the turd stays where it is")
+		_check(g.turds.is_empty(), "and the turd's gone")
 		# His own agent isn't safe either.
+		g.turds.append({"room": kr, "pos": me.position + Vector2(30, 0)})
 		me.protect_time = 0.0
 		me.ko_time = 0.0
 		me.position = g.turds[0]["pos"]
 	if _poo_frame > 0 and _f == _poo_frame + 2 * poo_frames + 94:
 		_check(me.ko_time > 0.0, "his own agent slips too")
 		_check(g.dog.owner_id == 0, "and Nacho goes home")
+		# Easy bots blunder through turds; the others plan routes round them.
+		var spot := World.ROOM.get_center()
+		g.turds.append({"room": kr, "pos": spot})
+		for lv in ["easy", "medium", "hard"]:
+			var b: Node = load("res://scripts/game/bot.gd").new()
+			b.set_physics_process(false)
+			g.add_child(b)
+			b.setup(g, me, 1, lv)
+			var grid: AStarGrid2D = b._grid(kr)
+			var cell := Vector2i(((spot - grid.offset) / grid.cell_size).round())
+			_check(grid.is_point_solid(cell) == (lv != "easy"),
+					"%s bots %s turds" % [lv, "walk round" if lv != "easy" else "walk straight through"])
 		print("nacho_poo: %s" % ("ok" if _failures == 0 else "%d failure(s)" % _failures))
 		g.queue_free()
 		quit(0 if _failures == 0 else 1)

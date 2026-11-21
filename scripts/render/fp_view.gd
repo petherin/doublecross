@@ -44,7 +44,7 @@ var dog: Node
 var turds: Array = []
 var camera: Camera3D
 var _dog_sprite: Sprite3D
-var _turds_built := {}            # index in turds -> true, for this room
+var _turds_built := {}            # turd dict -> Node3D, for this room
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
 var _target: Node3D
@@ -691,11 +691,16 @@ func _add_cutout(a: Agent) -> void:
 
 ## Nacho's turds in this room: three squashed brown swirls, stacked.
 func _show_turds() -> void:
-	for i in turds.size():
-		if _turds_built.has(i) or turds[i]["room"] != room:
+	# Gone (slipped in): clear it away.
+	for t in _turds_built.keys():
+		if not turds.has(t):
+			if is_instance_valid(_turds_built[t]):
+				_turds_built[t].queue_free()
+			_turds_built.erase(t)
+	for t in turds:
+		if _turds_built.has(t) or t["room"] != room:
 			continue
-		_turds_built[i] = true
-		var p: Vector2 = turds[i]["pos"]
+		var p: Vector2 = t["pos"]
 		var m := StandardMaterial3D.new()
 		m.albedo_color = Color("5c3719")
 		m.roughness = 0.25
@@ -703,6 +708,7 @@ func _show_turds() -> void:
 		var root := Node3D.new()
 		root.position = Vector3(p.x, 0.0, p.y)
 		_room_root.add_child(root)
+		_turds_built[t] = root
 		for l in [[13.0, 4.0], [10.0, 10.0], [6.5, 15.5]]:
 			var sm := SphereMesh.new()
 			sm.radius = l[0]

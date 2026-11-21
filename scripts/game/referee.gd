@@ -226,7 +226,8 @@ func _tick_poo() -> void:
 			game.broadcast({"type": "nacho_poo", "stage": "done", "owner": dog.owner_id,
 					"room": _poo_spot["room"], "pos": _poo_spot["pos"]})
 		return
-	if _now < _poo_at or dog.foe_id != 0 or not dog.visible_now() or dog.hurt_time > 0.0:
+	# Only out with an agent (never at home in his kennel), and not mid-fight.
+	if _now < _poo_at or dog.owner_id == 0 or dog.foe_id != 0 or not dog.visible_now() or dog.hurt_time > 0.0:
 		return
 	_poo_at = INF
 	var plan: Array = dog.poo_plan()
@@ -242,7 +243,7 @@ func poo_now() -> void:
 
 
 ## Anyone who treads in a turd slips, falls and is taken out, and
-## everything they were carrying goes flying.
+## everything they were carrying goes flying. The turd's gone with them.
 func _tick_turds() -> void:
 	if game.turds.is_empty():
 		return
@@ -272,7 +273,7 @@ func _slip(pid: int, turd: Dictionary) -> void:
 	inv["darts"] = game.MAX_DARTS
 	_penalise(pid, game.DOWN_PENALTY)
 	game.broadcast({"type": "down", "pid": pid, "by": 0, "kind": "slip", "room": turd["room"], "lost": lost,
-			"from": turd["pos"]})
+			"from": turd["pos"], "turd": turd["pos"]})
 	_send_nacho_home(pid)
 
 

@@ -6,8 +6,9 @@ extends Node
 ## in it. Anyone who attacks his agent, or him, gets chased and bitten until
 ## they stop. He can be hurt: three hits and he runs home to his kennel. He
 ## also runs home if his agent is taken out. Either way he's nobody's dog
-## until someone finds him again. Now and then (in about two matches in five)
-## he stops for a poo, and what he leaves behind is as good as a trap.
+## until someone finds him again. Now and then (in about two matches in five),
+## while he's out with an agent, he stops for a poo, and what he leaves
+## behind is as good as a trap (once).
 ##
 ## Who he belongs to is decided by the referee (the host) and arrives as
 ## events; every device walks him about itself, following his agent.
@@ -123,16 +124,9 @@ func hit(p_hp: int) -> void:
 
 
 ## Where he'd squat if he went now, which way he'd face, and where the
-## turd would land (just behind him): [stand, facing, turd]. At home he
-## wanders a little way from his kennel first.
+## turd would land (just behind him): [stand, facing, turd].
 func poo_plan() -> Array:
-	var stand := position
-	var face := facing
-	if owner_id == 0:
-		var side := Vector2.from_angle(_into_room() + PI / 2.0)
-		stand = _clamp_in(kennel_front() + side * 100.0 + Vector2.from_angle(_into_room()) * 30.0)
-		face = _into_room() + PI / 2.0
-	return [stand, face, _clamp_in(stand - Vector2.from_angle(face) * 30.0)]
+	return [position, facing, _clamp_in(position - Vector2.from_angle(facing) * 30.0)]
 
 
 ## Squats where the referee says, for POO_TIME (unless someone starts on him).
