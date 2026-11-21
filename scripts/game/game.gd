@@ -58,6 +58,12 @@ const MELEE_COOLDOWN := 0.55
 const DART_COOLDOWN := 0.7
 const DART_SPEED := 950.0
 const AIM_CONE := 0.6           # auto-aim at a rival within this angle (radians)
+## Bombs: three per life, shared between throwing them and hiding them in
+## furniture as traps; refilled when you're taken out.
+const MAX_BOMBS := 3
+const THROW_COOLDOWN := 2.5
+const THROW_RANGE := 480.0      # how far you can lob one (a floor square is 128)
+const THROW_TIME := 0.7         # seconds in the air before it lands and goes off
 const CRAWL_TIME := 2.4         # seconds spent crawling through an air duct
 
 ## Below this many frames a second for SLOW_TIME, first person drops to its
@@ -96,6 +102,8 @@ var bots := {}
 var eliminated := {}
 ## Darts in flight: { owner, room, pos, vel, live } (live = this device checks hits)
 var darts: Array = []
+## Thrown bombs in the air (for drawing): {room, from, to, t}.
+var flying: Array = []
 var time_limit := TIME_LIMIT
 ## Vent shortcuts the local player has been through: [vent index, partner].
 var known_vents: Array = []
@@ -127,6 +135,7 @@ var _rng := RandomNumberGenerator.new()
 var _start_room := {}
 var _melee_cd := 0.0
 var _dart_cd := 0.0
+var _throw_cd := 0.0
 var _step_t := {}
 var _was_searching := {}
 var _last_tick := -1
@@ -180,7 +189,8 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 		add_child(a)
 		agents.append(a)
 		_agent_by_id[id] = a
-		inventories[id] = {"items": [], "case": false, "gadgets": [], "hp": MAX_HP, "darts": MAX_DARTS}
+		inventories[id] = {"items": [], "case": false, "gadgets": [], "hp": MAX_HP, "darts": MAX_DARTS,
+				"bombs": MAX_BOMBS}
 		clocks[id] = time_limit
 		_start_room[id] = start
 		a.max_hp = MAX_HP
@@ -199,6 +209,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	view.highlight_color = local_agent.accent
 	view.my_id = my_id
 	view.darts = darts
+	view.flying = flying
 
 	if multiplayer.is_server():
 		for bid in bot_ids:
@@ -228,6 +239,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	hud.attack_pressed.connect(_try_melee)
 	hud.crawl_pressed.connect(_try_vent)
 	hud.fire_pressed.connect(_try_fire)
+	hud.throw_pressed.connect(_try_throw)
 	hud.view_pressed.connect(toggle_view)
 	hud.pause_pressed.connect(_set_paused.bind(true))
 	hud.resumed.connect(_set_paused.bind(false))
@@ -341,6 +353,10 @@ func _process(delta: float) -> void:
 		elapsed += delta
 	_melee_cd -= delta
 	_dart_cd -= delta
+	_throw_cd -= delta
+	for b in flying:
+		b["t"] += delta
+	flying.assign(flying.filter(func(b): return b["t"] < THROW_TIME + 0.5))
 	if multiplayer.is_server() and not over:
 		referee.tick_clocks(delta)
 	_update_hud_status()
@@ -350,6 +366,7 @@ func _process(delta: float) -> void:
 	var busy := over or spectating or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0
 	hud.attack_button.enabled = not busy and _melee_cd <= 0.0
 	hud.fire_button.enabled = not busy and _dart_cd <= 0.0 and inventories[my_id]["darts"] > 0
+	hud.throw_button.enabled = not busy and _throw_cd <= 0.0 and inventories[my_id]["bombs"] > 0
 	var near := -1 if busy else nearest_furniture(local_agent)
 	var door := -1 if busy else near_door(local_agent)
 	view.highlight = near
@@ -381,6 +398,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_vent()
 	elif event.is_action_pressed("fire"):
 		_try_fire()
+	elif event.is_action_pressed("throw"):
+		_try_throw()
 	elif event.is_action_pressed("toggle_view"):
 		toggle_view()
 	elif event.is_action_pressed("pause"):
@@ -433,6 +452,7 @@ func toggle_view() -> void:
 	if first_person and fp == null:
 		fp = FpView.new()
 		fp.dog = dog
+		fp.flying = flying
 		fp.turds = turds
 		add_child(fp)
 	view.visible = not first_person
@@ -724,7 +744,7 @@ func _update_hud_status() -> void:
 			var ra: Agent = _agent_by_id[id]
 			rivals.append({"clock": left, "accent": ra.accent, "mark": ra.mark, "out": out})
 	hud.set_status(clocks.get(my_id, 0.0), rivals,
-		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"])
+		inventories[my_id]["hp"], MAX_HP, inventories[my_id]["darts"], inventories[my_id]["bombs"])
 
 
 ## The nearest other agent in `a`'s room that can be hit, and within `reach`.
@@ -772,6 +792,35 @@ func _try_fire() -> void:
 		return
 	_dart_cd = DART_COOLDOWN
 	do_fire(my_id, 0.0)
+
+
+func _try_throw() -> void:
+	if over or local_agent.searching or local_agent.ko_time > 0.0 or local_agent.vent >= 0 or _throw_cd > 0.0:
+		return
+	if inventories[my_id]["bombs"] <= 0:
+		hud.toast("Out of bombs! You get %d more when you're taken out." % MAX_BOMBS, Color("ffd23f"), 2.0)
+		return
+	_throw_cd = THROW_COOLDOWN
+	do_throw(my_id, 0.0)
+
+
+## Lobs a bomb. It lands on a rival roughly in front (anyone, for a bot)
+## within range, or a good way ahead; `aim_error` is how far off (in floor
+## units) a bot's throw may land.
+func do_throw(id: int, aim_error: float) -> void:
+	var a: Agent = _agent_by_id[id]
+	var ahead := Vector2.from_angle(a.facing)
+	var to := a.position + ahead * THROW_RANGE * 0.7
+	var target := rival_near(a, THROW_RANGE)
+	if target and (id != my_id or absf(ahead.angle_to(target.position - a.position)) < AIM_CONE):
+		to = target.position
+	to += Vector2.from_angle(_rng.randf() * TAU) * _rng.randf() * aim_error
+	a.facing = (to - a.position).angle()
+	a.swing()
+	if bots.has(id) or multiplayer.is_server():
+		referee.handle_throw(id, to)
+	else:
+		_request_throw.rpc_id(1, to)
 
 
 ## Swing the cosh. Used for the local player and the bot.
@@ -889,6 +938,12 @@ func _on_recovered(id: int, kind: String) -> void:
 func request_hit(target: int, kind: String) -> void:
 	if multiplayer.is_server():
 		referee.handle_hit(_sender(), target, kind)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _request_throw(to: Vector2) -> void:
+	if multiplayer.is_server():
+		referee.handle_throw(_sender(), to)
 
 
 @rpc("any_peer", "call_local", "reliable")

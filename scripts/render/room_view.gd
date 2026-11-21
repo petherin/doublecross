@@ -14,6 +14,8 @@ const RoomEffects = preload("res://scripts/render/room_effects.gd")
 
 const DOOR_TOP := 82.0
 const LEDGE_H := 16.0
+## Matches the game's throw time (seconds a thrown bomb is in the air).
+const THROW_TIME := 0.7
 const HEIGHTS := {
 	"desk": 40.0, "console": 52.0, "cabinet": 72.0, "locker": 120.0, "crate": 58.0,
 	"shelf": 112.0, "safe": 62.0, "plant": 24.0, "rack": 100.0, "sofa": 24.0, "kennel": 70.0,
@@ -44,6 +46,8 @@ var my_id := 1
 var my_traps := {}
 ## Darts in flight (shared with the game): { owner, room, pos, vel, live }
 var darts: Array = []
+## Thrown bombs in the air (the game's list).
+var flying: Array = []
 ## Where the view sits when still; shakes are offsets from here.
 var base_position := Vector2.ZERO
 ## Trap explosions, hits, vent dust and their comic-book words.
@@ -192,6 +196,9 @@ func _draw() -> void:
 	for d in darts:
 		if d["room"] == room:
 			_draw_dart(d)
+	for b in flying:
+		if b["room"] == room:
+			_draw_flying_bomb(b)
 	_draw_front_ledges(area)
 	_draw_my_tripwires()
 	if dog:
@@ -472,6 +479,31 @@ func _draw_dart(d: Dictionary) -> void:
 	draw_line(tail, head, Color("c7ccd6"), 3.0, true)
 	draw_circle(tail, 3.5, Color("ff5a5f"))
 	draw_circle(World.iso(p, 0.0), 4.0, Color(0, 0, 0, 0.3))
+
+
+## A thrown bomb arcing through the air, its fuse fizzing, with its shadow
+## on the floor showing where it'll land.
+func _draw_flying_bomb(b: Dictionary) -> void:
+	var k := clampf(b["t"] / THROW_TIME, 0.0, 1.0)
+	if k >= 1.0:
+		return
+	var from: Vector2 = b["from"]
+	var to: Vector2 = b["to"]
+	var p := from.lerp(to, k)
+	var h := 55.0 + 4.0 * (45.0 + from.distance_to(to) * 0.15) * k * (1.0 - k)
+	draw_set_transform(World.iso(p), 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2.ZERO, 9.0 + 5.0 * (1.0 - absf(k - 0.5) * 2.0), Color(0, 0, 0, 0.35))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# Where it'll land.
+	draw_set_transform(World.iso(to), 0.0, Vector2(1.0, 0.5))
+	draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 32, Color(1.0, 0.35, 0.25, 0.35 + 0.3 * sin(_t * 20.0)), 2.0, true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var c := World.iso(p, h)
+	draw_circle(c, 10.0, Color(0.04, 0.04, 0.05))
+	draw_circle(c + Vector2(-3, -3), 3.0, Color(1, 1, 1, 0.35))
+	var fuse := c + Vector2(6, -11)
+	draw_line(c + Vector2(4, -8), fuse, Color("c9a46a"), 2.0)
+	draw_circle(fuse, 3.0 + sin(_t * 40.0), Color(1.0, 0.8, 0.3))
 
 
 ## Pulsing outline round the furniture you can search, plus a magnifier.

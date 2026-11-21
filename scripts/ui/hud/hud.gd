@@ -10,6 +10,7 @@ signal crawl_pressed
 signal trap_chosen(kind: String)
 signal attack_pressed
 signal fire_pressed
+signal throw_pressed
 signal view_pressed
 signal pause_pressed
 signal resumed
@@ -33,6 +34,7 @@ var trap_button: ActionButton
 var attack_button: ActionButton
 var crawl_button: ActionButton
 var fire_button: ActionButton
+var throw_button: ActionButton
 var _known_vents: Array = []
 var _status: Control
 var _clock_mine := 0.0
@@ -41,6 +43,7 @@ var _rivals: Array = []
 var _hp := 3
 var _max_hp := 3
 var _darts := 3
+var _bombs := 3
 var _trap_options := {}       # kind -> ActionButton
 var _trap_menu_open := false
 var _trap_menu_timer := 0.0
@@ -112,6 +115,14 @@ func setup(p_world: World, who: String, accent: Color) -> void:
 	fire_button.radius = 48.0
 	fire_button.pressed.connect(func(): fire_pressed.emit())
 	add_child(fire_button)
+
+	throw_button = ActionButton.new()
+	throw_button.label = "THROW"
+	throw_button.icon = "BOMB"
+	throw_button.accent = Color("ff5a3c")
+	throw_button.radius = 46.0
+	throw_button.pressed.connect(func(): throw_pressed.emit())
+	add_child(throw_button)
 
 	_status = Control.new()
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -257,9 +268,12 @@ func _place(b: Control, centre: Vector2) -> void:
 
 
 ## Clock, health and darts (top-left) and the rivals' clocks (top-right).
-func set_status(mine: float, rivals: Array, hp: int, max_hp: int, darts: int) -> void:
-	if absf(mine - _clock_mine) < 0.05 and rivals == _rivals and hp == _hp and darts == _darts:
+func set_status(mine: float, rivals: Array, hp: int, max_hp: int, darts: int, bombs := 0) -> void:
+	if absf(mine - _clock_mine) < 0.05 and rivals == _rivals and hp == _hp and darts == _darts and bombs == _bombs:
 		return
+	_bombs = bombs
+	throw_button.label = "THROW ×%d" % bombs
+	throw_button.queue_redraw()
 	_clock_mine = mine
 	_rivals = rivals
 	_hp = hp
@@ -284,7 +298,8 @@ func _draw_status() -> void:
 	var clock_text := _fmt(_clock_mine)
 	var pips_x := 46.0 + font.get_string_size(clock_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x + 22.0
 	var darts_x := pips_x + _max_hp * 22.0 + 4.0
-	var bg := Rect2(8, 4, darts_x + 40.0, 38)
+	var bombs_x := darts_x + 44.0
+	var bg := Rect2(8, 4, bombs_x + 40.0, 38)
 	_status.draw_rect(bg, Color(0, 0, 0, 0.45))
 	# Stopwatch icon
 	var c := Vector2(28, 23)
@@ -302,6 +317,9 @@ func _draw_status() -> void:
 	# Darts left
 	Icons.draw(_status, "DART", Vector2(darts_x, 23), 22.0, _darts > 0)
 	_status.draw_string(font, Vector2(darts_x + 14, 31), "%d" % _darts, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+	# Bombs left (to throw, or to hide as traps)
+	Icons.draw(_status, "BOMB", Vector2(bombs_x, 23), 22.0, _bombs > 0)
+	_status.draw_string(font, Vector2(bombs_x + 14, 31), "%d" % _bombs, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
 	_draw_rival_clocks(font)
 
 
@@ -345,6 +363,7 @@ func _layout() -> void:
 	_place(fire_button, Vector2(L.x - 228, L.y - 222))
 	_place(trap_button, Vector2(L.x - 250, L.y - 78))
 	_place(crawl_button, Vector2(L.x - 238, L.y - 352))
+	_place(throw_button, Vector2(L.x - 92, L.y - 400))
 	# Trap options fan out to the left of the TRAP button.
 	var spots := [
 		Vector2(L.x - 380, L.y - 72), Vector2(L.x - 392, L.y - 178), Vector2(L.x - 345, L.y - 280),
@@ -429,7 +448,7 @@ func set_facing(angle: float) -> void:
 ## Once you're out: hides your controls and says whose mission you're
 ## watching; the view button moves you on to the next agent.
 func set_watching(agent_name: String, col: Color) -> void:
-	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
+	for b in [search_button, trap_button, attack_button, fire_button, throw_button, crawl_button, joystick]:
 		b.visible = false
 	_close_trap_menu()
 	_view_button.text = "NEXT AGENT"
@@ -526,7 +545,7 @@ func _process(delta: float) -> void:
 ## The case-file debrief at the end of the match.
 func show_end(winner: int, my_id: int, winner_name: String, reason: String, can_rematch: bool,
 		timeline: Array = []) -> void:
-	for b in [search_button, trap_button, attack_button, fire_button, crawl_button, joystick]:
+	for b in [search_button, trap_button, attack_button, fire_button, throw_button, crawl_button, joystick]:
 		b.visible = false
 	_watching.visible = false
 	_close_trap_menu()

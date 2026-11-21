@@ -40,10 +40,13 @@ var detail_high := true
 var pitch := 0.0
 ## Nacho the dog, shown as a cut-out like the agents.
 var dog: Node
+## Thrown bombs in the air (the game's list).
+var flying: Array = []
 ## Nacho's turds (the game's list); those in this room are built as they appear.
 var turds: Array = []
 var camera: Camera3D
 var _dog_sprite: Sprite3D
+var _bomb_meshes: Array = []      # MeshInstance3D pool for bombs in the air
 var _turds_built := {}            # turd dict -> Node3D, for this room
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
@@ -122,6 +125,7 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	_cutouts.clear()
 	_labels.clear()
 	_dog_sprite = null
+	_bomb_meshes.clear()
 	_turds_built.clear()
 	_fx.clear()
 	_vents.clear()
@@ -190,6 +194,7 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 		_set_highlight(_furniture[i], i == highlight)
 	_show_dog()
 	_show_turds()
+	_show_bombs()
 	for a: Agent in agents:
 		if a == me:
 			continue
@@ -687,6 +692,35 @@ func _add_cutout(a: Agent) -> void:
 	l.no_depth_test = false
 	_room_root.add_child(l)
 	_labels[a] = l
+
+
+## Thrown bombs arcing through this room: black balls with a glowing fuse.
+func _show_bombs() -> void:
+	var here := flying.filter(func(b): return b["room"] == room and b["t"] < 0.7)
+	while _bomb_meshes.size() < here.size():
+		var mi := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 9.0
+		sm.height = 18.0
+		mi.mesh = sm
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.05, 0.05, 0.06)
+		m.metallic = 0.4
+		m.emission_enabled = true
+		m.emission = Color(1.0, 0.5, 0.15)
+		m.emission_energy_multiplier = 0.25
+		mi.material_override = m
+		_room_root.add_child(mi)
+		_bomb_meshes.append(mi)
+	for i in _bomb_meshes.size():
+		var mi: MeshInstance3D = _bomb_meshes[i]
+		mi.visible = i < here.size()
+		if mi.visible:
+			var b: Dictionary = here[i]
+			var k: float = clampf(b["t"] / 0.7, 0.0, 1.0)
+			var p: Vector2 = (b["from"] as Vector2).lerp(b["to"], k)
+			var h := 55.0 + 4.0 * (45.0 + (b["from"] as Vector2).distance_to(b["to"]) * 0.15) * k * (1.0 - k)
+			mi.position = Vector3(p.x, h, p.y)
 
 
 ## Nacho's turds in this room: three squashed brown swirls, stacked.

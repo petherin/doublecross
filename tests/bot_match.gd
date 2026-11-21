@@ -2,6 +2,7 @@ extends SceneTree
 ## Headless regression: an idle player against the hard bot. The bot must
 ## find the intel and briefcase and escape before the clock runs out.
 ##   godot --headless --fixed-fps 60 -s res://tests/bot_match.gd [-- --bots=3 --seed=7 --spectate]
+## --level=easy|medium plays weaker bots (hard by default).
 ## --all prints the match's whole timeline (otherwise just Nacho's part).
 ## With --spectate the player is put out after two seconds, and the camera
 ## must follow the bots (room by room) while they play on.
@@ -22,14 +23,17 @@ func _process(_delta: float) -> bool:
 		root.add_child(_game)
 		var bots := 1
 		var seed_value := 12345
+		var level := "hard"
 		for a in OS.get_cmdline_user_args():
 			if a.begins_with("--bots="):
 				bots = a.get_slice("=", 1).to_int()
 			elif a.begins_with("--seed="):
 				seed_value = a.get_slice("=", 1).to_int()
+			elif a.begins_with("--level="):
+				level = a.get_slice("=", 1)
 			elif a == "--spectate":
 				_spectate = true
-		_game.setup(seed_value, 1, [1], "hard", 6, {1: "TEST"}, bots)
+		_game.setup(seed_value, 1, [1], level, 6, {1: "TEST"}, bots)
 		return false
 	_frames += 1
 	if _spectate and _frames == 120:

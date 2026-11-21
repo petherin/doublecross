@@ -8,6 +8,11 @@ const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
 ## Chance of Nacho needing a poo in a match (about one match in two or three).
 const POO_CHANCE := 0.4
+## Thrown bombs: how near the blast you have to be for a direct hit (taken
+## out), two hits or one, in floor units (a floor square is 128).
+const BLAST_DIRECT := 64.0
+const BLAST_NEAR := 192.0
+const BLAST_FAR := 320.0
 
 var game: Node
 var _rng := RandomNumberGenerator.new()
@@ -23,6 +28,8 @@ var _poo_rng := RandomNumberGenerator.new()
 var _poo_at := INF
 var _poo_end := -1.0
 var _poo_spot := {}
+## Bombs in the air: {pid, room, pos, at (match time it lands)}.
+var _thrown: Array = []
 
 
 func _init(p_game: Node) -> void:
@@ -94,11 +101,15 @@ func handle_trap(pid: int, info: Dictionary) -> void:
 	elif key == World.furniture_key(game.world.kennel[0], game.world.kennel[1]):
 		reason = "Not in Nacho's kennel!"
 	elif game.traps_owned_by(pid) >= game.MAX_TRAPS:
-		reason = "You've already got %d game.traps set." % game.MAX_TRAPS
+		reason = "You've already got %d traps set." % game.MAX_TRAPS
+	elif kind == "BOMB" and game.inventories[pid]["bombs"] <= 0:
+		reason = "Out of bombs! You get %d more when you're taken out." % game.MAX_BOMBS
 	if reason != "":
 		game.broadcast({"type": "trap_fail", "pid": pid, "reason": reason})
 		return
 	game.traps[key] = {"kind": kind, "owner": pid}
+	if kind == "BOMB":
+		game.inventories[pid]["bombs"] -= 1   # bomb traps and thrown bombs share the supply
 	game.broadcast({"type": "trap_set", "pid": pid, "kind": kind, "key": key})
 
 
@@ -144,35 +155,105 @@ func handle_hit(by: int, target: int, kind: String) -> void:
 		return
 	if kind == "melee" and (ta.room != ba.room or ta.position.distance_to(ba.position) > game.MELEE_RANGE * 2.0):
 		return
-	# Attacking Nacho's agent sets him on you.
-	if target == game.dog.owner_id and kind != "bite" and game.dog.room == ba.room:
+	_damage(by, target, 1, kind, ba.position)
+
+
+## `amount` hits on `target` (from `by`, who was at `from`): a hit, or taken
+## out if it's their last. Attacking Nacho's agent sets him on you.
+func _damage(by: int, target: int, amount: int, kind: String, from: Vector2) -> void:
+	var ta: Agent = game.agent_of(target)
+	var ba: Agent = game.agent_of(by)
+	if target == game.dog.owner_id and by != target and kind != "bite" and ba and game.dog.room == ba.room:
 		_set_nacho_on(by)
 	var inv: Dictionary = game.inventories[target]
-	inv["hp"] -= 1
+	inv["hp"] -= amount
 	if inv["hp"] > 0:
-		game.broadcast({"type": "hit", "pid": target, "by": by, "kind": kind, "from": ba.position})
+		game.broadcast({"type": "hit", "pid": target, "by": by, "kind": kind, "from": from})
 		return
 	# Taken out: drop the intel, lose time, wake up back at the start.
 	var lost: Array = inv["items"].duplicate()
 	inv["items"].clear()
 	for item in lost:
 		_hide_somewhere(item, ta.room)
-	inv["hp"] = game.MAX_HP
-	inv["darts"] = game.MAX_DARTS
+	_refill(inv)
 	_penalise(target, game.DOWN_PENALTY)
 	game.broadcast({"type": "down", "pid": target, "by": by, "kind": kind, "room": ta.room, "lost": lost,
-			"from": ba.position})
+			"from": from})
 	_send_nacho_home(target)
+
+
+## Back on your feet after being taken out: full health, darts and bombs.
+func _refill(inv: Dictionary) -> void:
+	inv["hp"] = game.MAX_HP
+	inv["darts"] = game.MAX_DARTS
+	inv["bombs"] = game.MAX_BOMBS
+
+
+## Throws a bomb at floor point `to`: it lands THROW_TIME later and blows up.
+func handle_throw(pid: int, to: Vector2) -> void:
+	var a: Agent = game.agent_of(pid)
+	if game.over or a == null or not game.inventories.has(pid) or game.inventories[pid]["bombs"] <= 0:
+		return
+	if a.ko_time > 0.0 or a.vent >= 0 or a.out:
+		return
+	game.inventories[pid]["bombs"] -= 1
+	var d := to - a.position
+	to = a.position + d.limit_length(game.THROW_RANGE)
+	to = to.clamp(World.ROOM.position + Vector2(20, 20), World.ROOM.end - Vector2(20, 20))
+	_thrown.append({"pid": pid, "room": a.room, "pos": to, "at": _now + game.THROW_TIME})
+	game.broadcast({"type": "throw", "pid": pid, "room": a.room, "from": a.position, "to": to})
+
+
+## Thrown bombs that have landed go off.
+func _tick_thrown() -> void:
+	var keep := []
+	for b in _thrown:
+		if _now >= b["at"]:
+			_blast(b["pid"], b["room"], b["pos"])
+		else:
+			keep.append(b)
+	_thrown = keep
+
+
+## A thrown bomb goes off at `pos`: a direct hit takes you out (or Nacho);
+## nearer than 1.5 floor squares is two hits, nearer than 2.5 squares one.
+## The thrower isn't safe either.
+func _blast(by: int, room: Vector2i, pos: Vector2) -> void:
+	game.broadcast({"type": "blast", "pid": by, "room": room, "pos": pos})
+	for a: Agent in game.agents:
+		var id: int = game.id_of(a)
+		if a.room != room or a.out or a.vent >= 0 or a.ko_time > 0.0 or a.protect_time > 0.0 \
+				or not game.inventories.has(id):
+			continue
+		var amount := blast_damage(a.position.distance_to(pos))
+		if amount > 0:
+			_damage(by, id, amount, "blast", pos)
+	var dog: Node = game.dog
+	if dog.room == room and dog.visible_now() and dog.owner_id not in [0, by]:
+		var amount := blast_damage(dog.position.distance_to(pos))
+		if amount > 0:
+			_hit_nacho(by, amount)
+
+
+## Hits a blast does at `dist` from where it went off (3: taken out).
+static func blast_damage(dist: float) -> int:
+	if dist <= BLAST_DIRECT:
+		return 3
+	if dist <= BLAST_NEAR:
+		return 2
+	if dist <= BLAST_FAR:
+		return 1
+	return 0
 
 
 ## Someone hits Nacho: it hurts, he goes for them, and three hits send him
 ## home to his kennel, nobody's dog any more, for whoever finds him next.
-func _hit_nacho(by: int) -> void:
+func _hit_nacho(by: int, amount := 1) -> void:
 	var att: Agent = game.agent_of(by)
 	var dog: Node = game.dog
 	if game.over or att == null or dog.owner_id in [0, by] or att.room != dog.room or dog.protect_time > 0.0:
 		return
-	var hp: int = dog.hp - 1
+	var hp: int = dog.hp - amount
 	if hp > 0:
 		_set_nacho_on(by)
 		game.broadcast({"type": "nacho_hit", "pid": by, "hp": hp, "room": dog.room})
@@ -269,8 +350,7 @@ func _slip(pid: int, turd: Dictionary) -> void:
 	inv["case"] = false
 	for item in lost:
 		_hide_somewhere(item, turd["room"])
-	inv["hp"] = game.MAX_HP
-	inv["darts"] = game.MAX_DARTS
+	_refill(inv)
 	_penalise(pid, game.DOWN_PENALTY)
 	game.broadcast({"type": "down", "pid": pid, "by": 0, "kind": "slip", "room": turd["room"], "lost": lost,
 			"from": turd["pos"], "turd": turd["pos"]})
@@ -293,6 +373,7 @@ func tick_clocks(delta: float) -> void:
 		if not game.eliminated.has(id):
 			game.clocks[id] -= delta
 	tick_nacho(delta)
+	_tick_thrown()
 	_clock_sync -= delta
 	if _clock_sync <= 0.0:
 		_clock_sync = 0.5
