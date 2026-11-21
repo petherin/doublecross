@@ -58,7 +58,7 @@ def preview():
     dog = dog_model.Dog()
     _no_ink(scene, dog)
     shots = [("idle", 0, 2, 0), ("idle", 0, 2, 2), ("walk", 2, 8, 1), ("sit", 0, 2, 3),
-             ("sniff", 1, 4, 6), ("bark", 0, 4, 1), ("growl", 0, 2, 7), ("bite", 1, 3, 2)]
+             ("sniff", 1, 4, 6), ("bark", 0, 4, 1), ("growl", 0, 2, 7), ("poo", 1, 2, 3)]
     tiles = []
     for anim, i, n, d in shots:
         dog.root.rotation_euler = Euler((0, 0, math.radians(-45 * d)))

@@ -24,7 +24,7 @@ NOSE = (0.34, 0.13, 0.11)       # liver-brown nose
 EYE = (0.2, 0.06, 0.012)        # amber-brown eyes
 
 # Animation name -> frame count (see pose()).
-ANIMS = [("idle", 2), ("walk", 8), ("sniff", 4), ("sit", 2), ("bark", 4), ("growl", 2), ("bite", 3)]
+ANIMS = [("idle", 2), ("walk", 8), ("sniff", 4), ("sit", 2), ("bark", 4), ("growl", 2), ("bite", 3), ("poo", 2)]
 
 
 def _fur(name, color, light):
@@ -254,7 +254,7 @@ def _pose_params(anim, i, n):
         "gait": 0.0, "stride": 0.0, "sit": 0.0, "crouch": 0.0, "lunge": 0.0,
         "head_pitch": -8.0, "head_yaw": 0.0, "jaw": 0.0,
         "tail_up": 35.0, "tail_wag": 0.0, "ear_flap": 0.0, "ear_swing": 0.0, "breath": 0.0,
-        "head_low": 0.0,
+        "head_low": 0.0, "squat": 0.0,
     }
     if anim == "idle":
         p["breath"] = 0.008 * w
@@ -294,6 +294,13 @@ def _pose_params(anim, i, n):
         p["tail_up"] = 5.0
         p["tail_wag"] = 3.0 * w
         p["ear_flap"] = -8.0
+    elif anim == "poo":
+        # Hunched over, straining, tail up out of the way.
+        p["squat"] = 1.0
+        p["strain"] = 0.02 * i
+        p["head_pitch"] = -10.0 + 5.0 * i
+        p["tail_up"] = 78.0
+        p["ear_flap"] = 4.0 * i
     elif anim == "bite":
         k = [0.0, 1.0, 0.4][i % 3]
         p["lunge"] = 0.16 * k
@@ -321,6 +328,8 @@ def _skeleton(p):
     breath = p["breath"]
     if sit > 0.0:
         return _sitting(p)
+    if p["squat"] > 0.0:
+        return _squatting(p)
     hip_z = 0.56
     chest_z = 0.58 - crouch
     pts = {
@@ -382,6 +391,32 @@ def _sitting(p):
         pts["stifle_" + side] = Vector((0.03, y * 1.4, 0.15))
         pts["hock_" + side] = Vector((-0.16, y * 1.3, 0.05))
         pts["hpaw_" + side] = Vector((0.02, y * 1.3, 0.03))
+    _tail(pts, p)
+    return pts
+
+
+def _squatting(p):
+    """Squatting to go: rump hovering over the floor, back arched, hind legs
+    folded forward under him, front legs braced."""
+    strain = p.get("strain", 0.0)
+    pts = {
+        "rump": Vector((-0.33, 0, 0.24)),
+        "hip": Vector((-0.23, 0, 0.33)),
+        "mid": Vector((-0.02, 0, 0.56 + strain)),
+        "chest": Vector((0.2, 0, 0.58)),
+        "brisket": Vector((0.25, 0, 0.44)),
+        "neck": Vector((0.31, 0, 0.68)),
+        "head_base": Vector((0.4, 0, 0.82 - strain)),
+    }
+    for side, y in (("l", 0.095), ("r", -0.095)):
+        front = _limb((0.21, y, 0.52), [0.22, 0.2, 0.1], [4.0, -6.0, 2.0])
+        for n, name in enumerate(("sh_", "elbow_", "wrist_", "paw_")):
+            pts[name + side] = front[n]
+        pts["hp_" + side] = Vector((-0.22, y * 1.15, 0.3))
+        pts["stifle_" + side] = Vector((-0.04, y * 1.3, 0.2))
+        pts["hock_" + side] = Vector((-0.2, y * 1.25, 0.07))
+        pts["hpaw_" + side] = Vector((-0.06, y * 1.25, 0.03))
+    _ground(pts)
     _tail(pts, p)
     return pts
 

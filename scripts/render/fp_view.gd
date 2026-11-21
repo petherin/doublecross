@@ -40,8 +40,11 @@ var detail_high := true
 var pitch := 0.0
 ## Nacho the dog, shown as a cut-out like the agents.
 var dog: Node
+## Nacho's turds (the game's list); those in this room are built as they appear.
+var turds: Array = []
 var camera: Camera3D
 var _dog_sprite: Sprite3D
+var _turds_built := {}            # index in turds -> true, for this room
 var _room_root: Node3D
 ## Where new room pieces go: the room itself, or a neighbour beyond a door.
 var _target: Node3D
@@ -119,6 +122,7 @@ func rebuild(p_world: World, p_room: Vector2i) -> void:
 	_cutouts.clear()
 	_labels.clear()
 	_dog_sprite = null
+	_turds_built.clear()
 	_fx.clear()
 	_vents.clear()
 	_markers.clear()
@@ -184,6 +188,7 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 	for i in _furniture.size():
 		_set_highlight(_furniture[i], i == highlight)
 	_show_dog()
+	_show_turds()
 	for a: Agent in agents:
 		if a == me:
 			continue
@@ -681,6 +686,31 @@ func _add_cutout(a: Agent) -> void:
 	l.no_depth_test = false
 	_room_root.add_child(l)
 	_labels[a] = l
+
+
+## Nacho's turds in this room: three squashed brown swirls, stacked.
+func _show_turds() -> void:
+	for i in turds.size():
+		if _turds_built.has(i) or turds[i]["room"] != room:
+			continue
+		_turds_built[i] = true
+		var p: Vector2 = turds[i]["pos"]
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color("5c3719")
+		m.roughness = 0.25
+		m.metallic_specular = 0.8
+		var root := Node3D.new()
+		root.position = Vector3(p.x, 0.0, p.y)
+		_room_root.add_child(root)
+		for l in [[13.0, 4.0], [10.0, 10.0], [6.5, 15.5]]:
+			var sm := SphereMesh.new()
+			sm.radius = l[0]
+			sm.height = l[0] * 1.1
+			var mi := MeshInstance3D.new()
+			mi.mesh = sm
+			mi.material_override = m
+			mi.position = Vector3(0.0, l[1], 0.0)
+			root.add_child(mi)
 
 
 ## Nacho, if he's in this room (his sheet is drawn the same way as an agent's).

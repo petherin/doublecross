@@ -96,7 +96,15 @@ attacks you, or him, gets chased and bitten (each bite counts like a blow
 from a cosh) for as long as they keep attacking; once they leave off for a
 few seconds, so does he. He can be hurt, though: three hits (his health
 shows over him) and he limps home to his kennel. He goes home too if you're
-taken out. Either way he's nobody's dog until someone finds him again. Bots look for him too, and use his nose.
+taken out. Either way he's nobody's dog until someone finds him again.
+
+In about two matches in five, Nacho stops at some point for a **poo**
+("hnnng…"), which takes a few seconds. He won't go while he's fighting, and
+if anyone starts on him or his agent mid-poo he stops and goes for them (and
+tries again later). What he leaves behind stays put, and works like a trap:
+anyone who treads in it, his own agent included, slips, falls and is taken
+out, and everything they're carrying (intel, briefcase, gadgets) goes
+flying. Bots know to walk round it. Bots look for him too, and use his nose.
 
 <p align="center"><img src="docs/nacho.png" alt="Nacho, a scruffy ginger dog with long ears and a red collar, standing, trotting, sitting, sniffing, barking, growling and biting" width="80%"></p>
 
@@ -359,6 +367,8 @@ tests/
   smoke.gd              every script compiles, inputs mapped, 300 seeds of base rules
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
                         (--spectate: you're put out, and the camera must follow them)
+  nacho_poo.gd          his poo: squats, leaves a turd, stops if attacked, won't
+                        start mid-fight; treading in it takes you out, kit and all
   nacho.gd              Nacho: found in his kennel, sniffs out an item and a trap,
                         follows to the next room, bites an attacker until they stop,
                         taken out by three hits, goes home and is anyone's to find

@@ -528,9 +528,19 @@ func _grid(room: Vector2i) -> AStarGrid2D:
 				if (f["rect"] as Rect2).grow(margin).has_point(p):
 					solid = true
 					break
+			# Nobody treads in Nacho's mess on purpose.
+			for t in game.turds:
+				if t["room"] == room and p.distance_to(t["pos"]) < game.dog.TURD_RADIUS + Agent.RADIUS + 10.0:
+					solid = true
 			g.set_point_solid(cell, solid)
 	_grids[room] = g
 	return g
+
+
+## The room's layout changed (a turd appeared): plan routes afresh.
+func forget_room(room: Vector2i) -> void:
+	_grids.erase(room)
+	_path = PackedVector2Array()
 
 
 func _cell_of(p: Vector2, grid: AStarGrid2D) -> Vector2i:

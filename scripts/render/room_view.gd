@@ -31,8 +31,9 @@ var room := Vector2i.ZERO:
 var lights: RoomLights
 ## Agents to draw; only those in `room` are shown.
 var agents: Array = []
-## Nacho the dog (drawn among the agents, wherever he is).
+## Nacho the dog (drawn among the agents, wherever he is), and his turds.
 var dog: Node
+var turds: Array = []
 ## Index of the furniture the local agent can search right now (-1 = none).
 var highlight := -1
 var highlight_color := Color.WHITE
@@ -149,6 +150,8 @@ func _draw() -> void:
 		if e["kind"] == "BOMB":
 			effects.draw_scorch(self, e)
 	_draw_back_walls(area, tint)
+	if dog:
+		dog.paint_turds(self, turds, room)
 
 	# Depth sorting. Furniture is sorted among itself, then each agent is
 	# slotted in just after the last piece of furniture it stands in front of.
