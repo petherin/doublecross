@@ -29,7 +29,8 @@ const HELP := [
 		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
 	["NACHO", "Somewhere in the base is a [b]KENNEL[/b]. Search it to find [b]NACHO[/b] the dog, who follows "
 		+ "you everywhere, [b]growls[/b] at traps and [b]barks[/b] at hidden things, and bites anyone who attacks "
-		+ "you or him until they stop. Three hits, or you being taken out, send him home to be found again."],
+		+ "you or him until they stop. Three hits, or you being taken out, send him home to be found again. "
+		+ "Watch where you tread: if he stops for a poo, stepping in it takes you out, and you drop everything."],
 	["TIPS", "New agents get a few tips on the ticker tape during their first missions. "
 		+ "Clear them under SETTINGS to see them again."],
 	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · V crawl. "

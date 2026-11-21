@@ -528,6 +528,17 @@ def dog():
     g = _voice([(1.1, 95, 85, "o", 0.0, 1.0)], breath=0.4, rough=0.9)
     pulse = 0.55 + 0.45 * np.sin(2 * np.pi * 3.2 * np.arange(len(g)) / SR) ** 2
     save_wav("growl", reverb(lowpass(g * pulse, 1400), 0.4, 0.12), 0.7)
+    # Plop: a wet little drop. Slip: a squelch and a skid.
+    n = int(SR * 0.16)
+    tt = np.arange(n) / SR
+    drop = np.sin(2 * np.pi * np.cumsum(np.linspace(340, 110, n)) / SR) * env(n, 0.002, None, 0.06)
+    save_wav("plop", reverb(mix(drop, at(click(0.004, 1500) * 0.6, 0.0), lowpass(noise(0.08), 1800) * 0.3),
+                            0.3, 0.1), 0.7)
+    # Slip: a wet squelch underfoot, then the bang of landing flat on the floor.
+    squelch = bandpass(noise(0.22), 250, 1400) * env(int(SR * 0.22), 0.004, None, 0.08)
+    gloop = np.sin(2 * np.pi * np.cumsum(np.linspace(260, 90, int(SR * 0.18))) / SR) * env(int(SR * 0.18), 0.003, None, 0.05)
+    bang = mix(thud(65.0, 0.45, 1.4), lowpass(noise(0.12), 900) * env(int(SR * 0.12), 0.001, None, 0.03) * 1.2)
+    save_wav("slip", reverb(mix(squelch, gloop * 0.7, at(bang, 0.42)), 0.45, 0.15), 0.85)
     # Yelp: a high, sharp cry when he's hit.
     save_wav("yelp", reverb(mix(ruff(1150, 820, 0.11, "e", 0.15), at(ruff(980, 700, 0.09, "e", 0.15), 0.13)),
                             0.3, 0.1), 0.75)

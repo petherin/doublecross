@@ -110,6 +110,9 @@ var fp: FpView
 var first_person := false
 ## Nacho, the base's dog.
 var dog: Dog
+## What he's left behind: [{room, pos}]. They stay put, and anyone who treads
+## in one slips and is taken out.
+var turds: Array = []
 ## The agent the camera follows: you, or (once you're out) a rival you watch.
 var watched: Agent
 var spectating := false
@@ -192,6 +195,7 @@ func setup(seed_value: int, p_my_id: int, ids: Array, bot_level := "", minutes :
 	dog.setup(self)
 	dog.alerted.connect(_on_dog_alerted)
 	view.dog = dog
+	view.turds = turds
 	view.highlight_color = local_agent.accent
 	view.my_id = my_id
 	view.darts = darts
@@ -429,6 +433,7 @@ func toggle_view() -> void:
 	if first_person and fp == null:
 		fp = FpView.new()
 		fp.dog = dog
+		fp.turds = turds
 		add_child(fp)
 	view.visible = not first_person
 	local_agent.face_lock = first_person
@@ -874,7 +879,7 @@ func _send_hit(by: int, target: int, kind: String) -> void:
 
 func _on_recovered(id: int, kind: String) -> void:
 	# After being taken out you wake up back where you started.
-	if kind == "DOWN" and (id == my_id or bots.has(id)):
+	if kind in ["DOWN", "SLIP"] and (id == my_id or bots.has(id)):
 		_agent_by_id[id].respawn(_start_room[id])
 
 

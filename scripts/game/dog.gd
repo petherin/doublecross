@@ -6,7 +6,9 @@ extends Node
 ## in it. Anyone who attacks his agent, or him, gets chased and bitten until
 ## they stop. He can be hurt: three hits and he runs home to his kennel. He
 ## also runs home if his agent is taken out. Either way he's nobody's dog
-## until someone finds him again.
+## until someone finds him again. Now and then (in about two matches in five),
+## while he's out with an agent, he stops for a poo, and what he leaves
+## behind is as good as a trap (once).
 ##
 ## Who he belongs to is decided by the referee (the host) and arrives as
 ## events; every device walks him about itself, following his agent.
@@ -39,6 +41,9 @@ const BITE_STUN := 0.7
 const BITE_REACH := 80.0
 ## Hits he can take before he runs home (agents take three, too).
 const MAX_HP := 3
+## How long a poo takes, and how close you have to tread to slip in one.
+const POO_TIME := 3.0
+const TURD_RADIUS := 24.0
 
 static var _meta := {}
 static var _tex: Texture2D
@@ -59,7 +64,7 @@ var facing := PI / 2.0
 var moving := false
 ## What he's pointed out to his agent: furniture or door key -> "item"/"trap".
 var flags := {}
-var _state := "home"       # home, follow, go, sniff, alert, bite
+var _state := "home"       # home, follow, go, sniff, alert, guard, bite, poo
 var _state_t := 0.0
 var _target := Vector2.ZERO
 var _key := ""
@@ -118,6 +123,35 @@ func hit(p_hp: int) -> void:
 	protect_time = 0.4
 
 
+## Where he'd squat if he went now, which way he'd face, and where the
+## turd would land (just behind him): [stand, facing, turd].
+func poo_plan() -> Array:
+	return [position, facing, _clamp_in(position - Vector2.from_angle(facing) * 30.0)]
+
+
+## Squats where the referee says, for POO_TIME (unless someone starts on him).
+func start_poo(stand: Vector2, face: float) -> void:
+	position = stand
+	facing = face
+	_set_state("poo", POO_TIME + 1.0)
+
+
+func is_pooing() -> bool:
+	return _state == "poo"
+
+
+## Done: back to following, or to sitting by the kennel.
+func finish_poo() -> void:
+	if _state != "poo":
+		return
+	if owner_id == 0:
+		position = kennel_front()
+		facing = _into_room()
+		_set_state("home")
+	else:
+		_set_state("follow", 0.6)
+
+
 ## A bite lands: a snap of the jaws.
 func bite(_victim: Agent) -> void:
 	_set_state("bite", 0.45)
@@ -157,8 +191,9 @@ func _set_state(s: String, t := 0.0) -> void:
 func _process(delta: float) -> void:
 	hurt_time = maxf(0.0, hurt_time - delta)
 	protect_time = maxf(0.0, protect_time - delta)
-	if world == null or owner_id == 0:
-		moving = false
+	moving = false
+	if world == null or owner_id == 0 or _state == "poo":
+		# At home, or busy: he stays put (and catches up with his agent after).
 		return
 	var me: Agent = game.agent_of(owner_id)
 	if me == null or me.out:
@@ -327,20 +362,23 @@ static func sheet() -> Texture2D:
 ## The animation and frame he's showing.
 func _frame() -> Array:
 	var now := Time.get_ticks_msec()
+	var fr := []
 	match _state:
 		"home":
-			return ["sit", int(now / 900) % 2]
+			fr = ["sit", int(now / 900) % 2]
+		"poo":
+			fr = ["poo", int(now / 450) % 2] if _load_meta()["anims"].has("poo") else ["sit", 0]
 		"sniff":
-			return ["sniff", int(now / 160) % 4]
+			fr = ["sniff", int(now / 160) % 4]
 		"alert":
-			if _alert == "trap":
-				return ["growl", int(now / 200) % 2]
-			return ["bark", int(now / 120) % 4]
+			fr = ["growl", int(now / 200) % 2] if _alert == "trap" else ["bark", int(now / 120) % 4]
 		"bite":
-			return ["bite", mini(2, int((0.45 - _state_t) / 0.15))]
+			fr = ["bite", mini(2, int((0.45 - _state_t) / 0.15))]
 		"guard":
 			if not moving:
-				return ["growl", int(now / 200) % 2]
+				fr = ["growl", int(now / 200) % 2]
+	if not fr.is_empty():
+		return fr
 	if moving:
 		return ["walk", int(fposmod(_walk, TAU) / TAU * 8.0) % 8]
 	return ["idle", int(now / 700) % 2]
@@ -404,9 +442,13 @@ func paint(ci: CanvasItem) -> void:
 	elif _state == "sniff":
 		word = "sniff sniff"
 		col = Color(1, 1, 1, 0.75)
+	elif _state == "poo":
+		word = "hnnng…"
+		col = Color(1, 1, 1, 0.75)
 	if word != "":
-		var font := Style.stencil() if _state != "sniff" else Style.typewriter()
-		var size := 22 if _state != "sniff" else 15
+		var quiet := _state == "sniff" or _state == "poo"
+		var font := Style.typewriter() if quiet else Style.stencil()
+		var size := 15 if quiet else 22
 		var w := font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		var bob := sin(Time.get_ticks_msec() / 90.0) * 2.0
 		ci.draw_string_outline(font, foot + Vector2(-w / 2, -86 + bob), word, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5,
@@ -434,6 +476,36 @@ func paint_marks(ci: CanvasItem, my_id: int, heights: Dictionary) -> void:
 				Color(0, 0, 0, 0.8))
 		ci.draw_string(font, top + Vector2(-w / 2, 30), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
 				Color("ff5a5f") if trap else Color("ffd23f"))
+
+
+## What he's left behind, wherever in `room` it is: a glistening brown
+## swirl with a whiff coming off it.
+static func paint_turds(ci: CanvasItem, turds: Array, room: Vector2i) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	for t in turds:
+		if t["room"] != room:
+			continue
+		var c := World.iso(t["pos"])
+		ci.draw_set_transform(c, 0.0, Vector2(1.0, 0.5))
+		ci.draw_circle(Vector2.ZERO, 17.0, Color(0, 0, 0, 0.45))
+		var layers := [[14.0, 0.0, Color("4a2c14")], [11.0, -7.0, Color("5c3719")], [7.5, -13.0, Color("6b4220")]]
+		for l in layers:
+			ci.draw_set_transform(c + Vector2(0, l[1]), 0.0, Vector2(1.0, 0.62))
+			ci.draw_circle(Vector2.ZERO, l[0] + 1.5, Color(0.12, 0.07, 0.03))
+			ci.draw_circle(Vector2.ZERO, l[0], l[2])
+			ci.draw_circle(Vector2(-l[0] * 0.35, -l[0] * 0.35), l[0] * 0.28, Color(1, 0.9, 0.75, 0.25))
+		ci.draw_set_transform(c, 0.0, Vector2.ONE)
+		ci.draw_colored_polygon(PackedVector2Array([Vector2(-4, -17), Vector2(4, -17), Vector2(1, -24)]),
+				Color("6b4220"))
+		# The whiff.
+		for k in 3:
+			var life := fmod(now * 0.6 + k * 0.33, 1.0)
+			var pts := PackedVector2Array()
+			for j in 6:
+				var y := -22.0 - life * 34.0 - j * 4.0
+				pts.append(Vector2(-10.0 + k * 10.0 + sin(now * 4.0 + j * 1.3 + k) * 3.0, y))
+			ci.draw_polyline(pts, Color(0.75, 0.85, 0.55, 0.5 * (1.0 - life)), 1.5, true)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## A little paw print.

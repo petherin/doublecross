@@ -7,7 +7,7 @@ signal exit_touched
 signal search_finished(room: Vector2i, idx: int)
 signal trap_finished(info: Dictionary)
 signal door_passed(from_room: Vector2i, dir: int)
-## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE", "SHOCK" or "DOWN").
+## Emitted when a knock-out wears off (kind: "BOMB", "SPRING", "WIRE", "SHOCK", "DOWN" or "SLIP").
 signal recovered(kind: String)
 ## Emitted when the agent ducks into a vent (true) or pops out of one (false).
 signal vent_moved(entering: bool)
@@ -26,6 +26,8 @@ const SPRITE_HEIGHT := 120.0
 const FALL_TIME := 0.22
 ## How long the x-ray flicker and sparks last after a shock trap goes off.
 const SHOCK_FRY_TIME := 1.3
+## How long a slip takes: the skid, feet flying up, and the fall back.
+const SLIP_TIME := 0.5
 const SPRITE_METRES := 1.95
 static var _meta := {}
 static var _sheets := {}
@@ -65,6 +67,9 @@ var ko_time := 0.0
 var ko_kind := ""
 ## 1.0 right after a bomb, fading to 0: blackened with soot and smouldering.
 var soot := 0.0
+## 1.0 right after slipping in Nacho's mess, fading to 0: smeared in it,
+## with flies.
+var muck := 0.0
 ## Combat. hp/darts mirror the host's match state (for drawing).
 var hp := 3
 var max_hp := 3
@@ -126,9 +131,10 @@ func _physics_process(delta: float) -> void:
 		_walk += delta * 6.0
 		if ko_time == 0.0:
 			recovered.emit(ko_kind)
-	elif soot > 0.0:
-		# The soot wears off a while after you come round.
+	else:
+		# Soot and muck wear off a while after you come round.
 		soot = maxf(0.0, soot - delta / 10.0)
+		muck = maxf(0.0, muck - delta / 30.0)
 
 
 func knock_out(kind: String, seconds: float) -> void:
@@ -138,6 +144,8 @@ func knock_out(kind: String, seconds: float) -> void:
 	_ko_total = seconds
 	if kind == "BOMB":
 		soot = 1.0
+	elif kind == "SLIP":
+		muck = 1.0
 
 
 ## Ducks into vent `idx` (the agent is hidden and can't be hit until it
@@ -418,6 +426,9 @@ func _sprite_frame() -> Array:
 func _knocked_frame(anims: Dictionary) -> Array:
 	var now := Time.get_ticks_msec()
 	var ko := ko_time > 0.0
+	if ko and ko_kind == "SLIP":
+		# Feet out from under you, then flat on your back.
+		return ["hurt", 0] if _ko_total - ko_time < SLIP_TIME else ["down", int(anims["down"]["count"]) - 1]
 	if ko and ko_kind == "DOWN":
 		# Going over, then flat on the floor.
 		var last := int(anims["down"]["count"]) - 1
@@ -481,6 +492,14 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var ko_age := _ko_total - ko_time
 	if ko and ko_kind == "SPRING" and ko_age < 0.9:
 		foot.y -= sin(ko_age / 0.9 * PI) * 160.0
+	var slip_tilt := 0.0
+	if ko and ko_kind == "SLIP" and ko_age < SLIP_TIME:
+		# Skids on, goes up, and topples over backwards.
+		var k := ko_age / SLIP_TIME
+		var ahead := World.floor_to_screen_dir(Vector2.from_angle(facing))
+		foot += ahead * k * 30.0
+		foot.y -= sin(k * PI) * 34.0
+		slip_tilt = -signf(ahead.x if absf(ahead.x) > 0.05 else 1.0) * 1.4 * k
 	# Electrocuted: the agent judders about and every other instant shows as
 	# an x-ray, skeleton and all.
 	var zapped := ko and ko_kind == "SHOCK" and ko_age < SHOCK_FRY_TIME
@@ -504,12 +523,16 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	var region := Rect2(r[0], r[1], r[2], r[3])
 	var offset := Vector2(r[4], r[5])
 	# Dizzy wobble while knocked out by a trap.
-	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind != "DOWN" and not zapped else 0.0
+	var tilt := sin(_walk * 1.3) * 0.18 if ko and ko_kind not in ["DOWN", "SLIP"] and not zapped else 0.0
+	if ko and ko_kind == "SLIP":
+		tilt = slip_tilt
 	var tint := Color.WHITE
 	if zapped:
 		tint = Color(0.02, 0.03, 0.05) if xray else Color(0.8, 0.97, 1.0)
 	if soot > 0.0:
 		tint = tint.lerp(Color(0.28, 0.25, 0.23), minf(1.0, soot * 1.4))
+	if muck > 0.0:
+		tint = tint.lerp(Color(0.5, 0.33, 0.16), minf(0.55, muck * 0.7))
 	if hurt_time > 0.0:
 		tint = tint.lerp(Color(1.0, 0.45, 0.45), hurt_time / 0.3)
 	if protect_time > 0.0 and ko_time <= 0.0:
@@ -530,10 +553,38 @@ func _paint_sprite(ci: CanvasItem) -> void:
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if vent >= 0:
 		return
-	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 24.0 if not (ko and ko_kind == "DOWN") else 50.0)
+	_paint_overlays(ci, foot, ko, SPRITE_HEIGHT + 24.0 if not (ko and ko_kind in ["DOWN", "SLIP"]) else 50.0)
 
 
 ## Name tag, health pips, smoke, dizzy stars and the search bubble.
+## Muck all over (lying down: along the body), a stink rising and a few
+## flies buzzing round.
+func _paint_muck(ci: CanvasItem, foot: Vector2, lying: bool) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	var a := minf(1.0, muck * 1.5)
+	var spots := [Vector2(-9, -30), Vector2(7, -52), Vector2(-4, -78), Vector2(10, -96), Vector2(-12, -60)]
+	for i in spots.size():
+		var p: Vector2 = spots[i]
+		if lying:
+			p = Vector2(p.y * 0.45, -12.0 + p.x * 0.6)
+		ci.draw_circle(foot + p, 6.0 - i * 0.6, Color(0.3, 0.18, 0.07, 0.85 * a))
+		ci.draw_circle(foot + p + Vector2(-1.5, -1.5), 2.0, Color(0.6, 0.42, 0.22, 0.6 * a))
+	var top := -30.0 if lying else -112.0
+	for k in 3:
+		var life := fmod(now * 0.5 + k * 0.33, 1.0)
+		var pts := PackedVector2Array()
+		for j in 6:
+			pts.append(foot + Vector2(-14.0 + k * 14.0 + sin(now * 3.0 + j + k) * 4.0, top - life * 40.0 - j * 5.0))
+		ci.draw_polyline(pts, Color(0.7, 0.85, 0.45, 0.55 * (1.0 - life) * a), 2.0, true)
+	for f in 3:
+		var ang := now * (5.0 + f * 1.7) + f * 2.1
+		var fp := foot + Vector2(cos(ang) * (22.0 + f * 6.0), top + 20.0 + sin(ang * 1.3) * 12.0)
+		ci.draw_circle(fp, 2.2, Color(0.05, 0.05, 0.05, a))
+		var flap := 2.5 if int(now * 30.0 + f) % 2 == 0 else 1.2
+		ci.draw_circle(fp + Vector2(-2, -flap), 1.6, Color(0.85, 0.9, 1.0, 0.6 * a))
+		ci.draw_circle(fp + Vector2(2, -flap), 1.6, Color(0.85, 0.9, 1.0, 0.6 * a))
+
+
 ## The cartoon x-ray: bones drawn over the blacked-out sprite, in sprite
 ## units (the caller has set the transform so 0,0 is the feet).
 func _paint_skeleton(ci: CanvasItem) -> void:
@@ -583,6 +634,10 @@ func _paint_overlays(ci: CanvasItem, foot: Vector2, ko: bool, top := 104.0) -> v
 		var pip := foot + Vector2((i - (max_hp - 1) / 2.0) * 12.0, -top + 6.0)
 		ci.draw_circle(pip, 4.0, Color(0, 0, 0, 0.6))
 		ci.draw_circle(pip, 3.0, accent if i < hp else Color(1, 1, 1, 0.15))
+
+	# Smeared in Nacho's mess: brown splodges, a green whiff and flies.
+	if muck > 0.05:
+		_paint_muck(ci, foot, ko and ko_kind == "SLIP")
 
 	# Smouldering: smoke wisps curl up and the odd ember glows.
 	if soot > 0.05:

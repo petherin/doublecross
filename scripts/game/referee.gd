@@ -6,6 +6,8 @@ extends RefCounted
 
 const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
+## Chance of Nacho needing a poo in a match (about one match in two or three).
+const POO_CHANCE := 0.4
 
 var game: Node
 var _rng := RandomNumberGenerator.new()
@@ -15,6 +17,12 @@ var _clock_sync := 0.0
 var _now := 0.0
 var _foe_until := 0.0
 var _last_bite := -100.0
+## Nacho's poo: about two matches in five, at a random moment (match time),
+## from its own dice so the rest of the match plays out as before.
+var _poo_rng := RandomNumberGenerator.new()
+var _poo_at := INF
+var _poo_end := -1.0
+var _poo_spot := {}
 
 
 func _init(p_game: Node) -> void:
@@ -24,6 +32,9 @@ func _init(p_game: Node) -> void:
 ## Seeded from the match so a match (and the headless tests) replay the same.
 func seed_rng(seed_value: int) -> void:
 	_rng.seed = hash(["referee", seed_value])
+	_poo_rng.seed = hash(["poo", seed_value])
+	if _poo_rng.randf() < POO_CHANCE:
+		_poo_at = _poo_rng.randf_range(60.0, 210.0)
 
 
 func handle_search(pid: int, room: Vector2i, idx: int) -> void:
@@ -182,8 +193,12 @@ func _set_nacho_on(pid: int) -> void:
 ## calls it off once they've stopped attacking (or gone).
 func tick_nacho(delta: float) -> void:
 	_now += delta
+	if game.over:
+		return
+	_tick_poo()
+	_tick_turds()
 	var dog: Node = game.dog
-	if dog.foe_id == 0 or game.over:
+	if dog.foe_id == 0:
 		return
 	var foe: Agent = game.agent_of(dog.foe_id)
 	if foe == null or foe.out or foe.room != dog.room or dog.owner_id == 0 or _now > _foe_until:
@@ -193,6 +208,73 @@ func tick_nacho(delta: float) -> void:
 			and foe.ko_time <= 0.0 and foe.protect_time <= 0.0:
 		_last_bite = _now
 		handle_hit(dog.owner_id, dog.foe_id, "bite")
+
+
+## Nacho's poo: starts when it's time and he isn't fighting (or crawling
+## through a duct); stops if anyone starts on him or his agent (he'll try
+## again later); and leaves a turd when he's done.
+func _tick_poo() -> void:
+	var dog: Node = game.dog
+	if _poo_end >= 0.0:
+		if dog.foe_id != 0 or not dog.is_pooing() or dog.room != _poo_spot["room"]:
+			# Interrupted (he's gone for someone, or been sent home).
+			_poo_end = -1.0
+			_poo_at = _now + _poo_rng.randf_range(40.0, 90.0)
+			game.broadcast({"type": "nacho_poo", "stage": "stop", "owner": dog.owner_id})
+		elif _now >= _poo_end:
+			_poo_end = -1.0
+			game.broadcast({"type": "nacho_poo", "stage": "done", "owner": dog.owner_id,
+					"room": _poo_spot["room"], "pos": _poo_spot["pos"]})
+		return
+	# Only out with an agent (never at home in his kennel), and not mid-fight.
+	if _now < _poo_at or dog.owner_id == 0 or dog.foe_id != 0 or not dog.visible_now() or dog.hurt_time > 0.0:
+		return
+	_poo_at = INF
+	var plan: Array = dog.poo_plan()
+	_poo_spot = {"room": dog.room, "pos": plan[2]}
+	_poo_end = _now + dog.POO_TIME
+	game.broadcast({"type": "nacho_poo", "stage": "start", "owner": dog.owner_id, "room": dog.room,
+			"stand": plan[0], "face": plan[1]})
+
+
+## Starts Nacho's poo now (for tests).
+func poo_now() -> void:
+	_poo_at = _now
+
+
+## Anyone who treads in a turd slips, falls and is taken out, and
+## everything they were carrying goes flying. The turd's gone with them.
+func _tick_turds() -> void:
+	if game.turds.is_empty():
+		return
+	for a: Agent in game.agents:
+		if a.out or a.vent >= 0 or a.ko_time > 0.0 or a.protect_time > 0.0:
+			continue
+		for t in game.turds:
+			if t["room"] == a.room and a.position.distance_to(t["pos"]) < game.dog.TURD_RADIUS:
+				_slip(game.id_of(a), t)
+				break
+
+
+func _slip(pid: int, turd: Dictionary) -> void:
+	if not game.inventories.has(pid):
+		return
+	var inv: Dictionary = game.inventories[pid]
+	var lost: Array = inv["items"].duplicate()
+	if inv["case"]:
+		lost.append(World.BRIEFCASE)
+	lost.append_array(inv["gadgets"])
+	inv["items"].clear()
+	inv["gadgets"].clear()
+	inv["case"] = false
+	for item in lost:
+		_hide_somewhere(item, turd["room"])
+	inv["hp"] = game.MAX_HP
+	inv["darts"] = game.MAX_DARTS
+	_penalise(pid, game.DOWN_PENALTY)
+	game.broadcast({"type": "down", "pid": pid, "by": 0, "kind": "slip", "room": turd["room"], "lost": lost,
+			"from": turd["pos"], "turd": turd["pos"]})
+	_send_nacho_home(pid)
 
 
 ## Nacho's agent is out of action: he runs home to his kennel.

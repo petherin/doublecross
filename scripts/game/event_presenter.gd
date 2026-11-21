@@ -32,6 +32,10 @@ static func short_name(a: Agent) -> String:
 ## The moments worth a line in the debrief: intel and briefcases found,
 ## traps sprung, takedowns and agents going out.
 func _record(e: Dictionary) -> void:
+	if e.get("type", "") == "nacho_poo" and e["stage"] == "done":
+		timeline.append({"t": game.elapsed, "col": Color("b0703a"),
+				"text": "Nacho left a mess in the " + str(game.world.rooms[e["room"]]["name"]).to_upper()})
+		return
 	var who: Agent = game.agent_of(e.get("pid", 0))
 	if who == null:
 		return
@@ -59,12 +63,45 @@ func _record(e: Dictionary) -> void:
 				note(who, "was caught by %s's %s" % [short_name(owner), trap])
 		"down":
 			var by: Agent = game.agent_of(e["by"])
-			if by and e["kind"] == "bite":
+			if e["kind"] == "slip":
+				note(who, "slipped in Nacho's mess and was taken out")
+			elif by and e["kind"] == "bite":
 				note(who, "was taken out by Nacho")
 			elif by:
 				note(by, "took out " + short_name(who))
 		"out":
 			note(who, "ran out of time" if e["reason"] == "time" else "left the mission")
+
+
+## Nacho's poo: he squats, he's interrupted, or he's done (and there's a turd).
+func _poo(e: Dictionary) -> void:
+	var mine: bool = e["owner"] == game.my_id and game.my_id != 0
+	match e["stage"]:
+		"start":
+			game.dog.start_poo(e["stand"], e["face"])
+			if mine:
+				game.hud.toast("Nacho's stopped for a poo…", Color(1, 1, 1, 0.85), 2.5)
+		"stop":
+			game.dog.finish_poo()
+		"done":
+			game.dog.finish_poo()
+			game.turds.append({"room": e["room"], "pos": e["pos"]})
+			for b in game.bots.values():
+				b.forget_room(e["room"])
+			if e["room"] == game.watched.room:
+				Sound.play("plop", 0.0)
+				game.view.add_effect("PUFF", e["room"], e["pos"])
+				game.hud.toast("Mind your step: Nacho's left a little present.", Color("e0b080"), 3.0)
+
+
+## The turd someone slipped in is gone (squashed flat, all over them).
+func _tread_in(room: Vector2i, pos: Vector2) -> void:
+	for t in game.turds:
+		if t["room"] == room and (t["pos"] as Vector2).is_equal_approx(pos):
+			game.turds.erase(t)
+			break
+	for b in game.bots.values():
+		b.forget_room(room)
 
 
 ## Nacho's teeth find their mark: a snap, a yelp and a stumble.
@@ -157,16 +194,33 @@ func present(e: Dictionary) -> void:
 				pass
 		"down":
 			var victim: Agent = game.agent_of(pid)
-			victim.hurt(victim.position - e["from"])
+			if e["kind"] != "slip":
+				victim.hurt(victim.position - e["from"])
 			if e["kind"] == "bite":
 				game.dog.bite(victim)
-			victim.knock_out("DOWN", game.DOWN_TIME)
+			var slipped: bool = e["kind"] == "slip"
+			# A slip isn't a blow: no burst, just feet up, over and thump.
+			victim.knock_out("SLIP" if slipped else "DOWN", game.DOWN_TIME)
 			victim.protect_time = game.PROTECT_TIME
-			game.view.add_effect("DOWN", e["room"], victim.position)
+			if slipped:
+				_tread_in(e["room"], e["turd"])
+			else:
+				game.view.add_effect("DOWN", e["room"], victim.position)
 			if e["room"] == game.watched.room:
 				game.view.shake(8.0, 0.4)
-				game.hit_stop()
+				if not slipped:
+					game.hit_stop()
 			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
+			if e["kind"] == "slip":
+				if e["room"] == game.watched.room:
+					Sound.play("slip", 0.0)
+				if me:
+					game.hud.flash(Color("8a5a2b"))
+					game.hud.toast("You slipped in Nacho's mess! Taken out, and everything you had went flying.",
+							warn, 3.5)
+				elif e["room"] == game.watched.room:
+					game.hud.toast("%s slipped in Nacho's mess!" % victim.display_name, col, 3.0)
+				return
 			if me:
 				game.hud.flash(Color("ff2a2a"))
 				game.hud.toast("You've been taken out! -%ds.%s" % [int(game.DOWN_PENALTY), dropped], warn, 3.5)
@@ -195,6 +249,8 @@ func present(e: Dictionary) -> void:
 				game.hud.toast("Nacho's coming for you! Stop attacking and he'll back off.", warn, 3.0)
 			elif e["owner"] == game.my_id:
 				game.hud.toast("Nacho goes for %s!" % game.agent_of(pid).display_name, col, 2.5)
+		"nacho_poo":
+			_poo(e)
 		"nacho_hit":
 			game.dog.hit(e["hp"])
 			if e["room"] == game.watched.room:
