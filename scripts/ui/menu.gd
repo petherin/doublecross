@@ -27,13 +27,15 @@ const HELP := [
 		+ "to a room further away. The same vents link up every time, so remember the shortcuts."],
 	["FIGHTING", "[b]ATTACK[/b] swings your cosh, [b]FIRE[/b] shoots a dart. Three hits take an agent out: "
 		+ "they drop their intel, lose 30 seconds and wake up back at the start."],
+	["BOMBS", "You carry three, to [b]THROW[/b] or hide as traps. A direct hit takes an agent out; near "
+		+ "misses still hurt, including you if you're too close. You get three more when you're taken out."],
 	["NACHO", "Somewhere in the base is a [b]KENNEL[/b]. Search it to find [b]NACHO[/b] the dog, who follows "
 		+ "you everywhere, [b]growls[/b] at traps and [b]barks[/b] at hidden things, and bites anyone who attacks "
 		+ "you or him until they stop. Three hits, or you being taken out, send him home to be found again. "
 		+ "Watch where you tread: if he stops for a poo, stepping in it takes you out, and you drop everything."],
 	["TIPS", "New agents get a few tips on the ticker tape during their first missions. "
 		+ "Clear them under SETTINGS to see them again."],
-	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · V crawl. "
+	["KEYBOARD", "WASD/arrows move · E search · 1/2/3/4 traps · F cosh · G dart · B throw a bomb · V crawl. "
 		+ "Gamepads work too."],
 ]
 const TAGLINE := "Two agents. One way out."

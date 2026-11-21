@@ -58,6 +58,9 @@ jobs:
       - name: Bot match (spectating once out)
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bot_match.gd -- --bots=2 --spectate
 
+      - name: Thrown bombs (supply, direct hits, damage by distance)
+        run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/bombs.gd
+
       - name: Nacho the dog (finding, sniffing, guarding, going home)
         run: timeout 300 ~/godot/godot --headless --fixed-fps 60 -s res://tests/nacho.gd
 

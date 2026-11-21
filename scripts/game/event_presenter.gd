@@ -65,6 +65,10 @@ func _record(e: Dictionary) -> void:
 			var by: Agent = game.agent_of(e["by"])
 			if e["kind"] == "slip":
 				note(who, "slipped in Nacho's mess and was taken out")
+			elif e["kind"] == "blast" and by == who:
+				note(who, "blew themselves up")
+			elif e["kind"] == "blast" and by:
+				note(by, "bombed " + short_name(who))
 			elif by and e["kind"] == "bite":
 				note(who, "was taken out by Nacho")
 			elif by:
@@ -185,6 +189,9 @@ func present(e: Dictionary) -> void:
 			victim.hurt(victim.position - e["from"])
 			if e["kind"] == "bite":
 				_bitten(victim, me)
+			elif e["kind"] == "blast":
+				victim.soot = maxf(victim.soot, 0.6)
+				victim.knock_out("BOMB", 0.6)
 			game.view.add_effect("HIT", victim.room, victim.position)
 			if victim.room == game.watched.room:
 				game.view.shake(3.0, 0.2)
@@ -204,6 +211,8 @@ func present(e: Dictionary) -> void:
 			victim.protect_time = game.PROTECT_TIME
 			if slipped:
 				_tread_in(e["room"], e["turd"])
+			elif e["kind"] == "blast":
+				victim.soot = 1.0
 			else:
 				game.view.add_effect("DOWN", e["room"], victim.position)
 			if e["room"] == game.watched.room:
@@ -251,6 +260,24 @@ func present(e: Dictionary) -> void:
 				game.hud.toast("Nacho goes for %s!" % game.agent_of(pid).display_name, col, 2.5)
 		"nacho_poo":
 			_poo(e)
+		"throw":
+			var thrower: Agent = game.agent_of(pid)
+			thrower.facing = ((e["to"] as Vector2) - thrower.position).angle()
+			thrower.swing()
+			game.flying.append({"room": e["room"], "from": e["from"], "to": e["to"], "t": 0.0})
+			if e["room"] == game.watched.room:
+				Sound.play("swing", -2.0)
+				Sound.play("click", -10.0)
+		"blast":
+			for b in game.flying:
+				if b["room"] == e["room"] and (b["to"] as Vector2).is_equal_approx(e["pos"]):
+					game.flying.erase(b)
+					break
+			game.view.add_effect("BOMB", e["room"], e["pos"])
+			if e["room"] == game.watched.room:
+				game.view.shake(14.0, 0.5)
+			elif game.watched:
+				game.view.shake(4.0, 0.3)   # felt through the walls
 		"nacho_hit":
 			game.dog.hit(e["hp"])
 			if e["room"] == game.watched.room:
@@ -310,6 +337,9 @@ func _sound(e: Dictionary, me: bool) -> void:
 		"disarm":
 			if me:
 				Sound.play("gadget")
+		"blast":
+			# Loud enough to hear through the walls.
+			Sound.play("boom", 0.0, not here, 0.04)
 		"ko":
 			var sound_name: String = {"BOMB": "boom", "SPRING": "boing", "WIRE": "twang", "SHOCK": "zap"}[e["kind"]]
 			# A bomb is loud enough to hear through the walls.

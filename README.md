@@ -82,6 +82,15 @@ mission and your intel scatters; the last agent still in wins. Once you're
 out, the camera follows the agents still playing, room by room, until the
 match ends: **NEXT AGENT** (or <kbd>Tab</kbd>) switches who you're watching.
 
+**Bombs.** Every agent carries three bombs, and they're for throwing or
+hiding as traps, so each one is a choice: lob it now (**THROW**, <kbd>B</kbd>)
+or rig a cupboard for later. You get three more each time you're taken out.
+A thrown bomb arcs through the air for a moment (long enough to dodge, if
+you're quick) and auto-aims at a rival in front of you. Where it lands, a
+direct hit takes you out (Nacho too); within a floor square and a half it's
+two hits, within two and a half squares one. Mind your own blast: it hurts
+the thrower too.
+
 **Air vents.** Some rooms have a crawl-through vent that joins a room two or
 more rooms away. Stand at one and press CRAWL. The ones you've used appear on
 your mini-map.
@@ -263,6 +272,7 @@ A Mac can play against phones and tablets on the same Wi-Fi.
 | Set a trap | **TRAP**, then pick one | <kbd>1</kbd> bomb · <kbd>2</kbd> spring · <kbd>3</kbd> tripwire · <kbd>4</kbd> shock | LB bomb · RB spring · Back tripwire · right-stick click shock |
 | Cosh | **ATTACK** | <kbd>F</kbd> | X |
 | Fire a dart | **FIRE** | <kbd>G</kbd> | Y |
+| Throw a bomb | **THROW** | <kbd>B</kbd> | Right trigger |
 | Crawl through a vent | **CRAWL** (appears at a vent) | <kbd>V</kbd> | B |
 | Switch overhead / first person | **1ST PERSON** / **OVERHEAD** (top bar) | <kbd>Tab</kbd> | Start |
 | First person: turn / sidestep | Stick left/right, or swipe the right half | <kbd>←</kbd>/<kbd>→</kbd> turn · <kbd>A</kbd>/<kbd>D</kbd> sidestep | Right stick turns · left stick sidesteps |
@@ -371,6 +381,8 @@ tests/
   smoke.gd              every script compiles, inputs mapped, 300 seeds of base rules
   bot_match.gd          a full match against 1–3 hard bots must end in an escape
                         (--spectate: you're put out, and the camera must follow them)
+  bombs.gd              thrown bombs: the shared supply of three, direct hits,
+                        damage by distance, hurting the thrower, Nacho, refills
   nacho_poo.gd          his poo: squats, leaves a turd, stops if attacked, won't
                         start mid-fight or unowned; treading in it takes you out,
                         kit and all, and it's gone; easy bots blunder into them

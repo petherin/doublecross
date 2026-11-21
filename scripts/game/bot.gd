@@ -24,10 +24,12 @@ const CELL := 40.0
 ##  react:  delay before each attack (seconds)
 ##  aim:    dart aim error (radians)
 ##  chase:  how far it will chase you across a room
+##  lob:    chance of lobbing a bomb (when the rival's a safe distance off)
+##  spread: how far off target a thrown bomb may land (floor units)
 const FIGHT := {
-	"easy": {"aggro": 0.3, "react": [0.7, 1.2], "aim": 0.45, "chase": 250.0},
-	"medium": {"aggro": 0.6, "react": [0.35, 0.7], "aim": 0.22, "chase": 450.0},
-	"hard": {"aggro": 0.85, "react": [0.15, 0.4], "aim": 0.08, "chase": 700.0},
+	"easy": {"aggro": 0.3, "react": [0.7, 1.2], "aim": 0.45, "chase": 250.0, "lob": 0.1, "spread": 160.0},
+	"medium": {"aggro": 0.6, "react": [0.35, 0.7], "aim": 0.22, "chase": 450.0, "lob": 0.25, "spread": 90.0},
+	"hard": {"aggro": 0.85, "react": [0.15, 0.4], "aim": 0.08, "chase": 700.0, "lob": 0.35, "spread": 40.0},
 }
 
 ## Each bot also has a personality, on top of its difficulty:
@@ -65,6 +67,8 @@ var _attack_cd := 0.0
 var _fight_time := 0.0
 var _chase: PackedVector2Array = PackedVector2Array()
 var _chase_replan := 0.0
+## Just lobbed a bomb: back off until it's gone off.
+var _hold := 0.0
 
 var _grids := {}             # room -> AStarGrid2D
 var _searched := {}          # furniture key -> true (looked, nothing useful left)
@@ -94,6 +98,7 @@ func setup(p_game: Node, p_agent: Agent, p_id: int, p_level := "hard", p_persona
 			_f["aggro"] *= 0.5
 		"brawler":
 			_f["aggro"] = maxf(_f["aggro"], 0.9)
+			_f["lob"] = minf(0.6, _f["lob"] * 1.8)
 			_f["chase"] *= 1.5
 			_p["trap"] *= 0.4
 		"sneak":
@@ -166,6 +171,8 @@ func _maybe_trap(key: String, chance: float) -> void:
 		info = {"kind": "WIRE", "key": World.door_key(agent.room, door)}
 	elif not game.traps.has(key) and not game.contents.has(key):
 		var kinds: Array = World.FURNITURE_TRAPS
+		if game.inventories[id]["bombs"] <= 0:
+			kinds = kinds.filter(func(k): return k != "BOMB")
 		info = {"kind": kinds[_rng.randi_range(0, kinds.size() - 1)], "key": key}
 	if info.is_empty() or game.traps.has(info["key"]):
 		return
@@ -235,9 +242,7 @@ func _fight(delta: float) -> bool:
 			game.do_melee(id)
 			_attack_cd = game.MELEE_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
 		return true
-	if _attack_cd <= 0.0 and game.inventories[id]["darts"] > 0 and dist > 200.0 and _rng.randf() < 0.5:
-		game.do_fire(id, _f["aim"])
-		_attack_cd = game.DART_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
+	if _ranged(dist, to, delta):
 		return true
 	# Close in, going round any furniture in the way.
 	_chase_replan -= delta
@@ -250,6 +255,29 @@ func _fight(delta: float) -> bool:
 	var goal: Vector2 = _chase[0] if not _chase.is_empty() else rival.position
 	agent.move_input = (goal - agent.position).normalized() * _p["speed"]
 	return true
+
+
+## Attacks from a distance: lob a bomb if they're far enough off not to
+## catch us in the blast (a trapper keeps one back for trapping), backing
+## off while it's in the air; or fire a dart. True if it did either.
+func _ranged(dist: float, to: Vector2, delta: float) -> bool:
+	var keep: int = 1 if personality == "trapper" else 0
+	var acted := false
+	if _attack_cd <= 0.0 and game.inventories[id]["bombs"] > keep and dist > game.referee.BLAST_FAR + 20.0 \
+			and dist < game.THROW_RANGE and _rng.randf() < _f["lob"]:
+		game.do_throw(id, _f["spread"])
+		_attack_cd = game.THROW_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
+		_hold = game.THROW_TIME + 0.4
+		acted = true
+	elif _hold > 0.0:
+		_hold -= delta
+		agent.move_input = -to.normalized() * _p["speed"]
+		acted = true
+	elif _attack_cd <= 0.0 and game.inventories[id]["darts"] > 0 and dist > 200.0 and _rng.randf() < 0.5:
+		game.do_fire(id, _f["aim"])
+		_attack_cd = game.DART_COOLDOWN + _rng.randf_range(_f["react"][0], _f["react"][1])
+		acted = true
+	return acted
 
 
 # ------------------------------------------------------------------ decisions
