@@ -102,9 +102,10 @@ In about two matches in five, Nacho stops at some point for a **poo**
 ("hnnng…"), which takes a few seconds. He won't go while he's fighting, and
 if anyone starts on him or his agent mid-poo he stops and goes for them (and
 tries again later). What he leaves behind stays put, and works like a trap:
-anyone who treads in it, his own agent included, slips, falls and is taken
-out, and everything they're carrying (intel, briefcase, gadgets) goes
-flying. Bots know to walk round it. Bots look for him too, and use his nose.
+anyone who treads in it, his own agent included, skids, goes feet-up and
+lands flat on their back, taken out, and everything they're carrying
+(intel, briefcase, gadgets) goes flying. They stay smeared in it, with
+flies buzzing round them, for a good while after. Bots know to walk round it. Bots look for him too, and use his nose.
 
 <p align="center"><img src="docs/nacho.png" alt="Nacho, a scruffy ginger dog with long ears and a red collar, standing, trotting, sitting, sniffing, barking, growling and biting" width="80%"></p>
 

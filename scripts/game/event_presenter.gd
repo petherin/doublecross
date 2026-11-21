@@ -184,15 +184,19 @@ func present(e: Dictionary) -> void:
 				pass
 		"down":
 			var victim: Agent = game.agent_of(pid)
-			victim.hurt(victim.position - e["from"])
+			if e["kind"] != "slip":
+				victim.hurt(victim.position - e["from"])
 			if e["kind"] == "bite":
 				game.dog.bite(victim)
-			victim.knock_out("DOWN", game.DOWN_TIME)
+			var slipped: bool = e["kind"] == "slip"
+			# A slip isn't a blow: no flash of stars, just feet up and over.
+			victim.knock_out("SLIP" if slipped else "DOWN", game.DOWN_TIME)
 			victim.protect_time = game.PROTECT_TIME
-			game.view.add_effect("DOWN", e["room"], victim.position)
-			if e["room"] == game.watched.room:
-				game.view.shake(8.0, 0.4)
-				game.hit_stop()
+			if not slipped:
+				game.view.add_effect("DOWN", e["room"], victim.position)
+				if e["room"] == game.watched.room:
+					game.view.shake(8.0, 0.4)
+					game.hit_stop()
 			var dropped := " Your intel went flying!" if not (e["lost"] as Array).is_empty() else ""
 			if e["kind"] == "slip":
 				if e["room"] == game.watched.room:

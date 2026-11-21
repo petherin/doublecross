@@ -879,7 +879,7 @@ func _send_hit(by: int, target: int, kind: String) -> void:
 
 func _on_recovered(id: int, kind: String) -> void:
 	# After being taken out you wake up back where you started.
-	if kind == "DOWN" and (id == my_id or bots.has(id)):
+	if kind in ["DOWN", "SLIP"] and (id == my_id or bots.has(id)):
 		_agent_by_id[id].respawn(_start_room[id])
 
 

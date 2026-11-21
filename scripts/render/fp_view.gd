@@ -168,11 +168,12 @@ func update_view(me: Agent, agents: Array, highlight: int, delta: float) -> void
 	# Your own knockouts, felt: the view reels when stunned, judders when
 	# shocked, and drops to the floor when you're taken out.
 	var ko := me.ko_time > 0.0
-	var drop := EYE_H - 26.0 if ko and me.ko_kind == "DOWN" else 0.0
+	var down: bool = ko and me.ko_kind in ["DOWN", "SLIP"]
+	var drop := EYE_H - 26.0 if down else 0.0
 	_cam_drop = lerpf(_cam_drop, drop, minf(1.0, delta * 10.0))
 	var roll := 0.0
 	var jitter := Vector3.ZERO
-	if ko and me.ko_kind == "DOWN":
+	if down:
 		roll = 0.5
 	elif ko and me.ko_kind == "SHOCK":
 		jitter = Vector3(sin(_t * 97.0), cos(_t * 83.0), 0.0) * 3.0
