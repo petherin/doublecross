@@ -6,8 +6,10 @@ extends RefCounted
 
 const World = preload("res://scripts/core/world.gd")
 const Agent = preload("res://scripts/game/agent.gd")
-## Chance of Nacho needing a poo in a match (about one match in two or three).
-const POO_CHANCE := 0.4
+## Chance of Nacho needing (at least) one poo in a match, and after each
+## poo, the chance he'll need another later on.
+const POO_CHANCE := 0.75
+const POO_AGAIN_CHANCE := 0.5
 ## Thrown bombs: how near the blast you have to be for a direct hit (taken
 ## out), two hits or one, in floor units (a floor square is 128).
 const BLAST_DIRECT := 64.0
@@ -22,8 +24,9 @@ var _clock_sync := 0.0
 var _now := 0.0
 var _foe_until := 0.0
 var _last_bite := -100.0
-## Nacho's poo: about two matches in five, at a random moment (match time),
-## from its own dice so the rest of the match plays out as before.
+## Nacho's poo: in three matches out of four, at a random moment (match
+## time), and maybe again later. Its own dice, so the rest of the match plays
+## out as before.
 var _poo_rng := RandomNumberGenerator.new()
 var _poo_at := INF
 var _poo_end := -1.0
@@ -41,7 +44,7 @@ func seed_rng(seed_value: int) -> void:
 	_rng.seed = hash(["referee", seed_value])
 	_poo_rng.seed = hash(["poo", seed_value])
 	if _poo_rng.randf() < POO_CHANCE:
-		_poo_at = _poo_rng.randf_range(60.0, 210.0)
+		_poo_at = _poo_rng.randf_range(45.0, 150.0)
 
 
 func handle_search(pid: int, room: Vector2i, idx: int) -> void:
@@ -304,6 +307,9 @@ func _tick_poo() -> void:
 			game.broadcast({"type": "nacho_poo", "stage": "stop", "owner": dog.owner_id})
 		elif _now >= _poo_end:
 			_poo_end = -1.0
+			# Maybe another later on.
+			if _poo_rng.randf() < POO_AGAIN_CHANCE:
+				_poo_at = _now + _poo_rng.randf_range(90.0, 180.0)
 			game.broadcast({"type": "nacho_poo", "stage": "done", "owner": dog.owner_id,
 					"room": _poo_spot["room"], "pos": _poo_spot["pos"]})
 		return

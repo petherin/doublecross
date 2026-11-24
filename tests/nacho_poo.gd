@@ -31,6 +31,13 @@ func _process(_d: float) -> bool:
 		me.room = kr
 		me.position = g.dog.kennel_front() + Vector2(160, 160)
 		rival.room = _other_room(kr)
+		# About three matches in four have at least one poo planned.
+		var with_poo := 0
+		for sd in 2000:
+			var r: RefCounted = load("res://scripts/game/referee.gd").new(g)
+			r.seed_rng(sd)
+			with_poo += 1 if r._poo_at < INF else 0
+		_check(absf(with_poo / 2000.0 - 0.75) < 0.03, "a poo in about 3 matches in 4 (%d/2000)" % with_poo)
 		# Nobody's dog yet: he won't go at home.
 		g.referee.poo_now()
 	if _f == 30:
@@ -44,6 +51,9 @@ func _process(_d: float) -> bool:
 		_poo_frame = _f
 	if _poo_frame > 0 and _f == _poo_frame + poo_frames + 30:
 		_check(not g.dog.is_pooing() and g.turds.size() == 1, "and leaves a turd")
+		# After a poo, either no more (INF) or another one 1.5-3 minutes on.
+		var next: float = g.referee._poo_at - g.referee._now
+		_check(next == INF or (next >= 85.0 and next <= 180.0), "maybe another later on")
 		_check(g.turds[0]["room"] == kr, "where he was")
 		# Again, but this time the rival starts on his agent mid-poo.
 		g.referee.poo_now()
