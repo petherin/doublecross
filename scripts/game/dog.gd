@@ -6,9 +6,9 @@ extends Node
 ## in it. Anyone who attacks his agent, or him, gets chased and bitten until
 ## they stop. He can be hurt: three hits and he runs home to his kennel. He
 ## also runs home if his agent is taken out. Either way he's nobody's dog
-## until someone finds him again. Now and then (in about two matches in five),
-## while he's out with an agent, he stops for a poo, and what he leaves
-## behind is as good as a trap (once).
+## until someone finds him again. Now and then (in three matches out of four,
+## sometimes more than once), while he's out with an agent, he stops for a
+## poo, and what he leaves behind is as good as a trap (once).
 ##
 ## Who he belongs to is decided by the referee (the host) and arrives as
 ## events; every device walks him about itself, following his agent.

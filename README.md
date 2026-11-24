@@ -110,9 +110,9 @@ shows over him) and he limps home to his kennel. He goes home too if you're
 taken out. Either way he's nobody's dog until someone finds him again. Bots
 look for him too, and use his nose.
 
-In about two matches in five, while he's out with an agent (never at home
-in his kennel), Nacho stops at some point for a **poo** ("hnnng…"), which
-takes a few seconds. He won't go while he's fighting, and if anyone starts
+In three matches out of four (and sometimes more than once), while he's out
+with an agent (never at home in his kennel), Nacho stops for a **poo**
+("hnnng…"), which takes a few seconds. He won't go while he's fighting, and if anyone starts
 on him or his agent mid-poo he stops and goes for them (and tries again
 later). What he leaves behind stays put until someone treads in it,
 his own agent included: they skid, go feet-up and land flat on their back
